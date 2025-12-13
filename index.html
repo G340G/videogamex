@@ -1018,303 +1018,255 @@
       }
     }
 
-    // chest pickup
+    // chest pickup (CONTINUED)
     for (const c of chests){
-      if (c.opened) continue;
+      if(c.opened) continue;
       const d = Math.hypot((c.x+0.5)-player.x, (c.y+0.5)-player.y);
-      if (d < 0.55){
-        openChest(c);
-      }
+      if(d < 0.8) openChest(c);
     }
 
     // offering pickup
     for (const o of offerings){
-      if (o.collected) continue;
-      const d = Math.hypot((o.x+0.5)-player.x, (o.y+0.5)-player.y);
-      if (d < 0.55){
-        collectOffering(o);
+      if(!o.collected){
+        const d = Math.hypot((o.x+0.5)-player.x, (o.y+0.5)-player.y);
+        if(d < 0.8) collectOffering(o);
       }
     }
 
-    // exit interaction
-    if (exit){
+    // Exit check
+    if(exit && !exitLocked){
       const d = Math.hypot((exit.x+0.5)-player.x, (exit.y+0.5)-player.y);
-      if (d < 0.60){
-        if (exitLocked){
-          triggerMessage("EXIT LOCKED");
-          globalAnxiety = Math.max(globalAnxiety, 10);
-          if (Math.random()<0.02) audio?.blip?.(0.6);
-        } else {
-          alert("DESCENDING DEEPER...");
-          generateLevel();
-        }
+      if(d < 0.6) {
+        // WIN STATE
+        gameStarted = false;
+        alert("SEQUENCE COMPLETE. DATA UPLOADED.");
+        location.reload();
       }
     }
 
-    // pulse
-    if (pulse.active){
-      pulse.t += dt;
-      if (pulse.t > 0.55) pulse.active = false;
+    // Pulse expansion
+    if(pulse.active){
+      pulse.t += dt * 12; // wave speed
+      if(pulse.t > 25) pulse.active = false;
     }
 
-    // flash
-    if (flash.active){
+    // Flash fade
+    if(flash.active){
       flash.t += dt;
-      const a = Math.sin(Math.min(1, flash.t/flash.dur)*Math.PI);
-      flash.alpha = 0.78 * a;
-      if (flash.t >= flash.dur) flash.active = false;
+      // attack/decay curve for alpha
+      if(flash.t < flash.dur * 0.2) flash.alpha = flash.t / (flash.dur * 0.2);
+      else flash.alpha = 1 - (flash.t - flash.dur * 0.2) / (flash.dur * 0.8);
+      
+      if(flash.t >= flash.dur) {
+        flash.active = false;
+        flash.alpha = 0;
+      }
     }
 
-    // floating messages
-    messages = messages.filter(m=>m.life>0);
-    for (const m of messages) m.life--;
-
-    globalAnxiety = Math.min(globalAnxiety, 28);
+    // Message life
+    for(let i=messages.length-1; i>=0; i--){
+      messages[i].life--;
+      if(messages[i].life<=0) messages.splice(i,1);
+    }
   }
 
-  // ===== DRAW =====
-  function draw(){
-    ctx.fillStyle="#000";
+  // ===== RENDER =====
+  function render(){
+    // 1. Clear
+    ctx.fillStyle = "#050505";
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    // breathing FOV depends on fear + sanity
-    const fear = clamp(audio?.fear ?? 0, 0, 1);
-    const sanityFactor = clamp(player.sanity/100, 0, 1);
-    const breath = 0.35*Math.sin(performance.now()/700);
-    const fov = clamp(BASE_FOV + breath + (0.55 - fear)*1.6 + (sanityFactor-0.5)*0.6, MIN_FOV, MAX_FOV);
+    // 2. Camera/FOV calc
+    // "Fog of war" radius varies by anxiety
+    const viewRadius = clamp(BASE_FOV - (globalAnxiety/5) + (pulse.active?2.5:0), MIN_FOV, MAX_FOV);
 
-    // camera
-    ctx.save();
-    const shake = Math.min(10, globalAnxiety);
-    const shakeX = (Math.random()-0.5)*shake;
-    const shakeY = (Math.random()-0.5)*shake;
-    const camX = -player.x*TILE_SIZE + canvas.width/2;
-    const camY = -player.y*TILE_SIZE + canvas.height/2;
-    ctx.translate(camX+shakeX, camY+shakeY);
+    // 3. Draw Map Layer
+    // We iterate tiles and check distance to player to determine visibility (simple LOS)
+    for(let y=0; y<ROWS; y++){
+      for(let x=0; x<COLS; x++){
+        const dist = Math.hypot(x+0.5 - player.x, y+0.5 - player.y);
+        
+        let vis = 0;
+        if(dist < viewRadius) {
+           // quadratic falloff
+           vis = 1 - (dist/viewRadius);
+           vis = Math.pow(vis, 0.6); 
+        }
 
-    // draw map
-    for(let y=0;y<ROWS;y++){
-      for(let x=0;x<COLS;x++){
-        const dist = Math.hypot((x+0.5)-player.x, (y+0.5)-player.y);
-        if (dist>fov) continue;
-        const v = clamp(1 - dist/fov, 0, 1);
+        // Pulse Effect: light up tiles in a ring
+        if(pulse.active){
+          const pd = dist; 
+          // ring thickness ~1.5
+          if(Math.abs(pd - pulse.t) < 1.5) {
+            vis += 0.5 * (1 - (Math.abs(pd - pulse.t)/1.5));
+          }
+        }
 
-        const stained = stains.some(s=>s.x===x && s.y===y);
-        if (map[y][x]===1){
-          ctx.fillStyle = `rgba(50,52,62,${v})`;
+        if(vis <= 0.01) continue;
+        vis = clamp(vis, 0, 1);
+
+        const sx = x * TILE_SIZE;
+        const sy = y * TILE_SIZE;
+        
+        ctx.save();
+        ctx.globalAlpha = vis;
+
+        // Draw Tile
+        if(map[y][x]===1){
+          // Wall
+          ctx.fillStyle = "#333";
+          ctx.fillRect(sx,sy,TILE_SIZE,TILE_SIZE);
+          // outline
+          ctx.strokeStyle = "#1a1a1a";
+          ctx.strokeRect(sx,sy,TILE_SIZE,TILE_SIZE);
         } else {
-          ctx.fillStyle = stained ? `rgba(26,16,28,${v})` : `rgba(18,18,24,${v})`;
+          // Floor
+          ctx.fillStyle = "#0a0a0a";
+          ctx.fillRect(sx,sy,TILE_SIZE,TILE_SIZE);
+          
+          // Stains
+          const st = stains.find(s=>s.x===x && s.y===y);
+          if(st){
+            ctx.fillStyle = `rgba(${120+(Math.random()*40)}, 0, ${40+(Math.random()*40)}, 0.4)`;
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+          }
         }
-        ctx.fillRect(x*TILE_SIZE,y*TILE_SIZE,TILE_SIZE,TILE_SIZE);
-
-        // stain micro specks
-        if (stained && v>0.25 && Math.random()<0.12){
-          ctx.fillStyle = `rgba(255,60,90,${0.07*v})`;
-          ctx.fillRect(x*TILE_SIZE + ((Math.random()*TILE_SIZE)|0), y*TILE_SIZE + ((Math.random()*TILE_SIZE)|0), 1, 1);
-        }
+        ctx.restore();
       }
     }
 
-    // draw chests
-    for (const c of chests){
-      if (c.opened) continue;
-      const dist = Math.hypot((c.x+0.5)-player.x, (c.y+0.5)-player.y);
-      if (dist>fov) continue;
-      ctx.fillStyle = "rgba(160,160,180,0.9)";
-      ctx.fillRect(c.x*TILE_SIZE+4, c.y*TILE_SIZE+6, 8, 6);
-      ctx.fillStyle = "rgba(255,60,90,0.55)";
-      ctx.fillRect(c.x*TILE_SIZE+4, c.y*TILE_SIZE+9, 8, 1);
+    // 4. Draw Objects (Chests/Offerings/Exit)
+    const drawObj = (ox, oy, color, shape) => {
+       const dist = Math.hypot(ox+0.5 - player.x, oy+0.5 - player.y);
+       if(dist > viewRadius && !(pulse.active && Math.abs(dist-pulse.t)<1.5)) return;
+       
+       const sx = ox*TILE_SIZE;
+       const sy = oy*TILE_SIZE;
+       ctx.fillStyle = color;
+       if(shape==="box") ctx.fillRect(sx+4, sy+4, 8, 8);
+       else if(shape==="circle") {
+         ctx.beginPath(); ctx.arc(sx+8, sy+8, 4, 0, Math.PI*2); ctx.fill();
+       }
+       else if(shape==="diamond") {
+         ctx.beginPath(); 
+         ctx.moveTo(sx+8, sy+2); ctx.lineTo(sx+14, sy+8); 
+         ctx.lineTo(sx+8, sy+14); ctx.lineTo(sx+2, sy+8); 
+         ctx.fill();
+       }
+    };
+
+    // Chests (Blue/Cyan)
+    chests.forEach(c => {
+      if(!c.opened) drawObj(c.x, c.y, "#4488aa", "box");
+    });
+
+    // Offerings (Gold/Green based on mission)
+    offerings.forEach(o => {
+      if(!o.collected) drawObj(o.x, o.y, mission.type==="FOLLOW_ORDER" ? ["#f00","#0f0","#00f"][o.order-1] : "#ddcc44", "circle");
+    });
+
+    // Exit (White Diamond if unlocked, Red if locked)
+    if(exit){
+      drawObj(exit.x, exit.y, exitLocked ? "#550000" : "#ffffff", "diamond");
     }
 
-    // offerings
-    for (const o of offerings){
-      if (o.collected) continue;
-      const dist = Math.hypot((o.x+0.5)-player.x, (o.y+0.5)-player.y);
-      if (dist>fov) continue;
-
-      const p = 0.55 + Math.sin(Date.now()/220)*0.25;
-      let col = `rgba(200,200,120,${p})`;
-
-      if (mission.active && mission.type === "FOLLOW_ORDER"){
-        col = o.order===1 ? `rgba(210,160,90,${p})`
-            : o.order===2 ? `rgba(170,210,120,${p})`
-            : `rgba(210,120,150,${p})`;
-      }
-      ctx.fillStyle = col;
-      ctx.fillRect(o.x*TILE_SIZE+4, o.y*TILE_SIZE+4, 8, 8);
-    }
-
-    // exit (locked/unlocked)
-    if (exit){
-      const dist = Math.hypot((exit.x+0.5)-player.x, (exit.y+0.5)-player.y);
-      if (dist <= fov+0.6){
-        ctx.fillStyle = exitLocked ? "rgba(130,130,130,0.85)" : "rgba(255,255,255,0.95)";
-        ctx.fillRect(exit.x*TILE_SIZE, exit.y*TILE_SIZE, TILE_SIZE, TILE_SIZE);
-        ctx.fillStyle = exitLocked ? "rgba(255,60,90,0.35)" : "rgba(255,60,90,0.75)";
-        ctx.fillRect(exit.x*TILE_SIZE+7, exit.y*TILE_SIZE+3, 2, TILE_SIZE-6);
-      }
-    }
-
-    // enemy as creepy image following player
-    if (enemy.active){
-      const dist = Math.hypot(player.x-enemy.x, player.y-enemy.y);
-      if (dist < fov+0.2){
-        // warp intensity with proximity
-        const a = clamp(1 - dist/6, 0, 1);
-        const wobX = (Math.random()-0.5) * a * 2.0;
-        const wobY = (Math.random()-0.5) * a * 2.0;
-
-        ctx.globalAlpha = 0.75 + a*0.20;
-        ctx.drawImage(monsterSprite, (enemy.x-0.5)*TILE_SIZE + wobX, (enemy.y-0.5)*TILE_SIZE + wobY);
-        ctx.globalAlpha = 1;
-
-        // subtle red aura specks
-        if (a > 0.35 && Math.random() < 0.18){
-          ctx.fillStyle = `rgba(255,60,90,${0.10*a})`;
-          ctx.fillRect((enemy.x-0.5)*TILE_SIZE + ((Math.random()*16)|0), (enemy.y-0.5)*TILE_SIZE + ((Math.random()*16)|0), 1, 1);
-        }
+    // 5. Draw Enemy
+    if(enemy.active){
+      const dist = Math.hypot(enemy.x-player.x, enemy.y-player.y);
+      if(dist < viewRadius + 1.5){
+        const sx = enemy.x * TILE_SIZE - 8; // center sprite
+        const sy = enemy.y * TILE_SIZE - 8;
+        // jitter effect
+        const jx = (Math.random()-0.5)*2;
+        const jy = (Math.random()-0.5)*2;
+        ctx.drawImage(monsterSprite, sx+jx, sy+jy);
       }
     }
 
-    // player
-    ctx.fillStyle="#88AAFF";
-    const px = player.x*TILE_SIZE;
-    const py = player.y*TILE_SIZE;
-    ctx.beginPath();
-    ctx.arc(px,py,5,0,Math.PI*2);
-    ctx.fill();
+    // 6. Draw Player
+    ctx.fillStyle = "#eee";
+    ctx.fillRect(player.x*TILE_SIZE - 2, player.y*TILE_SIZE - 2, 4, 4);
 
-    // signal pulse vector
-    if (pulse.active){
-      const a = clamp(1 - pulse.t/0.55, 0, 1);
-      ctx.strokeStyle = `rgba(255,60,90,${0.35*a})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(px,py);
-      ctx.lineTo(px + pulse.dirX*28, py + pulse.dirY*28);
-      ctx.stroke();
-      ctx.fillStyle = `rgba(255,255,255,${0.12*a})`;
-      ctx.beginPath();
-      ctx.arc(px + pulse.dirX*28, py + pulse.dirY*28, 6, 0, Math.PI*2);
-      ctx.fill();
-    }
-
-    ctx.restore();
-
-    // floating glitch messages
-    ctx.font = "20px 'VT323', monospace";
-    for (const m of messages){
-      ctx.fillStyle = m.color;
-      ctx.fillText(m.text, m.x, m.y);
-    }
-
-    // mission box
-    if (mission.active){
-      ctx.save();
-      ctx.globalAlpha = 0.85;
-      ctx.fillStyle = "rgba(0,0,0,0.70)";
-      ctx.fillRect(6, 150, 308, 84);
+    // 7. Overlays
+    // Flash
+    if(flash.active && flash.img){
+      ctx.globalAlpha = flash.alpha * 0.85;
+      ctx.drawImage(flash.img, 0, 0, canvas.width, canvas.height);
       ctx.globalAlpha = 1;
-
-      ctx.fillStyle = "#ccffcc";
-      ctx.font = "16px 'VT323', monospace";
-      ctx.fillText(`MISSION: ${mission.title}`, 12, 166);
-
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
-      ctx.font = "14px 'VT323', monospace";
-      const lines = mission.desc.split("\n");
-      ctx.fillText(lines[0] || "", 12, 182);
-      ctx.fillText(lines[1] || "", 12, 196);
-
-      // progress
-      let progText = "";
-      if (mission.type === "STILLNESS" || mission.type === "NO_RUN"){
-        progText = `${mission.progress.toFixed(1)} / ${mission.goal.toFixed(1)}s`;
-      } else {
-        progText = `${mission.progress} / ${mission.goal}`;
-      }
-      ctx.fillStyle = "#ff2244";
-      ctx.fillText(`PROGRESS: ${progText}`, 12, 214);
-
-      ctx.restore();
     }
 
-    // prompt overlay with choices
-    if (prompt.active){
-      ctx.save();
-      ctx.globalAlpha = 0.92;
-      ctx.fillStyle = "rgba(0,0,0,0.80)";
-      ctx.fillRect(10, 20, 300, 110);
-      ctx.globalAlpha = 1;
-
-      ctx.fillStyle = "#ff2244";
-      ctx.font = "16px 'VT323', monospace";
-      ctx.fillText("TRANSMISSION:", 16, 36);
-
-      ctx.fillStyle = "rgba(255,255,255,0.9)";
-      ctx.fillText(prompt.text, 16, 54);
-
-      ctx.fillStyle = "#ccffcc";
-      ctx.fillText(prompt.a, 16, 80);
-      ctx.fillText(prompt.b, 16, 98);
-
-      ctx.fillStyle = "rgba(255,255,255,0.55)";
-      ctx.fillText(`RESPOND: 1 / 2   (${prompt.timer.toFixed(1)}s)`, 16, 118);
-
-      ctx.restore();
-    }
-
-    // sanity bar + small debug
-    ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.fillRect(6, 222, 308, 12);
-    ctx.fillStyle = "#ccffcc";
-    ctx.font = "12px 'VT323', monospace";
-    const fear = clamp(audio?.fear ?? 0, 0, 1);
-    ctx.fillText(`sanity:${Math.round(player.sanity)}  fear:${Math.round(fear*100)}%  exit:${exitLocked?"LOCKED":"OPEN"}`, 10, 232);
-
-    // noise overlay
+    // Noise (Anxiety)
     drawNoiseOverlay(globalAnxiety);
 
-    // creepy image flash
-    if (flash.active && flash.img){
-      ctx.save();
-      ctx.globalAlpha = flash.alpha;
-      // scale flash to screen
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(flash.img, 0, 0, canvas.width, canvas.height);
-      ctx.restore();
+    // Messages
+    ctx.font = "14px VT323";
+    messages.forEach(m => {
+      ctx.fillStyle = m.color;
+      ctx.globalAlpha = Math.min(1, m.life/20);
+      ctx.fillText(m.text, m.x, m.y);
+    });
+    ctx.globalAlpha = 1;
+
+    // Active Mission / Prompt UI
+    if(prompt.active){
+      ctx.fillStyle = "rgba(0,0,0,0.85)";
+      ctx.fillRect(20, 160, 280, 70);
+      ctx.strokeStyle = "#ccffcc";
+      ctx.strokeRect(20, 160, 280, 70);
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      ctx.fillText(prompt.text, 160, 180);
+      ctx.fillStyle = "#aaa";
+      ctx.fillText(prompt.a, 160, 200);
+      ctx.fillText(prompt.b, 160, 215);
+      
+      // Timer bar
+      ctx.fillStyle = "#f00";
+      ctx.fillRect(22, 226, (prompt.timer/6.5)*276, 2);
+    } 
+    else if(mission.active){
+      // small mission HUD
+      ctx.textAlign = "left";
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillRect(5, 5, 140, 45);
+      ctx.fillStyle = "#ccffcc";
+      ctx.fillText(mission.title, 10, 20);
+      
+      // Progress bar or text
+      const pct = clamp(mission.progress / mission.goal, 0, 1);
+      ctx.fillStyle = "#444";
+      ctx.fillRect(10, 28, 100, 4);
+      ctx.fillStyle = "#ccffcc";
+      ctx.fillRect(10, 28, 100*pct, 4);
+      
+      // Hint text lines
+      const lines = mission.desc.split('\n');
+      if(lines[1]){
+         ctx.fillStyle = "#aaa";
+         ctx.fillText(lines[1], 10, 42);
+      }
     }
   }
 
-  // ===== GAME LOOP =====
-  function gameLoop(){
-    if (gameStarted){
+  // ===== LOOP =====
+  function loop(){
+    if(gameStarted){
       update();
-      draw();
-    } else {
-      ctx.fillStyle="#000";
-      ctx.fillRect(0,0,canvas.width,canvas.height);
-      drawNoiseOverlay(6);
+      render();
     }
-    requestAnimationFrame(gameLoop);
+    requestAnimationFrame(loop);
   }
 
-  // ===== START =====
-  async function startGame(){
-    if (gameStarted) return;
-    gameStarted = true;
-    startOverlay.style.display = "none";
-    await ensureAudioRunning();
+  function startGame(){
+    if(gameStarted) return;
+    startOverlay.style.display = 'none';
+    ensureAudioRunning();
     generateLevel();
+    gameStarted = true;
+    loop();
   }
 
-  // boot
-  generateLevel();
-  gameLoop();
 })();
 </script>
 </body>
 </html>
-
-
-
