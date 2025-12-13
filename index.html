@@ -1,410 +1,537 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>ENTROPY.DAT</title>
-  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>ENTROPY.DAT</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#050505;
+    --fg:#cfd6d3;
+    --green:#ccffcc;
+    --red:#ff3355;
+    --dim:rgba(255,255,255,.65);
+  }
+  html,body{
+    margin:0; height:100%;
+    background:var(--bg);
+    color:var(--fg);
+    font-family:'VT323',monospace;
+    overflow:hidden;
+    user-select:none;
+  }
+  .wrap{
+    height:100%;
+    display:grid;
+    place-items:center;
+  }
+  .crt{
+    width:640px; height:480px;
+    position:relative;
+    border:1px solid #333;
+    box-shadow:0 0 24px rgba(0,0,0,.85);
+    background:#000;
+  }
+  canvas{
+    width:100%; height:100%;
+    image-rendering:pixelated;
+    display:block;
+    background:#000;
+  }
+  .scanlines{
+    position:absolute; inset:0;
+    background:linear-gradient(to bottom,
+      rgba(255,255,255,0),
+      rgba(255,255,255,0) 50%,
+      rgba(0,0,0,.22) 50%,
+      rgba(0,0,0,.22)
+    );
+    background-size:100% 4px;
+    pointer-events:none;
+    z-index:10;
+  }
+  .crt::after{
+    content:"";
+    position:absolute; inset:0;
+    background:rgba(18,16,16,.10);
+    opacity:0;
+    pointer-events:none;
+    z-index:10;
+    animation:flicker .14s infinite;
+  }
+  @keyframes flicker{0%{opacity:.02}50%{opacity:.06}100%{opacity:.02}}
 
-  <style>
-    body{
-      background:#050505;color:#a8b5b2;font-family:'VT323',monospace;
-      display:flex;flex-direction:column;align-items:center;justify-content:center;
-      height:100vh;margin:0;overflow:hidden;user-select:none;
-    }
-    .crt-monitor{
-      position:relative;border:1px solid #333;box-shadow:0 0 20px rgba(0,0,0,.8);
-      width:640px;height:480px;background:#000
-    }
-    canvas{width:100%;height:100%;background:#000;display:block;image-rendering:pixelated}
-    .scanlines{
-      position:absolute;inset:0;
-      background:linear-gradient(to bottom,rgba(255,255,255,0),rgba(255,255,255,0) 50%,rgba(0,0,0,.22) 50%,rgba(0,0,0,.22));
-      background-size:100% 4px;pointer-events:none;z-index:10
-    }
-    .crt-monitor::after{
-      content:" ";position:absolute;inset:0;background:rgba(18,16,16,.10);opacity:0;
-      z-index:10;pointer-events:none;animation:flicker .14s infinite
-    }
-    @keyframes flicker{0%{opacity:.02}50%{opacity:.06}100%{opacity:.02}}
+  /* HUD: keep it small */
+  .hud{
+    position:absolute;
+    top:8px; left:8px;
+    z-index:20;
+    font-size:18px;
+    color:var(--green);
+    text-shadow:0 0 6px rgba(204,255,204,.35);
+    pointer-events:none;
+    max-width: 240px;
+    line-height:1.05;
+  }
+  .hud .row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .hud .pill{
+    background:rgba(0,0,0,.55);
+    border:1px solid rgba(204,255,204,.22);
+    padding:4px 6px;
+  }
+  .hud .status{ color:var(--dim); border-color:rgba(255,255,255,.12); }
+  .hud .warn{ color:var(--red); border-color:rgba(255,51,85,.25); }
 
-    /* Compact UI */
-    #game-ui{
-      position:absolute;top:8px;left:8px;right:8px;
-      display:flex;justify-content:space-between;align-items:flex-start;
-      z-index:20;color:#ccffcc;text-shadow:0 0 5px #ccffcc;font-size:1.25rem;pointer-events:none;
-    }
-    .hud-left{
-      background:rgba(0,0,0,0.45);
-      padding:6px 8px;border:1px solid rgba(204,255,204,0.18);
-      border-radius:6px;max-width:46%;
-      transition:opacity .18s linear;
-    }
-    .hud-left.dim{opacity:0.25;}
-    .hud-right{
-      text-align:right;
-      background:rgba(0,0,0,0.45);
-      padding:6px 8px;border:1px solid rgba(204,255,204,0.18);
-      border-radius:6px;max-width:46%;
-    }
-    .hud-sub{opacity:0.7;font-size:1.0rem;line-height:1.05;}
-    .controls-hint{margin-top:20px;text-align:center;opacity:.55;font-size:1.2rem}
+  /* Mission box bottom-left but compact */
+  .missionBox{
+    position:absolute;
+    left:8px;
+    bottom:8px;
+    z-index:20;
+    width: 250px;
+    padding:8px;
+    background:rgba(0,0,0,.65);
+    border:1px solid rgba(255,255,255,.12);
+    color:rgba(255,255,255,.85);
+    pointer-events:none;
+    display:none;
+  }
+  .missionBox .title{
+    color:var(--green);
+    font-size:18px;
+    margin-bottom:2px;
+  }
+  .missionBox .desc{
+    opacity:.85;
+    font-size:16px;
+    white-space:pre-line;
+  }
+  .missionBox .bar{
+    height:4px;
+    background:rgba(255,255,255,.12);
+    margin-top:6px;
+    position:relative;
+  }
+  .missionBox .bar > i{
+    position:absolute; top:0; left:0; bottom:0;
+    background:rgba(204,255,204,.85);
+    width:0%;
+    display:block;
+  }
 
-    /* Start overlay */
-    .start-overlay{
-      position:absolute;inset:0;z-index:30;display:grid;place-items:center;
-      background:radial-gradient(circle at center,rgba(0,0,0,.35),rgba(0,0,0,.92));
-      color:#ccffcc;text-shadow:0 0 8px rgba(204,255,204,.35);cursor:pointer;
-      padding:18px;
-    }
-    .start-title{font-size:4rem;letter-spacing:2px;margin-bottom:8px;text-align:center}
-    .start-sub{font-size:1.45rem;opacity:.95;text-align:center;line-height:1.15}
-    .small{font-size:1.08rem;opacity:.75}
-    .tiny{font-size:0.98rem;opacity:.62}
+  /* Prompt box centered */
+  .promptBox{
+    position:absolute;
+    inset:auto 12px 110px 12px;
+    margin:auto;
+    width: 560px;
+    z-index:25;
+    padding:10px 12px;
+    background:rgba(0,0,0,.82);
+    border:1px solid rgba(204,255,204,.22);
+    color:rgba(255,255,255,.92);
+    text-align:center;
+    display:none;
+    pointer-events:none;
+  }
+  .promptBox .q{ font-size:20px; color:rgba(255,255,255,.95); }
+  .promptBox .a{ margin-top:6px; font-size:18px; opacity:.88; }
+  .promptBox .timer{
+    height:3px; margin-top:8px;
+    background:rgba(255,255,255,.10);
+    position:relative;
+  }
+  .promptBox .timer > i{
+    position:absolute; left:0; top:0; bottom:0;
+    width:100%;
+    background:rgba(255,51,85,.75);
+  }
 
-    .panel{
-      width:min(520px, 92vw);
-      background:rgba(0,0,0,0.55);
-      border:1px solid rgba(204,255,204,0.20);
-      border-radius:10px;
-      padding:12px 14px;
-      box-shadow:0 0 18px rgba(0,0,0,0.55);
-    }
-    .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:10px;}
-    .chip{
-      padding:6px 10px;border:1px solid rgba(204,255,204,0.25);
-      border-radius:999px;cursor:pointer;opacity:0.92;
-      background:rgba(0,0,0,0.25);
-    }
-    .chip.active{border-color:#ccffcc;box-shadow:0 0 8px rgba(204,255,204,0.18);opacity:1;}
-    .field{
-      width:min(360px, 84vw);
-      font-family:'VT323',monospace;
-      font-size:1.35rem;
-      padding:6px 10px;
-      border-radius:8px;
-      border:1px solid rgba(204,255,204,0.25);
-      background:rgba(0,0,0,0.35);
-      color:#ccffcc;
-      outline:none;
-    }
-    .btn{
-      margin-top:10px;
-      display:inline-block;
-      padding:8px 14px;
-      border-radius:10px;
-      border:1px solid rgba(204,255,204,0.35);
-      background:rgba(0,0,0,0.25);
-      cursor:pointer;
-      font-size:1.4rem;
-    }
-  </style>
+  /* Menu */
+  .menu{
+    position:absolute; inset:0;
+    z-index:30;
+    display:grid;
+    place-items:center;
+    background:radial-gradient(circle at center, rgba(0,0,0,.35), rgba(0,0,0,.92));
+  }
+  .panel{
+    width:min(520px, 92%);
+    padding:16px;
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(0,0,0,.65);
+    text-align:center;
+    box-shadow:0 0 18px rgba(0,0,0,.7);
+  }
+  .title{
+    font-size:56px;
+    letter-spacing:2px;
+    color:var(--green);
+    text-shadow:0 0 10px rgba(204,255,204,.25);
+    margin-bottom:6px;
+  }
+  .sub{ font-size:22px; opacity:.8; margin-bottom:10px; }
+  .grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin:12px 0;
+    text-align:left;
+  }
+  label{ font-size:18px; opacity:.85; display:block; margin-bottom:4px;}
+  input,select,button{
+    width:100%;
+    font-family:'VT323', monospace;
+    font-size:22px;
+    padding:8px 10px;
+    background:#000;
+    color:var(--fg);
+    border:1px solid rgba(255,255,255,.22);
+    box-sizing:border-box;
+  }
+  button{
+    cursor:pointer;
+    color:#000;
+    background:var(--green);
+    border-color:rgba(204,255,204,.35);
+  }
+  button:active{ transform:translateY(1px); }
+  .hint{
+    margin-top:10px;
+    font-size:18px;
+    opacity:.7;
+    line-height:1.1;
+  }
+  .tiny{ opacity:.55; font-size:16px; margin-top:8px; }
+
+  /* Simple bottom hint */
+  .controlsHint{
+    margin-top:10px;
+    text-align:center;
+    opacity:.55;
+    font-size:18px;
+  }
+
+</style>
 </head>
 <body>
-  <div class="crt-monitor" id="crt">
+<div class="wrap">
+  <div class="crt" id="crt">
     <div class="scanlines"></div>
 
-    <div id="game-ui">
-      <div id="hudLeft" class="hud-left">
-        <div id="score-display">EVIDENCE: 0/3</div>
-        <div id="mission-line" class="hud-sub"></div>
+    <div class="hud" id="hud">
+      <div class="row">
+        <div class="pill" id="hudLeft">NAME</div>
+        <div class="pill status" id="hudStatus">STATUS: IDLE</div>
       </div>
-      <div class="hud-right">
-        <div id="status-display">STATUS: OFFLINE</div>
-        <div id="stats-line" class="hud-sub"></div>
+      <div class="row" style="margin-top:6px;">
+        <div class="pill" id="hudOxy">O2: 100%</div>
+        <div class="pill" id="hudDiff">DIFF: ?</div>
+      </div>
+      <div class="row" style="margin-top:6px;">
+        <div class="pill" id="hudItems">CHESTS: 0/0</div>
       </div>
     </div>
 
-    <canvas id="gameCanvas" width="320" height="240"></canvas>
+    <div class="missionBox" id="missionBox">
+      <div class="title" id="missionTitle">MISSION</div>
+      <div class="desc" id="missionDesc">...</div>
+      <div class="bar"><i id="missionBar"></i></div>
+    </div>
 
-    <div id="startOverlay" class="start-overlay" tabindex="0" role="button" aria-label="Start game">
-      <div class="panel" id="startPanel">
-        <div class="start-title">ENTROPY.DAT</div>
-        <div id="loreLine1" class="start-sub">LOADING…</div>
-        <div id="loreLine2" class="start-sub small"></div>
-        <div id="loreLine3" class="start-sub small"></div>
+    <div class="promptBox" id="promptBox">
+      <div class="q" id="promptQ">...</div>
+      <div class="a" id="promptA">...</div>
+      <div class="timer"><i id="promptBar"></i></div>
+    </div>
 
-        <div style="height:10px"></div>
+    <canvas id="game" width="320" height="240"></canvas>
 
-        <div class="start-sub">PROTAGONIST NAME</div>
-        <div class="row">
-          <input id="nameInput" class="field" maxlength="18" placeholder="type a name…" />
+    <div class="menu" id="menu">
+      <div class="panel">
+        <div class="title">ENTROPY.DAT</div>
+        <div class="sub" id="loreIntro">A corrupted tape is waiting.</div>
+
+        <div class="grid">
+          <div>
+            <label for="name">PROTAGONIST NAME</label>
+            <input id="name" autocomplete="off" placeholder="e.g. MARTA" />
+          </div>
+          <div>
+            <label for="role">ROLE</label>
+            <select id="role">
+              <option value="thief">THIEF</option>
+              <option value="killer">KILLER</option>
+              <option value="butcher">BUTCHER</option>
+            </select>
+          </div>
         </div>
 
-        <div style="height:10px"></div>
+        <button id="startBtn">START</button>
 
-        <div class="start-sub">CHOOSE A ROLE</div>
-        <div class="row">
-          <div class="chip active" data-role="THIEF" id="roleThief">THIEF</div>
-          <div class="chip" data-role="KILLER" id="roleKiller">KILLER</div>
-          <div class="chip" data-role="BUTCHER" id="roleButcher">BUTCHER</div>
+        <div class="hint">
+          WASD / Arrows · Shift = Run (louder) · E = Signal Pulse<br>
+          Chests unlock missions. Complete mission to unseal the exit.
         </div>
-
-        <div id="diffLine" class="start-sub small" style="margin-top:10px;"></div>
-        <div id="loadLine" class="start-sub tiny">assets: 0/0</div>
-
-        <div class="row">
-          <div class="btn" id="startBtn">CLICK TO INITIALIZE</div>
+        <div class="tiny">
+          Tip: If audio doesn’t start, click START again (browser gesture lock).
         </div>
-        <div class="start-sub tiny">WASD/Arrows · Shift run · E pulse · 1/2 respond</div>
       </div>
     </div>
   </div>
 
-  <div class="controls-hint">
-    Chests unlock missions. Clear mission to unseal exit. Oxygen drains faster on harder runs.<br/>
-    When the face appears: do NOT stop.
+  <div class="controlsHint">
+    Low-res fog horror · abstract missions · choices matter · always different.
   </div>
+</div>
 
 <script>
 (() => {
-  // =======================
-  // ASSET MANIFEST (edit)
-  // =======================
-  const ASSET_MANIFEST = {
-    creepyFlashes: [
-      "assets/flash_01.png",
-      "assets/flash_02.png",
-      "assets/flash_03.png"
-    ],
-    monsterFaces: [
-      "assets/monster_face_01.png",
-      "assets/monster_face_02.png"
-    ],
-    // OPTIONAL: if you upload a monster body image, put it here (else procedural)
-    monsterBody: [
-      // "assets/monster_body.png"
-    ]
-  };
+  // ========= CONFIG =========
+  const TILE = 16, COLS = 20, ROWS = 15;
+  const CAN_W = 320, CAN_H = 240;
 
-  // ===== DOM =====
-  const canvas = document.getElementById('gameCanvas');
+  // Physics / movement
+  const PLAYER_R = 0.28;             // circle radius (tiles)
+  const ACCEL = 18.0;                // tiles/s^2
+  const FRICTION = 16.0;             // tiles/s^2
+  const MAX_SPEED = 2.25;            // tiles/s walk
+  const RUN_MULT = 1.55;
+
+  // Visibility
+  const BASE_FOV = 6.2;
+  const MIN_FOV = 4.4;
+  const MAX_FOV = 7.2;
+
+  // Oxygen baseline (>= 60s demanded)
+  const BASE_OXY_SECONDS = 90;       // walking ~90s baseline
+  const RUN_OXY_MULT = 1.75;         // running drains faster
+  const LOW_OXY_WARN = 15;           // seconds
+
+  // Level content
+  const CHESTS_PER_LEVEL_BASE = 3;
+  const TANKS_PER_LEVEL_BASE = 3;
+  const OFFERINGS_PER_LEVEL = 3;
+
+  // Monster tuning (winnable + abrasive)
+  const MONSTER_BASE_SPEED = 1.10;   // tiles/s
+  const MONSTER_HEAR_WALK = 4.7;
+  const MONSTER_HEAR_RUN  = 7.9;
+  const MONSTER_HIT_DIST  = 0.62;
+  const MONSTER_HIT_COOLDOWN = 1.2;  // seconds between hits
+  const STRIKES_TO_DIE = 2;
+
+  // Visual noise
+  const GRAIN_PARTICLES = 160;
+
+  // ========= DOM =========
+  const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d', { alpha:false });
 
-  const statusDisplay = document.getElementById('status-display');
-  const scoreDisplay  = document.getElementById('score-display');
-  const missionLine   = document.getElementById('mission-line');
-  const statsLine     = document.getElementById('stats-line');
-  const hudLeft       = document.getElementById('hudLeft');
+  const menu = document.getElementById('menu');
+  const startBtn = document.getElementById('startBtn');
+  const nameInput = document.getElementById('name');
+  const roleSelect = document.getElementById('role');
+  const loreIntroEl = document.getElementById('loreIntro');
 
-  const startOverlay  = document.getElementById('startOverlay');
-  const startBtn      = document.getElementById('startBtn');
-  const nameInput     = document.getElementById('nameInput');
-  const loreLine1     = document.getElementById('loreLine1');
-  const loreLine2     = document.getElementById('loreLine2');
-  const loreLine3     = document.getElementById('loreLine3');
-  const diffLine      = document.getElementById('diffLine');
-  const loadLine      = document.getElementById('loadLine');
+  const hudLeft = document.getElementById('hudLeft');
+  const hudStatus = document.getElementById('hudStatus');
+  const hudOxy = document.getElementById('hudOxy');
+  const hudDiff = document.getElementById('hudDiff');
+  const hudItems = document.getElementById('hudItems');
 
-  const roleThief     = document.getElementById('roleThief');
-  const roleKiller    = document.getElementById('roleKiller');
-  const roleButcher   = document.getElementById('roleButcher');
+  const missionBox = document.getElementById('missionBox');
+  const missionTitleEl = document.getElementById('missionTitle');
+  const missionDescEl = document.getElementById('missionDesc');
+  const missionBarEl = document.getElementById('missionBar');
 
-  // ===== CONFIG =====
-  const TILE_SIZE = 16;
-  const COLS = 20;
-  const ROWS = 15;
+  const promptBox = document.getElementById('promptBox');
+  const promptQEl = document.getElementById('promptQ');
+  const promptAEl = document.getElementById('promptA');
+  const promptBarEl = document.getElementById('promptBar');
 
-  const TOTAL_EVIDENCE = 3;
-  const CHESTS_BASE = 3;
+  // ========= INPUT =========
+  const keys = Object.create(null);
+  const justPressed = Object.create(null);
 
-  const BASE_FOV = 6;
-  const MIN_FOV  = 4.0;
-  const MAX_FOV  = 7.2;
+  function onKeyDown(e){
+    // Avoid page scrolling on arrows/space
+    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
 
-  // smooth movement
-  const MAX_SPEED = 4.2;               // tiles/sec cap (with run)
-  const ACCEL = 22.0;                  // tiles/sec^2
-  const FRICTION = 18.0;               // tiles/sec^2
-  const RUN_MULT = 1.55;
-  const INPUT_DEADZONE = 0.001;
+    if (!keys[e.code]) justPressed[e.code] = true;
+    keys[e.code] = true;
 
-  // difficulty presets (random each run)
-  const DIFF_PRESETS = [
-    { name:"EASY",   monsters:1, oxygenDrain:0.55, taskMult:0.85, enemyAggro:0.92 },
-    { name:"NORMAL", monsters:1, oxygenDrain:0.80, taskMult:1.00, enemyAggro:1.00 },
-    { name:"HARD",   monsters:2, oxygenDrain:1.05, taskMult:1.15, enemyAggro:1.12 },
-    { name:"HELL",   monsters:3, oxygenDrain:1.28, taskMult:1.35, enemyAggro:1.25 }
-  ];
-
-  // ===== ASSETS =====
-  const assets = {
-    creepyFlashes: [],
-    monsterFaces: [],
-    monsterBody: null
-  };
-  let assetsReady = false;
-  let startRequested = false;
-
-  function loadImage(url){
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => resolve({ ok:true, img, url });
-      img.onerror = () => resolve({ ok:false, img:null, url });
-      img.src = url + (url.includes("?") ? "" : `?v=${Date.now()}`);
-    });
-  }
-
-  async function loadAssets(){
-    const list = [
-      ...ASSET_MANIFEST.creepyFlashes.map(url => ({type:"creepyFlashes", url})),
-      ...ASSET_MANIFEST.monsterFaces.map(url => ({type:"monsterFaces", url})),
-      ...ASSET_MANIFEST.monsterBody.map(url => ({type:"monsterBody", url}))
-    ];
-    let done=0;
-    loadLine.textContent = `assets: ${done}/${list.length}`;
-
-    const results=[];
-    for(const entry of list){
-      const res = await loadImage(entry.url);
-      done++;
-      loadLine.textContent = `assets: ${done}/${list.length}`;
-      results.push({...entry, ...res});
+    // Respond to prompt with 1/2 even if moving
+    if (state.mode === "PLAY" && prompt.active){
+      if (e.code === "Digit1") choosePrompt(1);
+      if (e.code === "Digit2") choosePrompt(2);
     }
 
-    assets.creepyFlashes = results.filter(r=>r.type==="creepyFlashes" && r.ok).map(r=>r.img);
-    assets.monsterFaces  = results.filter(r=>r.type==="monsterFaces" && r.ok).map(r=>r.img);
-    const mb = results.find(r=>r.type==="monsterBody" && r.ok);
-    assets.monsterBody = mb ? mb.img : null;
+    // Start from keyboard, but ONLY if not typing in inputs
+    if (state.mode === "MENU" && (e.code === "Enter")){
+      const ae = document.activeElement;
+      const typing = (ae === nameInput || ae === roleSelect);
+      if (!typing) startGameFromMenu();
+    }
 
-    assetsReady = true;
-    if (startRequested) startGame();
+    // E pulse
+    if (state.mode === "PLAY" && e.code === "KeyE") triggerPulse();
   }
+  function onKeyUp(e){ keys[e.code] = false; }
+  window.addEventListener('keydown', onKeyDown, { passive:false });
+  window.addEventListener('keyup', onKeyUp, { passive:true });
 
-  // ===== HELPERS =====
+  // ========= RNG helpers =========
   const clamp = (v,a,b)=> v<a?a : v>b?b : v;
-  function pick(arr){ return arr[(Math.random()*arr.length)|0]; }
+  const rand = (a,b)=> a + Math.random()*(b-a);
+  const randi = (a,b)=> (a + Math.floor(Math.random()*(b-a+1)));
+  const pick = (arr)=> arr[(Math.random()*arr.length)|0];
 
-  // ===== INPUT (robust) =====
-  const keys = new Map();
-  const MOVE_KEYS = new Set(["KeyW","KeyA","KeyS","KeyD","ArrowUp","ArrowLeft","ArrowDown","ArrowRight","Space"]);
+  // ========= STATE =========
+  const state = {
+    mode: "MENU", // MENU | PLAY
+    seed: (Math.random()*1e9)|0,
+    time: 0,
+    anxiety: 0,
+    strikes: 0,
+    camShake: 0,
+  };
 
-  function isDown(code){ return keys.get(code)===true; }
-  function preventIfMovementKey(e){
-    if (MOVE_KEYS.has(e.code)) e.preventDefault();
-  }
+  const hero = {
+    name: "UNKNOWN",
+    role: "thief",
+    x: 1.5, y: 1.5,
+    vx: 0, vy: 0,
+    oxygen: BASE_OXY_SECONDS,
+    maxOxygen: BASE_OXY_SECONDS,
+    hitCooldown: 0,
+    sanity: 100,
+  };
 
-  window.addEventListener("keydown", (e) => {
-    preventIfMovementKey(e);
-    keys.set(e.code, true);
-
-    if (!gameStarted && (e.code==="Enter" || e.code==="Space")) requestStart();
-    if (gameStarted && e.code==="KeyE") triggerPulse();
-
-    if (prompt.active){
-      if (e.code==="Digit1" || e.code==="KeyY") choosePrompt(1);
-      if (e.code==="Digit2" || e.code==="KeyN") choosePrompt(2);
-    }
-  }, { passive:false });
-
-  window.addEventListener("keyup", (e) => {
-    preventIfMovementKey(e);
-    keys.set(e.code, false);
-  }, { passive:false });
-
-  window.addEventListener("blur", () => keys.clear());
-  document.addEventListener("visibilitychange", () => { if (document.hidden) keys.clear(); });
-
-  // ===== START UI interaction =====
-  let chosenRole = "THIEF";
-  function setRole(role){
-    chosenRole = role;
-    for (const el of [roleThief, roleKiller, roleButcher]) el.classList.remove("active");
-    if (role==="THIEF") roleThief.classList.add("active");
-    if (role==="KILLER") roleKiller.classList.add("active");
-    if (role==="BUTCHER") roleButcher.classList.add("active");
-    // refresh lore preview (small personalization)
-    updateLorePreview();
-  }
-
-  roleThief.addEventListener("click", (e)=>{ e.stopPropagation(); setRole("THIEF"); });
-  roleKiller.addEventListener("click", (e)=>{ e.stopPropagation(); setRole("KILLER"); });
-  roleButcher.addEventListener("click", (e)=>{ e.stopPropagation(); setRole("BUTCHER"); });
-
-  // prevent overlay click from blurring input weirdly
-  document.getElementById("startPanel").addEventListener("pointerdown", (e)=> e.stopPropagation());
-
-  startOverlay.addEventListener("pointerdown", (e)=>{ e.preventDefault(); requestStart(); });
-  startOverlay.addEventListener("click", (e)=>{ e.preventDefault(); requestStart(); });
-  startBtn.addEventListener("pointerdown", (e)=>{ e.preventDefault(); e.stopPropagation(); requestStart(); });
-
-  // ===== GAME STATE =====
   let map = [];
   let stains = [];
   let chests = [];
-  let evidence = [];
-  let exit = null;
-  let exitLocked = true;
+  let tanks = [];
+  let offerings = [];
+  let exit = { x: 0, y: 0, unlocked:false };
 
-  let messages = [];
-  let globalAnxiety = 0;
+  let messages = []; // floating glitch text
+  let flash = { active:false, t:0, dur:0.8, img:null, alpha:0, kind:"" };
+  let facePopup = { active:false, t:0, dur:0.55, img:null, intensity:0 };
 
-  // personalization
-  let hero = {
-    name: "UNKNOWN",
-    role: "THIEF",
-    tint: "#ccffcc",
-    maxOxygen: 100,
-    oxygen: 100,
-    oxygenDrainBase: 0.9,
-    stealth: 1.0
+  let pulse = { active:false, t:0, dirX:0, dirY:0, ring:0 };
+
+  // Mission
+  const mission = {
+    active:false,
+    title:"",
+    desc:"",
+    type:"",
+    progress:0,
+    goal:1,
+    extra:null,
+    completed:false,
   };
 
-  // difficulty (random each run)
-  let diff = pick(DIFF_PRESETS);
-
-  // movement smoothing
-  const player = {
-    x:1, y:1,
-    vx:0, vy:0,
-    panicHits:0,
-    panicGrace:0,
-    sanity:100
+  // Prompt
+  const prompt = {
+    active:false,
+    q:"",
+    a:"",
+    timer:0,
+    onChoose:null,
+    maxTime: 6.5
   };
 
-  // prompts + mission
-  let prompt = { active:false, text:"", a:"", b:"", onChoose:null, timer:0 };
-  let mission = { active:false, title:"", desc:"", type:"", progress:0, goal:1, extra:null, completed:false };
+  // Difficulty per run
+  const diff = {
+    name:"NORMAL",
+    oxygenDrain: 1.0,
+    monsters: 1,
+    monsterSpeed: 1.0,
+    fog: 1.0,
+    missionHard: 1.0,
+    aggression: 1.0,
+  };
 
-  // pulse + flash
-  let pulse = { active:false, t:0, dirX:0, dirY:0 };
-  let flash = { active:false, t:0, dur:0.9, img:null, alpha:0, procedural:null };
+  // Monsters (multiple)
+  const monsters = [];
 
-  // face overlay
-  let faceOverlay = { active:false, t:0, dur:0.55, img:null, intensity:0, alpha:0, pickCooldown:0 };
+  // ========= TEXT BANKS =========
+  const cryptic = [
+    "NULL REFERENCE","FRAME DROP","DE-SYNC","SIGNAL BLEED","YOU ARE DATA",
+    "EYES IN THE FOG","DOOR IS NOT A DOOR","THE MAZE REMEMBERS","PAINTED AIR",
+    "NEGATIVE SPACE","UNSAFE POINTER","STATIC...","1997","DON'T LOOK",
+    "THE TAPE IS WATCHING","MISSING INDEX","SPOOL CORRUPTION"
+  ];
 
-  // monsters: array (difficulty can spawn more)
-  let monsters = []; // each: {x,y,active,speed,aggression,stun,lastSeen,stepCooldown,targetTile,seed}
-
-  let collectedCount = 0;
-  let gameStarted = false;
-
-  // ===== LORE =====
-  function pad(n){ return String(n).padStart(4,"0"); }
-  function updateLorePreview(){
-    const nm = (nameInput.value || "UNKNOWN").trim().slice(0,18) || "UNKNOWN";
-    const role = chosenRole;
-    const caseNo = pad((Math.random()*9999)|0);
-    const cities = ["SANTA CROCE", "PORTO VECCHIO", "GREYHOLLOW", "VIA NERA", "ASHFIELD", "COLDWATER", "NULL DISTRICT"];
-    const victims = ["ELENA", "MARTA", "SOFIA", "LUCIA", "GIULIA", "IRENE", "VALERIA"];
-    const surnames = ["ROSSI","FERRI","BIANCHI","MORETTI","CONTINI","GALLI","RINALDI"];
-    const places = ["service tunnel","abandoned clinic","flooded stairwell","maintenance maze","sealed corridor","sub-basement"];
-    const hooks = [
-      `The tape says: "${nm}, don't come."`,
-      `A door appears only when ${nm} stops breathing.`,
-      `Someone wrote: "${nm} was here first."`,
-      `The CRT calls you by name. Then by role.`,
-    ];
-    const victim = `${pick(victims)} ${pick(surnames)}`;
-    loreLine1.textContent = `CASE ${caseNo} · ${pick(cities)} · ${role}`;
-    loreLine2.textContent = `${victim} vanished into the ${pick(places)}.`;
-    loreLine3.textContent = pick(hooks);
+  function pushMessage(text, color=null){
+    messages.push({
+      text,
+      x: Math.random()*CAN_W,
+      y: Math.random()*CAN_H,
+      life: 70,
+      color: color || (Math.random()<0.55 ? "#ff3355" : "#ffffff")
+    });
   }
 
-  nameInput.addEventListener("input", ()=> updateLorePreview());
-  updateLorePreview();
+  function randomLoreIntro(name, role){
+    const victims = ["a kidnapped lady","a missing child","a vanished caretaker","a girl in a hospital gown","a witness in a motel"];
+    const places  = ["a fog-choked corridor","a service tunnel","a flooded archive","a dead shopping center","a basement with humming walls"];
+    const objects = ["a tape labeled ENTROPY.DAT","a ring of keys that aren’t yours","a bag of teeth","a bloodless apron","a broken pager"];
+    const hooks   = [
+      "The air tastes like old coins.",
+      "You can hear a siren that isn’t there.",
+      "Your footsteps arrive late.",
+      "The walls remember your name incorrectly.",
+      "Something keeps counting your breaths."
+    ];
 
-  // ===== AUDIO (same as before, with oxygen/role influence) =====
+    const roleLine =
+      role==="thief"   ? "You steal locks. The locks steal you back." :
+      role==="killer"  ? "You know how to end people. The maze knows how to end you." :
+                         "You cut meat. Here, the meat looks back.";
+
+    const victim = pick(victims);
+    const place  = pick(places);
+    const obj    = pick(objects);
+    const hook   = pick(hooks);
+
+    const pro = name && name.trim() ? name.trim().toUpperCase() : "UNKNOWN";
+    return `${pro}: You came for ${victim}.\nYou woke up in ${place} holding ${obj}.\n${roleLine}\n${hook}\n\nOpen chests. Accept missions. Unseal the exit.`;
+  }
+
+  // ========= ASSET LOADER (your images) =========
+  function loadImage(src){
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+  }
+
+  const assets = {
+    monster:null,
+    face1:null,
+    face2:null,
+    flashes:[],
+  };
+
+  async function loadAssets(){
+    // These will resolve null if not present — game still works.
+    assets.monster = await loadImage("assets/monster.png");
+    assets.face1 = await loadImage("assets/face1.png");
+    assets.face2 = await loadImage("assets/face2.png");
+
+    const f1 = await loadImage("assets/flash1.png");
+    const f2 = await loadImage("assets/flash2.png");
+    const f3 = await loadImage("assets/flash3.png");
+    assets.flashes = [f1,f2,f3].filter(Boolean);
+  }
+
+  // ========= AUDIO (organic + abrasive) =========
   let audio = null;
 
   function initAudio(){
@@ -413,379 +540,715 @@
     const ac = new AC();
 
     const master = ac.createGain();
-    master.gain.value = 0.72;
+    master.gain.value = 0.70;
+
+    const limiter = ac.createDynamicsCompressor();
+    limiter.threshold.value = -18;
+    limiter.knee.value = 24;
+    limiter.ratio.value = 8;
+    limiter.attack.value = 0.004;
+    limiter.release.value = 0.18;
 
     const pan = ac.createStereoPanner();
     pan.pan.value = 0;
-    master.connect(pan);
+
+    master.connect(limiter);
+    limiter.connect(pan);
     pan.connect(ac.destination);
 
-    const noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+    // noise buffer (pink-ish)
+    const noiseBuf = ac.createBuffer(1, ac.sampleRate*2, ac.sampleRate);
     {
       const d = noiseBuf.getChannelData(0);
       let last = 0;
       for (let i=0;i<d.length;i++){
-        last = 0.97*last + 0.03*(Math.random()*2-1);
+        last = 0.985*last + 0.015*(Math.random()*2-1);
         d[i] = last;
       }
     }
 
-    const wind = ac.createBufferSource(); wind.buffer = noiseBuf; wind.loop = true;
-    const windLP = ac.createBiquadFilter(); windLP.type="lowpass"; windLP.frequency.value=250;
-    const windGain = ac.createGain(); windGain.gain.value=0.040;
-    wind.connect(windLP); windLP.connect(windGain); windGain.connect(master); wind.start();
+    // Wind bed
+    const wind = ac.createBufferSource();
+    wind.buffer = noiseBuf; wind.loop = true;
+    const windLP = ac.createBiquadFilter();
+    windLP.type = "lowpass";
+    windLP.frequency.value = 200;
+    const windGain = ac.createGain();
+    windGain.gain.value = 0.05;
+    wind.connect(windLP); windLP.connect(windGain); windGain.connect(master);
+    wind.start();
 
-    const stat = ac.createBufferSource(); stat.buffer=noiseBuf; stat.loop=true;
-    const statBP = ac.createBiquadFilter(); statBP.type="bandpass"; statBP.frequency.value=1200; statBP.Q.value=0.9;
-    const statGain = ac.createGain(); statGain.gain.value=0.020;
-    stat.connect(statBP); statBP.connect(statGain); statGain.connect(master); stat.start();
+    // Radio static
+    const stat = ac.createBufferSource();
+    stat.buffer = noiseBuf; stat.loop = true;
+    const statBP = ac.createBiquadFilter();
+    statBP.type = "bandpass";
+    statBP.frequency.value = 1100;
+    statBP.Q.value = 0.9;
+    const statGain = ac.createGain();
+    statGain.gain.value = 0.018;
+    stat.connect(statBP); statBP.connect(statGain); statGain.connect(master);
+    stat.start();
 
-    const drone = ac.createOscillator(); drone.type="sine"; drone.frequency.value=48;
-    const lfo = ac.createOscillator(); lfo.type="sine"; lfo.frequency.value=0.09;
-    const lfoGain = ac.createGain(); lfoGain.gain.value=14;
-    lfo.connect(lfoGain); lfoGain.connect(drone.frequency);
+    // Organic drone (two detuned sines + slow FM)
+    const d1 = ac.createOscillator(); d1.type = "sine"; d1.frequency.value = 47;
+    const d2 = ac.createOscillator(); d2.type = "sine"; d2.frequency.value = 47.6;
+    const fm = ac.createOscillator(); fm.type = "sine"; fm.frequency.value = 0.09;
+    const fmG = ac.createGain(); fmG.gain.value = 9.5;
+    fm.connect(fmG); fmG.connect(d1.frequency); fmG.connect(d2.frequency);
 
-    const droneLP = ac.createBiquadFilter(); droneLP.type="lowpass"; droneLP.frequency.value=520;
-    const droneGain = ac.createGain(); droneGain.gain.value=0.030;
-    drone.connect(droneLP); droneLP.connect(droneGain); droneGain.connect(master);
-    drone.start(); lfo.start();
+    const droneLP = ac.createBiquadFilter();
+    droneLP.type = "lowpass";
+    droneLP.frequency.value = 420;
 
-    const siren = ac.createOscillator(); siren.type="triangle"; siren.frequency.value=190;
-    const sirenGain = ac.createGain(); sirenGain.gain.value=0.0001;
-    const sirenLP = ac.createBiquadFilter(); sirenLP.type="lowpass"; sirenLP.frequency.value=700;
-    siren.connect(sirenLP); sirenLP.connect(sirenGain); sirenGain.connect(master);
-    siren.start();
+    const droneGain = ac.createGain();
+    droneGain.gain.value = 0.026;
 
-    function thump(intensity){
-      const t = ac.currentTime;
-      const o = ac.createOscillator();
-      o.type="sine";
-      o.frequency.value = 60 - Math.random()*6;
-      const g = ac.createGain();
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.10*intensity, t+0.008);
-      g.gain.exponentialRampToValueAtTime(0.0001, t+0.18);
-      const lp = ac.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value = 140;
-      o.connect(lp); lp.connect(g); g.connect(master);
-      o.start(t); o.stop(t+0.22);
-    }
+    d1.connect(droneLP); d2.connect(droneLP);
+    droneLP.connect(droneGain); droneGain.connect(master);
 
-    function click(intensity){
+    d1.start(); d2.start(); fm.start();
+
+    // Heart / breathing (amplitude pulses)
+    const breathOsc = ac.createOscillator();
+    breathOsc.type = "triangle";
+    breathOsc.frequency.value = 0.22;
+    const breathGain = ac.createGain();
+    breathGain.gain.value = 0.0; // modulates static/wind/drone subtle
+    breathOsc.connect(breathGain);
+    breathGain.connect(windGain.gain);
+    breathGain.connect(droneGain.gain);
+    breathOsc.start();
+
+    // Abrasive ticks / glitches
+    function blip(intensity=0.4){
       const t = ac.currentTime;
       const o = ac.createOscillator();
       o.type = Math.random()<0.5 ? "square" : "triangle";
-      o.frequency.value = 400 + Math.random()*2600;
-      const bp = ac.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value = 800 + Math.random()*2400; bp.Q.value = 10;
+      o.frequency.value = 140 + Math.random()*2200;
+
+      const bp = ac.createBiquadFilter();
+      bp.type="bandpass";
+      bp.frequency.value = 500 + Math.random()*3200;
+      bp.Q.value = 10;
+
       const g = ac.createGain();
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.07*intensity, t+0.002);
-      g.gain.exponentialRampToValueAtTime(0.0001, t+0.06);
+      g.gain.linearRampToValueAtTime(0.08*intensity, t+0.002);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.09);
+
       o.connect(bp); bp.connect(g); g.connect(master);
-      o.start(t); o.stop(t+0.07);
+      o.start(t); o.stop(t+0.1);
     }
 
+    // Thump (for tanks / chest)
+    function thump(intensity=0.25){
+      const t = ac.currentTime;
+      const o = ac.createOscillator();
+      o.type="sine";
+      o.frequency.setValueAtTime(60 + Math.random()*20, t);
+      o.frequency.exponentialRampToValueAtTime(26, t+0.18);
+
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.10*intensity, t+0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.22);
+
+      o.connect(g); g.connect(master);
+      o.start(t); o.stop(t+0.25);
+    }
+
+    // Mutations (non-repeating)
     function mutate(){
       const t = ac.currentTime;
-      const fear = audio?.fear ?? 0;
-      const air = audio?.air ?? 1;
+      statBP.frequency.setTargetAtTime(650 + Math.random()*3200, t, 1.6);
+      statGain.gain.setTargetAtTime(0.010 + Math.random()*0.045, t, 1.0);
+      windLP.frequency.setTargetAtTime(120 + Math.random()*320, t, 2.4);
 
-      statBP.frequency.setTargetAtTime(650 + Math.random()*2800, t, 1.4);
-      statBP.Q.setTargetAtTime(0.8 + fear*10, t, 0.3);
-      statGain.gain.setTargetAtTime(0.010 + fear*0.11, t, 0.2);
+      const base = 34 + Math.random()*65;
+      d1.frequency.setTargetAtTime(base, t, 2.2);
+      d2.frequency.setTargetAtTime(base + (Math.random()*1.4), t, 2.2);
+      droneLP.frequency.setTargetAtTime(220 + Math.random()*1100, t, 2.1);
 
-      windLP.frequency.setTargetAtTime(120 + Math.random()*300, t, 2.0);
-      windGain.gain.setTargetAtTime(0.030 + fear*0.090, t, 0.25);
-
-      drone.frequency.setTargetAtTime(32 + Math.random()*44, t, 1.6);
-      droneLP.frequency.setTargetAtTime(220 + Math.random()*900, t, 1.6);
-      droneGain.gain.setTargetAtTime(0.020 + fear*0.10, t, 0.2);
-
-      // siren breathes when oxygen low or fear high
-      if (Math.random() < 0.12 + fear*0.35 + (1-air)*0.35){
-        siren.frequency.setTargetAtTime(160 + Math.random()*160, t, 1.2);
-        sirenGain.gain.setTargetAtTime(0.002 + fear*0.020 + (1-air)*0.018, t, 0.8);
-        setTimeout(()=>{ try{sirenGain.gain.setTargetAtTime(0.0001, ac.currentTime, 1.1);}catch{} }, 900+Math.random()*1600);
+      if (Math.random()<0.18){
+        d1.detune.setTargetAtTime((Math.random()<0.5?-1:1)*(90+Math.random()*220), t, 0.7);
+        d2.detune.setTargetAtTime((Math.random()<0.5?-1:1)*(90+Math.random()*220), t, 0.7);
+        setTimeout(()=>{
+          d1.detune.setTargetAtTime(0, ac.currentTime, 1.0);
+          d2.detune.setTargetAtTime(0, ac.currentTime, 1.0);
+        }, 900 + Math.random()*1600);
       }
 
-      // small events
-      if (Math.random() < 0.10 + fear*0.40) click(0.20 + fear*0.8);
-      if ((fear > 0.55 || air < 0.55) && Math.random() < 0.20) thump(0.30 + fear*0.9 + (1-air)*0.6);
+      setTimeout(mutate, 900 + Math.random()*1700);
+    }
 
-      setTimeout(mutate, 800 + Math.random()*1500);
+    function eventTick(){
+      const fear = audio?.fear ?? 0;
+      const oxy = audio?.oxy ?? 1;
+      const chaos = fear*0.85 + (1-oxy)*0.9;
+      if (Math.random() < 0.12 + chaos*0.35) blip(0.25 + Math.random()*(0.6+chaos));
+      setTimeout(eventTick, 240 + Math.random()*(940 - chaos*520));
     }
 
     audio = {
       ac,
       fear: 0,
-      air: 1,
-      setFear(f){ audio.fear = f; },
-      setAir(a){ audio.air = a; },
-      setObjectivePan(p){ pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, p)), ac.currentTime, 0.2); },
-      click, thump
+      oxy: 1,
+      blip,
+      thump,
+      setFear(f){
+        audio.fear = clamp(f,0,1);
+        const t = ac.currentTime;
+        // More fear = more static + sharper bandpass + louder drone
+        statGain.gain.setTargetAtTime(0.012 + audio.fear*0.12, t, 0.08);
+        statBP.Q.setTargetAtTime(0.9 + audio.fear*12, t, 0.12);
+        droneGain.gain.setTargetAtTime(0.020 + audio.fear*0.10, t, 0.2);
+        windGain.gain.setTargetAtTime(0.04 + audio.fear*0.10, t, 0.15);
+        if (audio.fear>0.72 && Math.random()<0.07) blip(0.85*audio.fear);
+      },
+      setOxy(x){
+        audio.oxy = clamp(x,0,1);
+        const t = ac.currentTime;
+        // Lower oxygen -> breathing modulation increases + lowpass moves
+        const strain = (1-audio.oxy);
+        breathOsc.frequency.setTargetAtTime(0.18 + strain*0.55, t, 0.22);
+        breathGain.gain.setTargetAtTime(0.008 + strain*0.045, t, 0.18);
+        windLP.frequency.setTargetAtTime(140 + (1-strain)*220, t, 1.0);
+      },
+      setObjectivePan(p){
+        pan.pan.setTargetAtTime(clamp(p,-1,1), ac.currentTime, 0.12);
+      }
     };
 
-    setTimeout(mutate, 700);
+    setTimeout(mutate, 450);
+    setTimeout(eventTick, 800);
   }
 
-  async function ensureAudioRunning(){
+  async function ensureAudio(){
     initAudio();
     if (audio?.ac?.state === "suspended"){
       try { await audio.ac.resume(); } catch {}
     }
   }
 
-  // ===== VISUAL EFFECTS =====
-  function drawNoiseOverlay(amount){
-    if (amount<=0) return;
-    ctx.save();
-    ctx.globalAlpha = Math.min(0.26, amount/50);
-    for(let i=0;i<140;i++){
-      const x=Math.random()*canvas.width;
-      const y=Math.random()*canvas.height;
-      const w=1+Math.random()*2;
-      const h=1+Math.random()*2;
-      ctx.fillStyle = Math.random()<0.5 ? "#0d0d0d" : "#1a1a1a";
-      ctx.fillRect(x,y,w,h);
-    }
-    ctx.restore();
-  }
-
-  function generateProceduralCreepy(){
-    const c = document.createElement("canvas");
-    c.width = 160; c.height = 120;
-    const g = c.getContext("2d");
-
-    g.fillStyle="#000"; g.fillRect(0,0,c.width,c.height);
-    for(let i=0;i<2400;i++){
-      const x=(Math.random()*c.width)|0, y=(Math.random()*c.height)|0;
-      const v=(Math.random()*70)|0;
-      g.fillStyle=`rgb(${v},${v},${v})`;
-      g.fillRect(x,y,1,1);
-    }
-    g.fillStyle="rgba(255,60,90,0.08)";
-    g.fillRect(20, 30, 120, 70);
-
-    g.fillStyle="rgba(255,60,90,0.55)";
-    g.fillRect(55, 55, 10, 4);
-    g.fillRect(95, 55, 10, 4);
-
-    g.globalAlpha=0.22;
-    for(let i=0;i<7;i++){
-      const y=(Math.random()*c.height)|0;
-      const dx=(Math.random()*20-10);
-      g.drawImage(c, 0, y, c.width, 2, dx, y, c.width, 2);
-    }
-    g.globalAlpha=1;
-
-    return c;
-  }
-
-  function triggerFlash(){
-    flash.active = true;
-    flash.t = 0;
-    flash.dur = 0.7 + Math.random()*0.7;
-    if (assets.creepyFlashes.length > 0){
-      flash.img = pick(assets.creepyFlashes);
-      flash.procedural = null;
+  // ========= DIFFICULTY PER RUN =========
+  function rollDifficulty(){
+    const r = Math.random();
+    if (r < 0.55){
+      diff.name="NORMAL";
+      diff.oxygenDrain = 1.00;
+      diff.monsters = 1;
+      diff.monsterSpeed = 1.00;
+      diff.fog = 1.00;
+      diff.missionHard = 1.00;
+      diff.aggression = 1.00;
+    } else if (r < 0.85){
+      diff.name="HARD";
+      diff.oxygenDrain = 1.20;
+      diff.monsters = 2;
+      diff.monsterSpeed = 1.10;
+      diff.fog = 1.08;
+      diff.missionHard = 1.25;
+      diff.aggression = 1.12;
     } else {
-      flash.img = null;
-      flash.procedural = generateProceduralCreepy();
+      diff.name="HELL";
+      diff.oxygenDrain = 1.40;
+      diff.monsters = 3;
+      diff.monsterSpeed = 1.22;
+      diff.fog = 1.15;
+      diff.missionHard = 1.45;
+      diff.aggression = 1.22;
     }
-    flash.alpha = 0;
   }
 
-  function drawDistortedImage(img, x, y, w, h, intensity){
-    const slices = 10 + (intensity*24)|0;
-    const sliceH = h / slices;
-    ctx.save();
-    ctx.imageSmoothingEnabled = false;
-
-    ctx.globalAlpha = 0.55 + intensity*0.25;
-    ctx.drawImage(img, x, y, w, h);
-
-    ctx.globalAlpha = 0.88;
-    for (let i=0;i<slices;i++){
-      const sy = y + i*sliceH;
-      const off = (Math.random()-0.5) * (2 + intensity*18);
-      const wob = (Math.random()-0.5) * (1 + intensity*10);
-      ctx.drawImage(img,
-        0, (img.height/slices)*i, img.width, img.height/slices,
-        x + off, sy + wob, w, sliceH + 0.5
-      );
-    }
-
-    ctx.globalCompositeOperation = "screen";
-    ctx.globalAlpha = 0.10 + intensity*0.25;
-    ctx.fillStyle = "rgba(255,60,90,1)";
-    ctx.fillRect(x, y, w, h);
-
-    ctx.restore();
+  // ========= MAP GEN =========
+  function inBounds(x,y){ return x>=0 && y>=0 && x<COLS && y<ROWS; }
+  function isWall(tx,ty){
+    if (!inBounds(tx,ty)) return true;
+    return map[ty][tx] === 1;
+  }
+  function isFloor(tx,ty){
+    return inBounds(tx,ty) && map[ty][tx] === 0;
   }
 
-  function maybeTriggerFaceOverlay(dist){
-    if (assets.monsterFaces.length === 0) return;
-    if (faceOverlay.pickCooldown > 0) return;
-    if (dist > 4.2) return;
-
-    const chance = clamp(0.004 + (4.2-dist)*0.008, 0.004, 0.06);
-    if (Math.random() > chance) return;
-
-    faceOverlay.active = true;
-    faceOverlay.t = 0;
-    faceOverlay.dur = 0.45 + Math.random()*0.35;
-    faceOverlay.img = pick(assets.monsterFaces);
-    faceOverlay.intensity = clamp(1 - dist/4.2, 0, 1);
-    faceOverlay.alpha = 0;
-    faceOverlay.pickCooldown = 50 + ((Math.random()*70)|0);
-
-    pushMessage(`DO NOT STARE, ${hero.name}`);
-  }
-
-  // ===== TEXT =====
-  function pushMessage(text){
-    messages.push({
-      text,
-      x: 8 + Math.random()*(canvas.width-16),
-      y: 18 + Math.random()*(canvas.height-20),
-      life: 70,
-      color: Math.random()>0.5 ? "#ff2244" : "#ffffff"
-    });
-  }
-
-  // ===== MAP =====
-  const inBounds = (x,y)=> x>=0 && y>=0 && x<COLS && y<ROWS;
-  const isFloor = (x,y)=> inBounds(x,y) && map[y][x]===0;
-
-  function randomFloorFarFrom(px, py, minManhattan){
-    for(let i=0;i<900;i++){
-      const x=(Math.random()*COLS)|0, y=(Math.random()*ROWS)|0;
-      if(!isFloor(x,y)) continue;
-      if(Math.abs(x-px)+Math.abs(y-py) < minManhattan) continue;
+  function randomFloorFarFrom(px,py,minManhattan){
+    for (let i=0;i<900;i++){
+      const x = (Math.random()*COLS)|0;
+      const y = (Math.random()*ROWS)|0;
+      if (!isFloor(x,y)) continue;
+      if (Math.abs(x-px)+Math.abs(y-py) < minManhattan) continue;
       return {x,y};
+    }
+    // fallback scan
+    for (let y=1;y<ROWS-1;y++){
+      for (let x=1;x<COLS-1;x++){
+        if (isFloor(x,y) && Math.abs(x-px)+Math.abs(y-py) >= minManhattan) return {x,y};
+      }
     }
     return {x:1,y:1};
   }
 
-  // collision sample: tighten, but keep escape nudges
-  function checkWall(x,y){
-    const ax=Math.floor(x+0.18), ay=Math.floor(y+0.18);
-    const bx=Math.floor(x+0.82), by=Math.floor(y+0.82);
-    if (!inBounds(ax,ay) || !inBounds(bx,by)) return true;
-    return map[ay][ax]===1 || map[by][ax]===1 || map[ay][bx]===1 || map[by][bx]===1;
+  function generateLevel(){
+    // Maze (recursive backtracker)
+    map = Array(ROWS).fill(0).map(()=>Array(COLS).fill(1));
+    const stack = [];
+    const start = {x:1,y:1};
+    map[start.y][start.x] = 0;
+    stack.push(start);
+    while (stack.length){
+      const c = stack[stack.length-1];
+      const dirs = [{dx:0,dy:-2},{dx:0,dy:2},{dx:-2,dy:0},{dx:2,dy:0}].sort(()=>Math.random()-0.5);
+      let carved=false;
+      for (const d of dirs){
+        const nx=c.x+d.dx, ny=c.y+d.dy;
+        if (nx>0 && nx<COLS-1 && ny>0 && ny<ROWS-1 && map[ny][nx]===1){
+          map[ny][nx]=0;
+          map[c.y + d.dy/2][c.x + d.dx/2]=0;
+          stack.push({x:nx,y:ny});
+          carved=true;
+          break;
+        }
+      }
+      if (!carved) stack.pop();
+    }
+
+    // Reset hero position / motion
+    hero.x=1.5; hero.y=1.5;
+    hero.vx=0; hero.vy=0;
+    hero.hitCooldown=0;
+    hero.sanity=100;
+    state.strikes=0;
+
+    // Oxygen base
+    hero.maxOxygen = BASE_OXY_SECONDS; // seconds
+    hero.oxygen = hero.maxOxygen;
+
+    // Stains
+    stains = [];
+    const stainCount = 8 + (diff.name==="HELL"?3:0);
+    for (let i=0;i<stainCount;i++){
+      stains.push(randomFloorFarFrom(1,1,4));
+    }
+
+    // Offerings (used in some missions)
+    offerings = [];
+    while (offerings.length < OFFERINGS_PER_LEVEL){
+      const r = randomFloorFarFrom(1,1,6);
+      if (offerings.some(o=>o.x===r.x && o.y===r.y)) continue;
+      offerings.push({x:r.x,y:r.y, taken:false, order:0});
+    }
+
+    // Chests unlock missions
+    const chCount = CHESTS_PER_LEVEL_BASE + (diff.name==="HARD"?1:0) + (diff.name==="HELL"?2:0);
+    chests = [];
+    while (chests.length < chCount){
+      const r = randomFloorFarFrom(1,1,5);
+      if (chests.some(c=>c.x===r.x && c.y===r.y)) continue;
+      if (offerings.some(o=>o.x===r.x && o.y===r.y)) continue;
+      chests.push({x:r.x,y:r.y, opened:false});
+    }
+
+    // Oxygen tanks
+    const tankCount = TANKS_PER_LEVEL_BASE + (diff.name==="HELL"?2:0);
+    tanks = [];
+    while (tanks.length < tankCount){
+      const r = randomFloorFarFrom(1,1,5);
+      if (tanks.some(t=>t.x===r.x && t.y===r.y)) continue;
+      if (chests.some(c=>c.x===r.x && c.y===r.y)) continue;
+      if (offerings.some(o=>o.x===r.x && o.y===r.y)) continue;
+      tanks.push({x:r.x,y:r.y, used:false, amount: randi(25,40)}); // seconds
+    }
+
+    // Exit locked until mission complete
+    exit = randomFloorFarFrom(1,1,12);
+    exit.unlocked = false;
+
+    // Mission / prompt / effects reset
+    mission.active=false; mission.completed=false;
+    prompt.active=false;
+    pulse.active=false;
+    flash.active=false;
+    facePopup.active=false;
+    messages = [];
+    state.anxiety = 0;
+    state.camShake = 0;
+
+    // Spawn monsters
+    monsters.length = 0;
+    for (let i=0;i<diff.monsters;i++){
+      const r = randomFloorFarFrom(1,1,14);
+      monsters.push({
+        x: r.x+0.5, y: r.y+0.5,
+        vx: 0, vy: 0,
+        speed: MONSTER_BASE_SPEED * diff.monsterSpeed * rand(0.92, 1.08),
+        stun: 0,
+        lastHeard: 0,
+        target: null,
+        stepCooldown: 0,
+        aggression: diff.aggression * rand(0.90, 1.15),
+        id: i,
+      });
+    }
+
+    hudStatus.textContent = "STATUS: ALONE";
+    hudStatus.className = "pill status";
+    pushMessage("BOOT SECTOR OK", "#ffffff");
+    pushMessage(pick(cryptic));
+    updateHud();
+    updateMissionUI();
+    updatePromptUI();
   }
 
-  // ===== OBJECTIVES =====
+  // ========= COLLISION FIX (NO STICKING) =========
+  function resolveCircleGrid(px,py){
+    let x = px, y = py;
+
+    // Iterative resolution helps with deep overlaps + corner cases
+    for (let iter=0; iter<4; iter++){
+      let pushed = false;
+      const minX = Math.floor(x - PLAYER_R - 1);
+      const maxX = Math.floor(x + PLAYER_R + 1);
+      const minY = Math.floor(y - PLAYER_R - 1);
+      const maxY = Math.floor(y + PLAYER_R + 1);
+
+      for (let ty=minY; ty<=maxY; ty++){
+        for (let tx=minX; tx<=maxX; tx++){
+          if (!isWall(tx,ty)) continue;
+
+          // tile AABB [tx,tx+1]x[ty,ty+1]
+          const cx = Math.max(tx, Math.min(x, tx+1));
+          const cy = Math.max(ty, Math.min(y, ty+1));
+          const dx = x - cx;
+          const dy = y - cy;
+          const d2 = dx*dx + dy*dy;
+
+          if (d2 < PLAYER_R*PLAYER_R){
+            const d = Math.max(1e-6, Math.sqrt(d2));
+            const push = (PLAYER_R - d);
+            const nx = dx / d;
+            const ny = dy / d;
+            x += nx * push;
+            y += ny * push;
+            pushed = true;
+          }
+        }
+      }
+      if (!pushed) break;
+    }
+    return {x,y};
+  }
+
+  // ========= MONSTER AI (tile-guided drift) =========
+  function pickMonsterStepToward(mx,my, tx,ty){
+    const cx = Math.floor(mx);
+    const cy = Math.floor(my);
+    const opts = [
+      {x:cx+1,y:cy},{x:cx-1,y:cy},{x:cx,y:cy+1},{x:cx,y:cy-1}
+    ].filter(p=>isFloor(p.x,p.y));
+    if (!opts.length) return null;
+
+    let best = opts[0], bestScore = 1e9;
+    for (const o of opts){
+      const d = Math.hypot((o.x+0.5)-tx, (o.y+0.5)-ty);
+      const wob = (Math.random()-0.5)*0.35;
+      const score = d + wob;
+      if (score < bestScore){
+        bestScore = score;
+        best = o;
+      }
+    }
+    return best;
+  }
+
+  function updateMonsters(dt){
+    // fear based on nearest monster
+    let nearest = 999;
+    for (const m of monsters){
+      const d = Math.hypot(m.x-hero.x, m.y-hero.y);
+      if (d < nearest) nearest = d;
+    }
+    const fear = clamp(1 - nearest/6, 0, 1);
+    audio?.setFear?.(fear);
+
+    // faces when very close
+    if (nearest < 2.3 && Math.random() < 0.05){
+      triggerFacePopup(nearest);
+    }
+
+    // monster motion
+    const sprinting = !!keys["ShiftLeft"];
+    const hear = sprinting ? MONSTER_HEAR_RUN : MONSTER_HEAR_WALK;
+
+    for (const m of monsters){
+      if (m.stun > 0){
+        m.stun -= dt;
+        continue;
+      }
+
+      const dx = hero.x - m.x;
+      const dy = hero.y - m.y;
+      const dist = Math.max(1e-6, Math.hypot(dx,dy));
+
+      // decide target
+      let tx = m.x, ty = m.y;
+      if (dist < hear){
+        m.lastHeard = 1.2;
+        tx = hero.x; ty = hero.y;
+      } else if (m.lastHeard > 0){
+        m.lastHeard -= dt;
+        tx = m.x + (dx/dist) * 1.2;
+        ty = m.y + (dy/dist) * 1.2;
+      } else {
+        // drift to stains
+        const s = stains[(Math.random()*stains.length)|0];
+        tx = s.x+0.5; ty = s.y+0.5;
+      }
+
+      m.stepCooldown -= dt;
+      if (m.stepCooldown <= 0 || !m.target){
+        m.stepCooldown = 0.10 + Math.random()*0.22;
+        const step = pickMonsterStepToward(m.x, m.y, tx, ty);
+        if (step) m.target = step;
+      }
+
+      const spd = m.speed * m.aggression;
+      if (m.target){
+        const gx = m.target.x+0.5;
+        const gy = m.target.y+0.5;
+        const mdx = gx - m.x;
+        const mdy = gy - m.y;
+        const md = Math.max(1e-6, Math.hypot(mdx,mdy));
+        m.x += (mdx/md) * spd * dt;
+        m.y += (mdy/md) * spd * dt;
+        if (md < 0.10) m.stepCooldown = 0;
+      }
+
+      // sprint lurch
+      if (sprinting && fear>0.45 && Math.random() < 0.0035){
+        m.x += (dx/dist)*0.55;
+        m.y += (dy/dist)*0.55;
+        state.anxiety = Math.max(state.anxiety, 18);
+        audio?.blip?.(1.0);
+        pushMessage("IMAGE TEAR");
+        triggerFlash("tear");
+      }
+
+      // hit
+      if (hero.hitCooldown > 0) hero.hitCooldown -= dt;
+      if (dist < MONSTER_HIT_DIST && hero.hitCooldown <= 0){
+        hero.hitCooldown = MONSTER_HIT_COOLDOWN;
+        m.stun = 0.28; // brief pause
+        state.anxiety = Math.max(state.anxiety, 22);
+        state.camShake = Math.max(state.camShake, 12);
+        audio?.blip?.(1.0);
+        triggerFlash("hit");
+        pushMessage("DON'T LOOK", "#ff3355");
+
+        // shove
+        hero.x -= (dx/dist)*0.35;
+        hero.y -= (dy/dist)*0.35;
+        const r = resolveCircleGrid(hero.x, hero.y);
+        hero.x = r.x; hero.y = r.y;
+
+        state.strikes++;
+        hero.sanity = Math.max(0, hero.sanity - 18);
+
+        if (state.strikes >= STRIKES_TO_DIE){
+          dieAndReset();
+          return;
+        } else {
+          hudStatus.textContent = "STATUS: PANICKING";
+          hudStatus.className = "pill warn";
+          setTimeout(()=>{
+            if (state.mode==="PLAY"){
+              hudStatus.textContent = mission.active ? "STATUS: MISSION ACTIVE" : "STATUS: WATCHED";
+              hudStatus.className = mission.active ? "pill" : "pill warn";
+            }
+          }, 650);
+        }
+      }
+    }
+  }
+
+  function dieAndReset(){
+    state.mode = "MENU";
+    menu.style.display = "grid";
+    loreIntroEl.textContent = "CAUGHT. THE TAPE REWINDS.";
+    pushMessage("RESET");
+  }
+
+  // ========= OBJECTIVES =========
   function openedChests(){ return chests.filter(c=>c.opened).length; }
-  function updateHUD(){
-    scoreDisplay.textContent = `EVIDENCE: ${collectedCount}/${TOTAL_EVIDENCE}  |  CHESTS: ${openedChests()}/${chests.length}`;
-    const diffTxt = diff ? diff.name : "???";
-    statsLine.textContent = `${hero.name} · ${hero.role} · O₂ ${hero.oxygen.toFixed(0)}% · ${diffTxt}`;
-    missionLine.textContent = mission.active ? `${mission.title} (${Math.floor(100*clamp(mission.progress/mission.goal,0,1))}%)` : (exitLocked ? "Find a chest." : "Exit unsealed.");
+  function nearestObjective(){
+    // unopened chest -> mission completion stuff -> exit
+    let best=null, bestD=1e9;
+
+    for (const c of chests){
+      if (c.opened) continue;
+      const d = Math.hypot((c.x+0.5)-hero.x, (c.y+0.5)-hero.y);
+      if (d<bestD){ bestD=d; best={x:c.x,y:c.y,type:"chest"}; }
+    }
+    if (best) return best;
+
+    for (const o of offerings){
+      if (o.taken) continue;
+      const d = Math.hypot((o.x+0.5)-hero.x, (o.y+0.5)-hero.y);
+      if (d<bestD){ bestD=d; best={x:o.x,y:o.y,type:"offering"}; }
+    }
+    if (exit && exit.unlocked){
+      const d = Math.hypot((exit.x+0.5)-hero.x, (exit.y+0.5)-hero.y);
+      if (d<bestD){ bestD=d; best={x:exit.x,y:exit.y,type:"exit"}; }
+    }
+    return best;
   }
 
-  // ===== PROMPT SYSTEM =====
-  function showPrompt(p){
-    if (prompt.active) return;
-    prompt.active = true;
-    prompt.text = p.text.replaceAll("{NAME}", hero.name).replaceAll("{ROLE}", hero.role);
-    prompt.a = p.a.replaceAll("{NAME}", hero.name);
-    prompt.b = p.b.replaceAll("{NAME}", hero.name);
-    prompt.onChoose = p.choose;
-    prompt.timer = 6.5;
-    pushMessage("INPUT REQUIRED");
-    globalAnxiety = Math.max(globalAnxiety, 10);
+  // ========= PULSE =========
+  function triggerPulse(){
+    if (pulse.active) return;
+    const obj = nearestObjective();
+    if (!obj) return;
+
+    const dx = (obj.x+0.5) - hero.x;
+    const dy = (obj.y+0.5) - hero.y;
+    const d = Math.max(1e-6, Math.hypot(dx,dy));
+    pulse.active = true;
+    pulse.t = 0;
+    pulse.ring = 0;
+    pulse.dirX = dx/d;
+    pulse.dirY = dy/d;
+
+    state.anxiety = Math.max(state.anxiety, 10);
+    audio?.blip?.(1.0);
+    pushMessage("ECHO PULSE", "#ffffff");
+
+    if (mission.active && mission.type === "ECHO_COUNT"){
+      mission.extra.used++;
+      if (mission.extra.used > mission.extra.max){
+        mission.extra.used = 0;
+        state.anxiety = Math.max(state.anxiety, 16);
+        pushMessage("ECHO OVERFLOW", "#ff3355");
+      }
+    }
   }
 
-  function choosePrompt(choice){
-    if (!prompt.active) return;
-    const fn = prompt.onChoose;
-    prompt.active = false;
-    if (fn) fn(choice);
-    audio?.click?.(0.9);
-  }
-
-  function buildLorePrompts(){
-    const hooks = {
-      THIEF: [
-        { text:`A lock whispers: "{NAME}, return what you stole."`, a:"1) RETURN IT", b:"2) KEEP IT", choose:(c)=>{ if(c===1){ monsters.forEach(m=>m.aggression*=0.93); pushMessage("DEBT PAID"); } else { monsters.forEach(m=>m.aggression*=1.07); pushMessage("DEBT GROWS"); globalAnxiety=Math.max(globalAnxiety,13);} } },
-        { text:`A drawer opens by itself: "HANDS CLEAN?"`, a:"1) YES", b:"2) NO", choose:(c)=>{ if(c===1){ pushMessage("LIAR"); monsters.forEach(m=>m.aggression*=1.06);} else { hero.oxygen=Math.min(hero.maxOxygen, hero.oxygen+8); pushMessage("BREATH RETURNS"); } } }
-      ],
-      KILLER: [
-        { text:`The corridor asks: "{NAME}, do you feel REMORSE?"`, a:"1) YES", b:"2) NO", choose:(c)=>{ if(c===1){ hero.oxygenDrainBase*=0.92; pushMessage("SOFTER STEPS"); } else { monsters.forEach(m=>m.speed*=1.05); pushMessage("HUNGER ANSWERS"); globalAnxiety=Math.max(globalAnxiety,14);} } },
-        { text:`A tape loops: "CONFESS."`, a:"1) CONFESS", b:"2) DENY", choose:(c)=>{ if(c===1){ monsters.forEach(m=>m.aggression*=0.90); pushMessage("THE MAZE LISTENS"); } else { pushMessage("THE MAZE GRINS"); hero.oxygen=Math.max(0, hero.oxygen-10);} } }
-      ],
-      BUTCHER: [
-        { text:`A hook swings: "{NAME}, sharpen?"`, a:"1) SHARPEN", b:"2) REFUSE", choose:(c)=>{ if(c===1){ hero.maxOxygen=Math.max(80, hero.maxOxygen-6); hero.oxygen=Math.min(hero.oxygen, hero.maxOxygen); monsters.forEach(m=>m.aggression*=0.92); pushMessage("STEEL SONG"); } else { monsters.forEach(m=>m.aggression*=1.07); pushMessage("DULL TEETH"); globalAnxiety=Math.max(globalAnxiety,13);} } },
-        { text:`A sink runs: "WASH THE HANDS."`, a:"1) WASH", b:"2) DON'T", choose:(c)=>{ if(c===1){ hero.oxygen=Math.min(hero.maxOxygen, hero.oxygen+6); pushMessage("WATER IS BLACK"); } else { hero.oxygenDrainBase*=1.10; pushMessage("SALT IN LUNGS"); } } }
-      ]
-    };
-    return hooks[hero.role] || hooks.THIEF;
-  }
-
-  let lorePrompts = [];
-
-  // ===== MISSION SYSTEM =====
+  // ========= MISSIONS (unlocked by chests) =========
   function setMission(m){
     mission.active = true;
     mission.completed = false;
-    mission.title = m.title.replaceAll("{NAME}", hero.name);
-    mission.desc  = m.desc.replaceAll("{NAME}", hero.name);
-    mission.type  = m.type;
+    mission.title = m.title;
+    mission.desc = m.desc;
+    mission.type = m.type;
     mission.progress = 0;
     mission.goal = m.goal ?? 1;
     mission.extra = m.extra ?? null;
 
-    exitLocked = true;
-    statusDisplay.style.color = "#ccffcc";
-    statusDisplay.textContent = "STATUS: TRACE ACTIVE";
-    pushMessage(`NEW TASK FOR ${hero.name}`);
+    exit.unlocked = false;
+
+    hudStatus.textContent = "STATUS: MISSION ACTIVE";
+    hudStatus.className = "pill";
+    pushMessage("NEW TASK LOADED", "#ffffff");
+    updateMissionUI();
   }
 
   function completeMission(){
     mission.completed = true;
     mission.active = false;
-    exitLocked = false;
-    pushMessage("TRACE COMPLETE");
-    pushMessage("EXIT UNSEALED");
-    audio?.click?.(1.0);
-    statusDisplay.style.color = "#ccffcc";
-    statusDisplay.textContent = "STATUS: EXIT UNLOCKED";
-    monsters.forEach(m => m.aggression = Math.max(0.85, m.aggression * 0.94));
-    globalAnxiety = Math.max(0, globalAnxiety - 4);
+    exit.unlocked = true;
+
+    pushMessage("TASK COMPLETE", "#ccffcc");
+    pushMessage("EXIT UNSEALED", "#ccffcc");
+    audio?.blip?.(1.0);
+
+    hudStatus.textContent = "STATUS: EXIT UNLOCKED";
+    hudStatus.className = "pill status";
+
+    // small reward
+    state.anxiety = Math.max(0, state.anxiety - 4);
+    for (const m of monsters) m.aggression = Math.max(0.92, m.aggression - 0.06);
+
+    updateMissionUI();
   }
 
-  function generateRandomMission(){
-    const t = pick(["HOLD_BREATH","NO_RUN","STAIN_TOUCH","ECHO_COUNT","FOLLOW_ORDER"]);
-    const taskMult = diff.taskMult;
+  function genMission(){
+    // always different missions; scaled by difficulty
+    const t = pick(["STILLNESS","NO_RUN","STAIN_TOUCH","ECHO_COUNT","FOLLOW_ORDER","STATIC_PURGE"]);
+    const hard = diff.missionHard;
 
-    if (t==="HOLD_BREATH"){
-      const seconds = (2.2 + Math.random()*2.2) * taskMult;
-      return { type:"HOLD_BREATH", title:"HOLD YOUR BREATH", desc:`Stand still near a stain for ${seconds.toFixed(1)}s.\nDo not move.`, goal:seconds, extra:{} };
+    if (t==="STILLNESS"){
+      const sec = clamp(2.0*hard + rand(0.0, 2.2), 2.0, 5.5);
+      return {
+        type:"STILLNESS",
+        title:"STILLNESS RITUAL",
+        desc:`Stand still near a stain for ${sec.toFixed(1)}s.\n(Do not move.)`,
+        goal: sec,
+        extra:{}
+      };
     }
+
     if (t==="NO_RUN"){
-      const time = (8 + ((Math.random()*10)|0)) * taskMult;
-      return { type:"NO_RUN", title:"MOVE QUIETLY", desc:`Survive ${time.toFixed(0)}s without running.\nShift forbidden.`, goal:time, extra:{} };
+      const sec = clamp(10*hard + randi(0,8), 10, 26);
+      return {
+        type:"NO_RUN",
+        title:"SILENT WALK",
+        desc:`Survive ${sec.toFixed(0)}s without sprinting.\n(Shift forbidden.)`,
+        goal: sec,
+        extra:{}
+      };
     }
+
     if (t==="STAIN_TOUCH"){
-      const count = Math.max(2, Math.round((2 + ((Math.random()*3)|0)) * taskMult));
-      return { type:"STAIN_TOUCH", title:"FOLLOW THE STAINS", desc:`Step into ${count} different stains.\nEach counts once.`, goal:count, extra:{ touched:new Set() } };
+      const count = clamp(Math.round(2*hard + rand(0,2)), 2, 6);
+      return {
+        type:"STAIN_TOUCH",
+        title:"TOUCH THE CORRUPTION",
+        desc:`Step into ${count} different stains.\n(Each stain counts once.)`,
+        goal: count,
+        extra:{ touched:new Set() }
+      };
     }
+
     if (t==="ECHO_COUNT"){
-      const pulses = Math.max(2, Math.round((2 + ((Math.random()*3)|0)) * taskMult));
-      return { type:"ECHO_COUNT", title:"PING THE CORRIDOR", desc:`Use Signal Pulse (E) exactly ${pulses} times.\nToo many resets.`, goal:pulses, extra:{ used:0, max:pulses } };
+      const pulses = clamp(Math.round(2*hard + rand(0,2)), 2, 6);
+      return {
+        type:"ECHO_COUNT",
+        title:"ECHO TEST",
+        desc:`Use Signal Pulse (E) exactly ${pulses} times.\n(Too many resets.)`,
+        goal: pulses,
+        extra:{ used:0, max:pulses }
+      };
     }
-    const order=[1,2,3].sort(()=>Math.random()-0.5);
-    evidence.forEach((o,i)=>o.order=order[i]);
-    return { type:"FOLLOW_ORDER", title:"RECONSTRUCT TIMELINE", desc:`Collect evidence in sequence.\nColors indicate order.`, goal:TOTAL_EVIDENCE, extra:{ needed:1 } };
+
+    if (t==="FOLLOW_ORDER"){
+      const order = [1,2,3].sort(()=>Math.random()-0.5);
+      offerings.forEach((o,i)=>o.order = order[i]);
+      return {
+        type:"FOLLOW_ORDER",
+        title:"SEQUENCE OF OFFERINGS",
+        desc:`Collect offerings in the correct sequence.\n(Colors indicate order.)`,
+        goal: OFFERINGS_PER_LEVEL,
+        extra:{ needed:1 }
+      };
+    }
+
+    // STATIC_PURGE: stand still while holding breath (oxygen low-ish)
+    const sec = clamp(2.5*hard + rand(0,2.8), 2.5, 6.2);
+    return {
+      type:"STATIC_PURGE",
+      title:"STATIC PURGE",
+      desc:`When O2 < 40s, stand still for ${sec.toFixed(1)}s.\n(Wait for the tape to clear.)`,
+      goal: sec,
+      extra:{}
+    };
   }
 
   function updateMission(dt, moving, sprinting){
     if (!mission.active) return;
 
-    if (mission.type==="HOLD_BREATH"){
-      const near = stains.some(s=>Math.hypot((s.x+0.5)-player.x,(s.y+0.5)-player.y) < 2.0);
+    if (mission.type==="STILLNESS"){
+      const near = stains.some(s => Math.hypot((s.x+0.5)-hero.x, (s.y+0.5)-hero.y) < 2.0);
       if (!moving && near) mission.progress += dt;
       else mission.progress = Math.max(0, mission.progress - dt*0.9);
+
       if (mission.progress >= mission.goal) completeMission();
       return;
     }
@@ -793,16 +1256,19 @@
     if (mission.type==="NO_RUN"){
       if (sprinting){
         mission.progress = Math.max(0, mission.progress - dt*2.2);
-        globalAnxiety = Math.max(globalAnxiety, 12);
-        if (Math.random()<0.02) pushMessage("TOO LOUD");
-      } else mission.progress += dt;
+        state.anxiety = Math.max(state.anxiety, 12);
+        if (Math.random()<0.02) pushMessage("TOO LOUD", "#ff3355");
+      } else {
+        mission.progress += dt;
+      }
       if (mission.progress >= mission.goal) completeMission();
       return;
     }
 
     if (mission.type==="STAIN_TOUCH"){
-      for(const s of stains){
-        if (Math.hypot((s.x+0.5)-player.x,(s.y+0.5)-player.y) < 0.9) mission.extra.touched.add(`${s.x},${s.y}`);
+      for (const s of stains){
+        const d = Math.hypot((s.x+0.5)-hero.x, (s.y+0.5)-hero.y);
+        if (d < 0.9) mission.extra.touched.add(`${s.x},${s.y}`);
       }
       mission.progress = mission.extra.touched.size;
       if (mission.progress >= mission.goal) completeMission();
@@ -816,769 +1282,876 @@
     }
 
     if (mission.type==="FOLLOW_ORDER"){
-      mission.progress = collectedCount;
+      // handled by pickups
+      mission.progress = offerings.filter(o=>o.taken).length;
+      return;
+    }
+
+    if (mission.type==="STATIC_PURGE"){
+      const okOxy = hero.oxygen < 40;
+      if (okOxy && !moving) mission.progress += dt;
+      else mission.progress = Math.max(0, mission.progress - dt*0.9);
+      if (!okOxy && Math.random()<0.01) pushMessage("WAIT FOR LOW AIR", "#ffffff");
+      if (mission.progress >= mission.goal) completeMission();
       return;
     }
   }
 
-  // ===== PULSE =====
-  function getNearestObjective(){
-    let best=null, bestD=1e9;
-    for(const c of chests){
-      if(c.opened) continue;
-      const d=Math.hypot((c.x+0.5)-player.x,(c.y+0.5)-player.y);
-      if(d<bestD){bestD=d; best={x:c.x,y:c.y};}
-    }
-    if(best) return best;
-    for(const o of evidence){
-      if(o.collected) continue;
-      const d=Math.hypot((o.x+0.5)-player.x,(o.y+0.5)-player.y);
-      if(d<bestD){bestD=d; best={x:o.x,y:o.y};}
-    }
-    if(!best && exit) best={x:exit.x,y:exit.y};
-    return best;
-  }
-
-  function triggerPulse(){
-    if (!gameStarted) return;
-    if (pulse.active) return;
-    const target = getNearestObjective();
-    if (!target) return;
-
-    const dx=(target.x+0.5)-player.x, dy=(target.y+0.5)-player.y;
-    const d=Math.max(0.0001, Math.hypot(dx,dy));
-    pulse.active=true; pulse.t=0; pulse.dirX=dx/d; pulse.dirY=dy/d;
-    globalAnxiety=Math.max(globalAnxiety, 10);
-    pushMessage("ECHO PULSE");
-    audio?.click?.(0.9);
-
-    if (mission.active && mission.type==="ECHO_COUNT"){
-      mission.extra.used++;
-      if (mission.extra.used > mission.extra.max){
-        mission.extra.used = 0;
-        pushMessage("ECHO OVERFLOW");
-        globalAnxiety=Math.max(globalAnxiety, 16);
+  // ========= PROMPTS (lore choices) =========
+  const promptBank = [
+    {
+      q:`A whisper says: "DO YOU WANT TO BE SEEN, {NAME}?"`,
+      a:`1) YES (more clarity)\n2) NO (more safety)`,
+      choose:(c)=>{
+        if (c===1){
+          state.anxiety = Math.max(state.anxiety, 12);
+          for (const m of monsters) m.aggression += 0.08;
+          pushMessage("YOU ARE VISIBLE", "#ff3355");
+        } else {
+          for (const m of monsters) m.aggression = Math.max(0.92, m.aggression - 0.07);
+          pushMessage("YOU ARE MISSING", "#ffffff");
+        }
       }
-    }
-  }
-
-  // ===== MONSTERS =====
-  function enemyPickStepToward(m, tx, ty){
-    const ex=m.x|0, ey=m.y|0;
-    const opts=[{x:ex+1,y:ey},{x:ex-1,y:ey},{x:ex,y:ey+1},{x:ex,y:ey-1}].filter(p=>isFloor(p.x,p.y));
-    if(!opts.length) return null;
-
-    let best=opts[0], bestScore=1e9;
-    for(const o of opts){
-      const d=Math.hypot((o.x+0.5)-tx,(o.y+0.5)-ty);
-      const wob=(Math.random()-0.5)*0.25;
-      const score=d + wob;
-      if(score<bestScore){bestScore=score; best=o;}
-    }
-    return best;
-  }
-
-  function spawnMonsters(){
-    monsters = [];
-    const count = diff.monsters;
-    for (let i=0;i<count;i++){
-      const r = randomFloorFarFrom(player.x|0, player.y|0, 12 + i*2);
-      monsters.push({
-        x:r.x+0.5, y:r.y+0.5,
-        speed: (1.9 + Math.random()*0.7) * (0.95 + i*0.06),
-        aggression: diff.enemyAggro * (0.95 + Math.random()*0.18),
-        stun:0,
-        lastSeen:0,
-        stepCooldown:0,
-        targetTile:null,
-        seed: Math.random()*9999
-      });
-    }
-    statusDisplay.textContent = "STATUS: WATCHED";
-    statusDisplay.style.color = "#ff3344";
-  }
-
-  function updateMonsters(dt){
-    if (monsters.length===0 && collectedCount >= 1){
-      spawnMonsters();
-      audio?.click?.(1.0);
-    }
-    if (monsters.length===0) return;
-
-    let closest = 999;
-    for (const m of monsters){
-      const dx=player.x-m.x, dy=player.y-m.y;
-      const dist=Math.max(0.0001, Math.hypot(dx,dy));
-      closest = Math.min(closest, dist);
-
-      // fear audio uses closest monster
-      if (m.stun>0){ m.stun-=dt; continue; }
-
-      const sprinting = isDown("ShiftLeft");
-      const hearRadius = sprinting ? 8.0 : 4.8;
-
-      let targetX=m.x, targetY=m.y;
-      if (dist < hearRadius){
-        m.lastSeen = 1.3;
-        targetX = player.x; targetY = player.y;
-      } else if (m.lastSeen>0){
-        m.lastSeen -= dt;
-        targetX = m.x + (dx/dist)*1.0;
-        targetY = m.y + (dy/dist)*1.0;
-      } else {
-        const s = stains[(Math.random()*stains.length)|0];
-        targetX = s.x+0.5; targetY = s.y+0.5;
+    },
+    {
+      q:`The CRT hisses: "SACRIFICE SPEED FOR SILENCE, {NAME}?"`,
+      a:`1) ACCEPT\n2) REFUSE`,
+      choose:(c)=>{
+        if (c===1){
+          pushMessage("SILENCE TRADE", "#ffffff");
+          state.anxiety = Math.max(0, state.anxiety - 4);
+        } else {
+          pushMessage("LOUD TRADE", "#ff3355");
+          for (const m of monsters) m.aggression += 0.10;
+        }
       }
-
-      m.stepCooldown -= dt;
-      if (m.stepCooldown<=0 || !m.targetTile){
-        m.stepCooldown = 0.12 + Math.random()*0.18;
-        const step = enemyPickStepToward(m, targetX, targetY);
-        if (step) m.targetTile=step;
+    },
+    {
+      q:`A stain pulses: "NAME THE COLOR."`,
+      a:`1) RED\n2) NONE`,
+      choose:(c)=>{
+        if (c===1){
+          pushMessage("WRONG", "#ff3355");
+          state.anxiety = Math.max(state.anxiety, 16);
+          triggerFlash("wrong");
+        } else {
+          pushMessage("CORRECT", "#ccffcc");
+          hero.sanity = Math.min(100, hero.sanity + 10);
+        }
       }
-
-      const spd = m.speed * m.aggression;
-      if (m.targetTile){
-        const cx=m.targetTile.x+0.5, cy=m.targetTile.y+0.5;
-        const mdx=cx-m.x, mdy=cy-m.y;
-        const md=Math.max(0.0001, Math.hypot(mdx,mdy));
-        m.x += (mdx/md) * spd * dt;
-        m.y += (mdy/md) * spd * dt;
-        if (md < 0.10) m.stepCooldown = 0;
-      }
-
-      // close attack (2 strikes total)
-      if (player.panicGrace>0) player.panicGrace -= dt;
-      if (dist < 0.62 && player.panicGrace<=0){
-        player.panicGrace = 0.85;
-        m.stun = 0.55;
-
-        globalAnxiety = Math.max(globalAnxiety, 22);
-        pushMessage(`DON'T LOOK, ${hero.name}`);
-        triggerFlash();
-
-        // shove back
-        player.x -= (dx/dist)*0.35;
-        player.y -= (dy/dist)*0.35;
-
-        player.panicHits += 1;
-        hero.oxygen = Math.max(0, hero.oxygen - 12);
-
-        if (player.panicHits >= 2){
-          alert("CAUGHT. RESETTING.");
-          generateLevel();
-          return;
+    },
+    {
+      q:`A voice counts your breaths: "STOP BREATHING?"`,
+      a:`1) STOP\n2) KEEP GOING`,
+      choose:(c)=>{
+        if (c===1){
+          // risky: less oxygen drain briefly, but more fear spikes
+          pushMessage("HOLDING", "#ffffff");
+          hero.oxygen = Math.min(hero.maxOxygen, hero.oxygen + 6);
+          state.anxiety = Math.max(state.anxiety, 14);
+        } else {
+          pushMessage("GOOD DOG", "#ff3355");
+          for (const m of monsters) m.aggression += 0.06;
         }
       }
     }
+  ];
 
-    // audio fear + face overlay
-    const fear = clamp(1 - closest/6, 0, 1);
-    audio?.setFear?.(fear);
-    maybeTriggerFaceOverlay(closest);
+  function showPrompt(p){
+    if (prompt.active) return;
+    prompt.active = true;
+    prompt.timer = prompt.maxTime;
+    prompt.onChoose = p.choose;
+
+    const name = hero.name.toUpperCase();
+    prompt.q = p.q.replaceAll("{NAME}", name);
+    prompt.a = p.a;
+
+    pushMessage("INPUT REQUIRED", "#ffffff");
+    state.anxiety = Math.max(state.anxiety, 10);
+    updatePromptUI();
   }
 
-  // ===== LEVEL GEN =====
-  function generateLevel(){
-    // randomize difficulty each run
-    diff = pick(DIFF_PRESETS);
-    diffLine.textContent = `RANDOM DIFFICULTY: ${diff.name} · monsters: ${diff.monsters} · oxygen drain: x${diff.oxygenDrain.toFixed(2)} · tasks: x${diff.taskMult.toFixed(2)}`;
-
-    // set hero based on role
-    hero.name = (nameInput.value || "UNKNOWN").trim().slice(0,18) || "UNKNOWN";
-    hero.role = chosenRole;
-    hero.maxOxygen = hero.role==="BUTCHER" ? 92 : hero.role==="KILLER" ? 96 : 100;
-    hero.oxygen = hero.maxOxygen;
-    hero.oxygenDrainBase = hero.role==="THIEF" ? 0.85 : hero.role==="KILLER" ? 0.95 : 1.00;
-    hero.stealth = hero.role==="THIEF" ? 0.90 : hero.role==="KILLER" ? 1.05 : 1.10; // affects hearing radius indirectly
-    hero.tint = hero.role==="THIEF" ? "#ccffcc" : hero.role==="KILLER" ? "#ff6677" : "#ffcc66";
-
-    lorePrompts = buildLorePrompts();
-
-    // maze
-    map = Array(ROWS).fill(0).map(()=>Array(COLS).fill(1));
-    const stack=[];
-    const start={x:1,y:1};
-    map[start.y][start.x]=0;
-    stack.push(start);
-
-    while(stack.length){
-      const c = stack[stack.length-1];
-      const dirs=[{dx:0,dy:-2},{dx:0,dy:2},{dx:-2,dy:0},{dx:2,dy:0}].sort(()=>Math.random()-0.5);
-      let carved=false;
-      for(const d of dirs){
-        const nx=c.x+d.dx, ny=c.y+d.dy;
-        if(nx>0&&nx<COLS-1&&ny>0&&ny<ROWS-1&&map[ny][nx]===1){
-          map[ny][nx]=0;
-          map[c.y+(d.dy/2)][c.x+(d.dx/2)]=0;
-          stack.push({x:nx,y:ny});
-          carved=true; break;
-        }
-      }
-      if(!carved) stack.pop();
-    }
-
-    stains=[];
-    for(let i=0;i<8;i++) stains.push(randomFloorFarFrom(1,1,4));
-
-    evidence=[];
-    while(evidence.length<TOTAL_EVIDENCE){
-      const r = randomFloorFarFrom(1,1,6);
-      if(evidence.some(o=>o.x===r.x && o.y===r.y)) continue;
-      evidence.push({x:r.x,y:r.y,collected:false,order:0});
-    }
-
-    // chests scale slightly with difficulty
-    const chestCount = CHESTS_BASE + (diff.name==="HELL" ? 1 : 0);
-    chests=[];
-    while(chests.length<chestCount){
-      const r = randomFloorFarFrom(1,1,5);
-      if(chests.some(c=>c.x===r.x && c.y===r.y)) continue;
-      if(evidence.some(o=>o.x===r.x && o.y===r.y)) continue;
-      chests.push({x:r.x,y:r.y,opened:false});
-    }
-
-    exit = randomFloorFarFrom(1,1,12);
-    exitLocked = true;
-
-    collectedCount=0;
-    messages=[];
-    globalAnxiety=0;
-
-    // player
-    player.x=1; player.y=1;
-    player.vx=0; player.vy=0;
-    player.panicHits=0; player.panicGrace=0;
-    player.sanity=100;
-
-    // monsters reset
-    monsters=[];
-    // mission reset
-    mission.active=false; mission.completed=false;
-    prompt.active=false;
-    pulse.active=false;
-    flash.active=false;
-    faceOverlay.active=false; faceOverlay.pickCooldown=0;
-
-    statusDisplay.style.color="#ccffcc";
-    statusDisplay.textContent="STATUS: ALONE";
-
-    pushMessage(`HELLO, ${hero.name}.`);
-    pushMessage(`ROLE: ${hero.role}.`);
-    pushMessage(`DIFFICULTY: ${diff.name}.`);
-
-    updateHUD();
+  function choosePrompt(choice){
+    if (!prompt.active) return;
+    const fn = prompt.onChoose;
+    prompt.active = false;
+    prompt.onChoose = null;
+    audio?.blip?.(0.9);
+    if (fn) fn(choice);
+    updatePromptUI();
   }
 
-  // ===== PICKUPS =====
-  function openChest(ch){
-    ch.opened=true;
-    pushMessage(`CHEST OPENED BY ${hero.name}`);
-    audio?.click?.(1.0);
-    if (Math.random()<0.85) triggerFlash();
+  function updatePromptUI(){
+    promptBox.style.display = prompt.active ? "block" : "none";
+    if (!prompt.active) return;
+    promptQEl.textContent = prompt.q;
+    promptAEl.textContent = prompt.a;
+    promptBarEl.style.width = "100%";
+  }
 
-    if (!mission.active && exitLocked){
-      setMission(generateRandomMission());
+  // ========= FLASH / DISTORTION =========
+  function proceduralCreepyCanvas(kind=""){
+    const c = document.createElement('canvas');
+    c.width = 160; c.height = 120;
+    const g = c.getContext('2d');
+
+    g.fillStyle="#000"; g.fillRect(0,0,c.width,c.height);
+
+    // grain
+    for (let i=0;i<2800;i++){
+      const x=(Math.random()*c.width)|0;
+      const y=(Math.random()*c.height)|0;
+      const v=(Math.random()*70)|0;
+      g.fillStyle=`rgb(${v},${v},${v})`;
+      g.fillRect(x,y,1,1);
+    }
+
+    // abstract face-ish
+    const cx = c.width/2 + rand(-14,14);
+    const cy = c.height/2 + rand(-10,10);
+    g.fillStyle="rgba(255,51,85,0.65)";
+    g.fillRect(cx-32, cy-10, 10, 4);
+    g.fillRect(cx+22, cy-10, 10, 4);
+    g.fillStyle="rgba(0,0,0,0.85)";
+    g.fillRect(cx-28, cy-9, 2, 2);
+    g.fillRect(cx+26, cy-9, 2, 2);
+
+    g.fillStyle="rgba(255,255,255,0.10)";
+    g.fillRect(cx-22, cy+14, 44, 3);
+
+    // tears
+    g.fillStyle="rgba(255,51,85,0.20)";
+    for (let i=0;i<8;i++){
+      const x=cx + rand(-55,55);
+      const y=rand(0,c.height);
+      g.fillRect(x, y, 1, rand(12,55));
+    }
+
+    // smear rows
+    g.globalAlpha=0.22;
+    for (let i=0;i<7;i++){
+      const y=(Math.random()*c.height)|0;
+      const dx=rand(-14,14);
+      g.drawImage(c, 0, y, c.width, 2, dx, y, c.width, 2);
+    }
+    g.globalAlpha=1;
+
+    // kind-specific highlight
+    if (kind==="hit" || kind==="wrong"){
+      g.fillStyle="rgba(255,51,85,0.08)";
+      g.fillRect(0,0,c.width,c.height);
+    }
+    return c;
+  }
+
+  function distortDrawImage(img, x, y, w, h, intensity){
+    // slice jitter + channel-ish offsets (cheap & creepy)
+    const slices = 10 + ((intensity*16)|0);
+    for (let i=0;i<slices;i++){
+      const sy = (i/slices)*h;
+      const sh = h/slices;
+      const dx = rand(-1,1) * (2 + intensity*10);
+      const dy = rand(-1,1) * (1 + intensity*6);
+      const sx = rand(-1,1) * (1 + intensity*4);
+
+      ctx.globalAlpha = 0.55 + Math.random()*0.45;
+      ctx.drawImage(img,
+        0, sy, img.width, (img.height/slices),
+        x + dx + sx, y + sy + dy, w, sh
+      );
+    }
+
+    // red veil / burn
+    ctx.globalAlpha = 0.12 + intensity*0.18;
+    ctx.fillStyle = "rgba(255,51,85,1)";
+    ctx.fillRect(x,y,w,h);
+    ctx.globalAlpha = 1;
+  }
+
+  function triggerFlash(kind="pickup"){
+    flash.active = true;
+    flash.t = 0;
+    flash.dur = 0.65 + Math.random()*0.75;
+    flash.kind = kind;
+
+    // choose image: your flashes -> else procedural
+    if (assets.flashes.length){
+      flash.img = pick(assets.flashes);
     } else {
-      if (Math.random()<0.75) showPrompt(pick(lorePrompts));
+      flash.img = proceduralCreepyCanvas(kind);
     }
-    updateHUD();
+    flash.alpha = 0;
   }
 
-  function collectEvidence(o){
+  function triggerFacePopup(dist){
+    if (facePopup.active) return;
+    const img = (Math.random()<0.5 ? assets.face1 : assets.face2);
+    facePopup.active = true;
+    facePopup.t = 0;
+    facePopup.dur = 0.48 + Math.random()*0.35;
+    facePopup.img = img || proceduralCreepyCanvas("face");
+    facePopup.intensity = clamp(1 - dist/2.3, 0.15, 1);
+  }
+
+  // Monster sprite: use your monster image if present, else procedural tiny sprite
+  const fallbackMonster = (() => {
+    const c = document.createElement('canvas');
+    c.width=24; c.height=24;
+    const g=c.getContext('2d');
+    g.clearRect(0,0,24,24);
+    g.fillStyle="rgba(40,40,55,0.92)";
+    g.fillRect(6,6,12,12);
+    g.fillStyle="rgba(255,51,85,0.85)";
+    g.fillRect(9,12,2,1);
+    g.fillRect(13,12,2,1);
+    g.fillStyle="rgba(0,0,0,0.85)";
+    g.fillRect(10,15,4,2);
+    for (let i=0;i<30;i++){
+      g.fillStyle = Math.random()<0.5 ? "rgba(255,51,85,0.12)" : "rgba(255,255,255,0.08)";
+      g.fillRect((Math.random()*24)|0, (Math.random()*24)|0, 1,1);
+    }
+    return c;
+  })();
+
+  // ========= PICKUPS =========
+  function openChest(c){
+    c.opened = true;
+    audio?.thump?.(0.40);
+    audio?.blip?.(0.8);
+    pushMessage("CHEST OPENED", "#ffffff");
+
+    // chest always causes some visual offense
+    if (Math.random() < 0.8) triggerFlash("chest");
+
+    // if no mission active and exit locked -> unlock mission
+    if (!mission.active && !exit.unlocked){
+      setMission(genMission());
+    } else {
+      // otherwise likely prompt
+      if (Math.random() < 0.7) showPrompt(pick(promptBank));
+    }
+
+    updateHud();
+    updateMissionUI();
+  }
+
+  function collectTank(t){
+    t.used = true;
+    hero.oxygen = Math.min(hero.maxOxygen, hero.oxygen + t.amount);
+    audio?.thump?.(0.28);
+    pushMessage(`OXYGEN +${t.amount}s`, "#ccffcc");
+    if (Math.random()<0.35) triggerFlash("tank");
+    updateHud();
+  }
+
+  function collectOffering(o){
     if (mission.active && mission.type==="FOLLOW_ORDER"){
-      const needed=(mission.extra?.needed ?? 1);
+      const needed = mission.extra.needed;
       if (o.order !== needed){
-        pushMessage("WRONG TIMELINE");
-        globalAnxiety=Math.max(globalAnxiety,18);
-        audio?.thump?.(1.0);
-        triggerFlash();
+        pushMessage("WRONG SEQUENCE", "#ff3355");
+        audio?.blip?.(1.0);
+        triggerFlash("wrong");
+        // punish: rewind level
         generateLevel();
         return;
       }
       mission.extra.needed = needed + 1;
-      if (mission.extra.needed > TOTAL_EVIDENCE) completeMission();
+      if (mission.extra.needed > OFFERINGS_PER_LEVEL){
+        completeMission();
+      }
     }
 
-    o.collected=true;
-    collectedCount++;
-    pushMessage(`EVIDENCE FOUND: ${hero.name}`);
-    audio?.click?.(0.9);
+    o.taken = true;
+    audio?.blip?.(0.95);
+    pushMessage("OFFERING ACCEPTED", "#ffffff");
+    pushMessage(pick(["FOUND FOOTAGE OK","INDEX CORRUPTED","MEMORY FRAME LOST","AUDIO DESCENDS"]), "#ffffff");
 
-    // oxygen micro reward on thief (playstyle)
-    if (hero.role==="THIEF") hero.oxygen = Math.min(hero.maxOxygen, hero.oxygen + 3);
+    if (Math.random() < 0.60) triggerFlash("pickup");
+    if (Math.random() < 0.30) showPrompt(pick(promptBank));
 
-    if (Math.random()<0.65) triggerFlash();
-    if (Math.random()<0.35) showPrompt(pick(lorePrompts));
-
-    updateHUD();
+    updateHud();
   }
 
-  // ===== DRAW PLAYER (animated creepy) =====
-  function drawCreepyProtagonist(px, py, t){
-    // px/py are in pixels at tile coords
-    const wob = Math.sin(t*7.2) * 0.9;
-    const breathe = 1 + Math.sin(t*2.4) * 0.05;
-    const jitterX = (Math.random()-0.5)*0.6;
-    const jitterY = (Math.random()-0.5)*0.6;
+  // ========= HUD =========
+  function updateHud(){
+    hudLeft.textContent = `${hero.name.toUpperCase()} · ${hero.role.toUpperCase()} · STRIKES ${state.strikes}/${STRIKES_TO_DIE}`;
+    hudDiff.textContent = `DIFF: ${diff.name}`;
+    hudItems.textContent = `CHESTS: ${openedChests()}/${chests.length} · EXIT: ${exit.unlocked ? "OPEN" : "SEALED"}`;
 
-    // silhouette
-    ctx.save();
-    ctx.translate(px + jitterX, py + jitterY);
-    ctx.scale(1, breathe);
+    const oxyPct = clamp(hero.oxygen / hero.maxOxygen, 0, 1);
+    hudOxy.textContent = `O2: ${(oxyPct*100)|0}% (${hero.oxygen.toFixed(0)}s)`;
 
-    // body
-    ctx.fillStyle = "rgba(10,10,12,0.95)";
-    ctx.fillRect(-3, -6, 6, 10);
-
-    // “head”
-    ctx.fillStyle = "rgba(20,20,24,0.95)";
-    ctx.fillRect(-2, -10, 4, 4);
-
-    // role glow
-    ctx.globalCompositeOperation = "screen";
-    ctx.globalAlpha = 0.20;
-    ctx.fillStyle = hero.tint;
-    ctx.fillRect(-4, -11, 8, 16);
-
-    // eyes flicker
-    ctx.globalAlpha = 0.55 + 0.35*Math.sin(t*12.0 + wob);
-    ctx.fillStyle = hero.role==="KILLER" ? "rgba(255,60,90,1)" :
-                    hero.role==="BUTCHER" ? "rgba(255,180,90,1)" :
-                    "rgba(120,255,160,1)";
-    if (Math.random()<0.85){
-      ctx.fillRect(-1, -9, 1, 1);
-      ctx.fillRect(1, -9, 1, 1);
+    // warn style
+    if (hero.oxygen < LOW_OXY_WARN){
+      hudOxy.className = "pill warn";
+    } else {
+      hudOxy.className = "pill";
     }
+  }
 
-    // trailing smear line (abstract)
-    ctx.globalCompositeOperation = "source-over";
-    ctx.globalAlpha = 0.12;
-    ctx.fillStyle = "rgba(255,60,90,1)";
-    ctx.fillRect(-2 + wob, 4, 4, 1);
+  function updateMissionUI(){
+    missionBox.style.display = mission.active ? "block" : "none";
+    if (!mission.active) return;
+    missionTitleEl.textContent = mission.title;
+    missionDescEl.textContent = mission.desc;
+    const pct = clamp(mission.progress / mission.goal, 0, 1);
+    missionBarEl.style.width = `${(pct*100).toFixed(0)}%`;
+  }
 
+  // ========= PLAYER DRAW (animated creepy figure) =========
+  function drawPlayer(px,py,t){
+    // player is screen-centered (camera), so px/py are already camera-space
+    const role = hero.role;
+    const wob = Math.sin(t*6.2)*0.8 + Math.sin(t*2.1)*0.6;
+    const flick = Math.random()<0.20 ? 1 : 0;
+
+    // small trailing smear
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.fillRect(px-2 - wob*0.4, py-2 + wob*0.2, 4, 4);
+    ctx.globalAlpha = 1;
+
+    if (role==="thief"){
+      // thin, angular
+      ctx.fillStyle = "#e6eefc";
+      ctx.beginPath();
+      ctx.moveTo(px, py-5-wob*0.3);
+      ctx.lineTo(px+4+wob*0.2, py+4);
+      ctx.lineTo(px-4-wob*0.2, py+4);
+      ctx.closePath();
+      ctx.fill();
+      if (flick){
+        ctx.fillStyle="rgba(255,51,85,0.35)";
+        ctx.fillRect(px-1, py-1, 2, 2);
+      }
+    } else if (role==="killer"){
+      // compact “mask” square with blinking red dot
+      ctx.fillStyle = "#f2f2f2";
+      ctx.fillRect(px-4, py-4, 8, 8);
+      ctx.fillStyle = "rgba(0,0,0,0.85)";
+      ctx.fillRect(px-2, py-1, 4, 2);
+      ctx.fillStyle = flick ? "rgba(255,51,85,0.85)" : "rgba(255,51,85,0.45)";
+      ctx.fillRect(px-1, py-3, 2, 1);
+    } else {
+      // butcher: heavier, “apron” look
+      ctx.fillStyle="#f2f2f2";
+      ctx.fillRect(px-4, py-5, 8, 10);
+      ctx.fillStyle="rgba(255,51,85,0.45)";
+      ctx.fillRect(px-3, py+1, 6, 2);
+      ctx.fillStyle="rgba(0,0,0,0.85)";
+      ctx.fillRect(px-2, py-2, 4, 1);
+      if (flick){
+        ctx.fillStyle="rgba(255,51,85,0.25)";
+        ctx.fillRect(px-4, py-5, 8, 10);
+      }
+    }
+  }
+
+  // ========= RENDER =========
+  function drawNoise(amount){
+    if (amount<=0) return;
+    ctx.save();
+    ctx.globalAlpha = Math.min(0.26, amount/50);
+    for (let i=0;i<GRAIN_PARTICLES;i++){
+      const x=Math.random()*CAN_W;
+      const y=Math.random()*CAN_H;
+      const w=1+Math.random()*2;
+      const h=1+Math.random()*2;
+      ctx.fillStyle = Math.random()<0.5 ? "#0d0d0d" : "#1a1a1a";
+      ctx.fillRect(x,y,w,h);
+    }
     ctx.restore();
   }
 
-  // ===== RENDER =====
-  function render(){
-    ctx.fillStyle="#050505";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
+  function render(dt){
+    // Clear
+    ctx.fillStyle="#000";
+    ctx.fillRect(0,0,CAN_W,CAN_H);
 
-    const viewRadius = clamp(BASE_FOV - (globalAnxiety/5) + (pulse.active?2.5:0), MIN_FOV, MAX_FOV);
+    // Determine view radius (fog)
+    const viewRadius = clamp(BASE_FOV - (state.anxiety/6)*diff.fog + (pulse.active?2.3:0), MIN_FOV, MAX_FOV);
 
-    // map
-    for(let y=0;y<ROWS;y++){
-      for(let x=0;x<COLS;x++){
-        const dist = Math.hypot((x+0.5)-player.x,(y+0.5)-player.y);
-        let vis=0;
-        if (dist<viewRadius){
-          vis=1-(dist/viewRadius);
-          vis=Math.pow(vis, 0.65);
+    // Camera centered on hero + shake
+    const shake = Math.min(10, state.camShake + state.anxiety*0.22);
+    const shakeX = (Math.random()-0.5)*shake;
+    const shakeY = (Math.random()-0.5)*shake;
+    const camX = CAN_W/2 - hero.x*TILE + shakeX;
+    const camY = CAN_H/2 - hero.y*TILE + shakeY;
+
+    // Tiles
+    for (let y=0;y<ROWS;y++){
+      for (let x=0;x<COLS;x++){
+        const dist = Math.hypot((x+0.5)-hero.x, (y+0.5)-hero.y);
+        let vis = 0;
+        if (dist < viewRadius){
+          vis = 1 - (dist/viewRadius);
+          vis = Math.pow(vis, 0.62);
         }
-        if (pulse.active && Math.abs(dist-pulse.t)<1.5){
-          vis += 0.5*(1-(Math.abs(dist-pulse.t)/1.5));
+
+        // pulse ring
+        if (pulse.active){
+          const ring = pulse.ring;
+          const delta = Math.abs(dist - ring);
+          if (delta < 1.6){
+            vis += 0.55*(1 - delta/1.6);
+          }
         }
-        if (vis<=0.01) continue;
+
+        if (vis <= 0.01) continue;
         vis = clamp(vis,0,1);
 
-        const sx=x*TILE_SIZE, sy=y*TILE_SIZE;
+        const sx = camX + x*TILE;
+        const sy = camY + y*TILE;
+
         ctx.save();
-        ctx.globalAlpha=vis;
+        ctx.globalAlpha = vis;
 
         if (map[y][x]===1){
-          ctx.fillStyle="#333";
-          ctx.fillRect(sx,sy,TILE_SIZE,TILE_SIZE);
-          ctx.strokeStyle="#1a1a1a";
-          ctx.strokeRect(sx,sy,TILE_SIZE,TILE_SIZE);
+          ctx.fillStyle = "#333";
+          ctx.fillRect(sx,sy,TILE,TILE);
+          ctx.strokeStyle = "#1a1a1a";
+          ctx.strokeRect(sx,sy,TILE,TILE);
         } else {
-          ctx.fillStyle="#0a0a0a";
-          ctx.fillRect(sx,sy,TILE_SIZE,TILE_SIZE);
+          ctx.fillStyle = "#0a0a0a";
+          ctx.fillRect(sx,sy,TILE,TILE);
 
+          // stains
           if (stains.some(s=>s.x===x && s.y===y)){
-            ctx.fillStyle=`rgba(${110+(Math.random()*60)},0,${30+(Math.random()*50)},0.35)`;
-            ctx.fillRect(sx,sy,TILE_SIZE,TILE_SIZE);
+            ctx.fillStyle = `rgba(${120+Math.random()*40|0},0,${40+Math.random()*40|0},0.35)`;
+            ctx.fillRect(sx,sy,TILE,TILE);
           }
         }
         ctx.restore();
       }
     }
 
-    // objects helper
-    const drawObj=(ox,oy,color,shape)=>{
-      const dist=Math.hypot((ox+0.5)-player.x,(oy+0.5)-player.y);
-      if(dist>viewRadius && !(pulse.active && Math.abs(dist-pulse.t)<1.5)) return;
-      const sx=ox*TILE_SIZE, sy=oy*TILE_SIZE;
-      ctx.fillStyle=color;
-      if(shape==="box") ctx.fillRect(sx+4,sy+4,8,8);
-      if(shape==="circle"){ ctx.beginPath(); ctx.arc(sx+8,sy+8,4,0,Math.PI*2); ctx.fill(); }
-      if(shape==="diamond"){
-        ctx.beginPath(); ctx.moveTo(sx+8,sy+2); ctx.lineTo(sx+14,sy+8);
-        ctx.lineTo(sx+8,sy+14); ctx.lineTo(sx+2,sy+8); ctx.fill();
+    // Helper to draw objects (respect visibility)
+    function drawObj(tx,ty, color, shape){
+      const dist = Math.hypot((tx+0.5)-hero.x, (ty+0.5)-hero.y);
+      if (dist > viewRadius && !(pulse.active && Math.abs(dist-pulse.ring)<1.6)) return;
+
+      const sx = camX + tx*TILE;
+      const sy = camY + ty*TILE;
+
+      ctx.fillStyle = color;
+      if (shape==="box"){
+        ctx.fillRect(sx+4, sy+4, 8, 8);
+      } else if (shape==="circle"){
+        ctx.beginPath();
+        ctx.arc(sx+8, sy+8, 4, 0, Math.PI*2);
+        ctx.fill();
+      } else if (shape==="diamond"){
+        ctx.beginPath();
+        ctx.moveTo(sx+8, sy+2);
+        ctx.lineTo(sx+14, sy+8);
+        ctx.lineTo(sx+8, sy+14);
+        ctx.lineTo(sx+2, sy+8);
+        ctx.closePath();
+        ctx.fill();
       }
-    };
+    }
 
-    // chests
-    chests.forEach(c=>{ if(!c.opened) drawObj(c.x,c.y,"#4488aa","box"); });
+    // Chests
+    for (const c of chests){
+      if (!c.opened) drawObj(c.x,c.y,"#4488aa","box");
+    }
+    // Tanks
+    for (const t of tanks){
+      if (!t.used) drawObj(t.x,t.y,"#5cf","box");
+    }
+    // Offerings (color sequence if mission)
+    for (const o of offerings){
+      if (o.taken) continue;
+      if (mission.active && mission.type==="FOLLOW_ORDER"){
+        const col = o.order===1 ? "#ff3355" : o.order===2 ? "#55ff88" : "#3388ff";
+        drawObj(o.x,o.y,col,"circle");
+      } else {
+        drawObj(o.x,o.y,"#ddcc44","circle");
+      }
+    }
+    // Exit
+    if (exit){
+      drawObj(exit.x, exit.y, exit.unlocked ? "#ffffff" : "#550000", "diamond");
+      if (exit.unlocked){
+        const sx = camX + exit.x*TILE;
+        const sy = camY + exit.y*TILE;
+        ctx.fillStyle = "rgba(255,51,85,0.65)";
+        ctx.fillRect(sx+7, sy+3, 2, TILE-6);
+      }
+    }
 
-    // evidence
-    evidence.forEach(o=>{
-      if(o.collected) return;
-      const col = (mission.active && mission.type==="FOLLOW_ORDER")
-        ? (["#ff2244","#ccff88","#88aaff"][o.order-1] || "#ddcc44")
-        : "#ddcc44";
-      drawObj(o.x,o.y,col,"circle");
-    });
-
-    // exit
-    if(exit) drawObj(exit.x, exit.y, exitLocked ? "#550000" : "#ffffff", "diamond");
-
-    // monsters (creepy image following player)
+    // Monsters (image sprite following)
     for (const m of monsters){
-      const dist=Math.hypot(m.x-player.x,m.y-player.y);
-      if(dist<viewRadius+1.5){
-        const sx=m.x*TILE_SIZE-8, sy=m.y*TILE_SIZE-8;
-        const jx=(Math.random()-0.5)*2, jy=(Math.random()-0.5)*2;
+      const dist = Math.hypot(m.x-hero.x, m.y-hero.y);
+      if (dist > viewRadius + 1.6) continue;
 
-        if (assets.monsterBody){
-          // distorted draw of your monster body image
-          ctx.save();
-          ctx.globalAlpha = 0.55 + clamp(1-dist/6,0,1)*0.35;
-          drawDistortedImage(assets.monsterBody, sx+jx, sy+jy, 16, 16, clamp(1-dist/6,0,1));
-          ctx.restore();
-        } else {
-          // procedural mini “creepy image”
-          ctx.save();
-          ctx.globalAlpha = 0.65 + clamp(1-dist/6,0,1)*0.25;
-          ctx.fillStyle="rgba(255,60,90,0.25)";
-          ctx.fillRect(sx+jx, sy+jy, 16, 16);
-          ctx.fillStyle="rgba(0,0,0,0.75)";
-          ctx.fillRect(sx+5+jx, sy+6+jy, 2, 1);
-          ctx.fillRect(sx+10+jx, sy+6+jy, 2, 1);
-          ctx.restore();
-        }
-      }
+      const sx = camX + m.x*TILE - 12;
+      const sy = camY + m.y*TILE - 12;
+
+      const img = assets.monster || fallbackMonster;
+
+      // subtle jitter & distortion increases as it approaches
+      const intensity = clamp(1 - dist/6, 0, 1);
+      const jx = (Math.random()-0.5)*(2 + intensity*4);
+      const jy = (Math.random()-0.5)*(2 + intensity*4);
+
+      ctx.save();
+      ctx.globalAlpha = 0.72 + intensity*0.25;
+      distortDrawImage(img, sx+jx, sy+jy, 24, 24, intensity*0.9);
+      ctx.restore();
     }
 
-    // player (animated, creepy)
-    const t = performance.now()/1000;
-    drawCreepyProtagonist(player.x*TILE_SIZE, player.y*TILE_SIZE, t);
+    // Player at center
+    const px = CAN_W/2;
+    const py = CAN_H/2;
+    drawPlayer(px, py, state.time);
 
-    // flash overlay
-    if(flash.active){
+    // Pulse line direction (subtle)
+    if (pulse.active){
       ctx.save();
-      ctx.globalAlpha = flash.alpha*0.85;
-      const img = flash.img || flash.procedural;
-      if(img){
-        ctx.imageSmoothingEnabled=false;
-        ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      ctx.globalAlpha = 0.18;
+      ctx.strokeStyle = "#ccffcc";
+      ctx.beginPath();
+      ctx.moveTo(px,py);
+      ctx.lineTo(px + pulse.dirX*60, py + pulse.dirY*60);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Flash overlay
+    if (flash.active && flash.img){
+      const a = flash.alpha * 0.85;
+      ctx.save();
+      ctx.globalAlpha = a;
+      const img = flash.img;
+      // if it's an <img> scale to full; if canvas same
+      ctx.drawImage(img, 0, 0, CAN_W, CAN_H);
+      // extra distortion on top when intense
+      if (flash.kind==="hit" || flash.kind==="wrong"){
+        ctx.globalAlpha = a*0.45;
+        distortDrawImage(img, 0, 0, CAN_W, CAN_H, 0.85);
       }
       ctx.restore();
     }
 
-    // face overlay
-    if(faceOverlay.active && faceOverlay.img){
+    // Face popup overlay when near monster
+    if (facePopup.active && facePopup.img){
+      const a = (1 - (facePopup.t/facePopup.dur)) * 0.95;
+      const intensity = facePopup.intensity;
+
       ctx.save();
-      ctx.globalAlpha = faceOverlay.alpha;
-      drawDistortedImage(faceOverlay.img, 0,0, canvas.width, canvas.height, faceOverlay.intensity);
+      ctx.globalAlpha = a;
+      const w = CAN_W;
+      const h = CAN_H;
+      distortDrawImage(facePopup.img, 0, 0, w, h, intensity);
       ctx.restore();
     }
 
-    // pulse indicator
-    if(pulse.active){
-      const px=player.x*TILE_SIZE, py=player.y*TILE_SIZE;
-      ctx.strokeStyle="rgba(255,60,90,0.35)";
-      ctx.lineWidth=2;
-      ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px+pulse.dirX*28, py+pulse.dirY*28); ctx.stroke();
-    }
-
-    // noise + messages
-    drawNoiseOverlay(globalAnxiety);
-
-    ctx.font="14px VT323";
-    messages.forEach(m=>{
-      ctx.fillStyle=m.color;
-      ctx.globalAlpha=Math.min(1, m.life/22);
+    // Messages
+    ctx.save();
+    ctx.font = "18px VT323";
+    for (const m of messages){
+      ctx.globalAlpha = Math.min(1, m.life/20);
+      ctx.fillStyle = m.color;
       ctx.fillText(m.text, m.x, m.y);
-    });
-    ctx.globalAlpha=1;
+    }
+    ctx.restore();
 
-    // prompt box (center-bottom)
-    if(prompt.active){
-      ctx.fillStyle="rgba(0,0,0,0.85)";
-      ctx.fillRect(18, 160, 284, 72);
-      ctx.strokeStyle="#ccffcc";
-      ctx.strokeRect(18, 160, 284, 72);
-      ctx.fillStyle="#fff";
-      ctx.textAlign="center";
-      ctx.fillText(prompt.text, 160, 180);
-      ctx.fillStyle="#aaa";
-      ctx.fillText(prompt.a, 160, 202);
-      ctx.fillText(prompt.b, 160, 218);
-      ctx.fillStyle="#ff2244";
-      ctx.fillRect(20, 228, (prompt.timer/6.5)*280, 2);
-      ctx.textAlign="left";
+    // Noise
+    drawNoise(state.anxiety);
+
+    // Prompt bar updates (UI)
+    if (prompt.active){
+      const pct = clamp(prompt.timer / prompt.maxTime, 0, 1);
+      promptBarEl.style.width = `${(pct*100).toFixed(0)}%`;
     }
   }
 
-  // ===== UPDATE =====
-  let lastTime = performance.now();
-  let hudDimTimer = 0;
+  // ========= UPDATE LOOP =========
+  let last = performance.now();
+
+  function isDown(code){ return !!keys[code]; }
 
   function update(dt){
-    // oxygen drain: harder diff + running + low sanity vibe
-    const sprinting = isDown("ShiftLeft");
-    const movingInput = (isDown("KeyW")||isDown("ArrowUp")||isDown("KeyS")||isDown("ArrowDown")||isDown("KeyA")||isDown("ArrowLeft")||isDown("KeyD")||isDown("ArrowRight"));
-    const runPenalty = sprinting ? 1.45 : 1.0;
-    const drain = hero.oxygenDrainBase * diff.oxygenDrain * runPenalty;
-    hero.oxygen = Math.max(0, hero.oxygen - drain * dt * 6.0);
+    state.time += dt;
 
-    audio?.setAir?.(hero.oxygen / hero.maxOxygen);
-
-    // if oxygen is 0, you “choke” = increased anxiety and slower accel
-    const choke = hero.oxygen <= 0.1;
-    if (choke){
-      globalAnxiety = Math.max(globalAnxiety, 16);
-      pushMessage(Math.random()<0.02 ? `${hero.name} CAN'T BREATHE` : "");
-    }
+    // decay cam shake + anxiety
+    state.camShake = Math.max(0, state.camShake - dt*18);
+    state.anxiety = Math.max(0, state.anxiety - dt*2.2);
 
     // prompt timer
     if (prompt.active){
       prompt.timer -= dt;
       if (prompt.timer <= 0){
-        prompt.active=false;
-        pushMessage("NO RESPONSE");
-        globalAnxiety=Math.max(globalAnxiety,14);
-        monsters.forEach(m=>m.aggression*=1.03);
+        prompt.active = false;
+        pushMessage("NO RESPONSE", "#ff3355");
+        state.anxiety = Math.max(state.anxiety, 14);
+        // punish: monsters get bolder
+        for (const m of monsters) m.aggression += 0.06;
+        updatePromptUI();
       }
     }
 
-    // smooth acceleration movement (fix stuck-feel)
+    // movement input
     let ix=0, iy=0;
-    if (isDown("KeyW")||isDown("ArrowUp")) iy -= 1;
-    if (isDown("KeyS")||isDown("ArrowDown")) iy += 1;
-    if (isDown("KeyA")||isDown("ArrowLeft")) ix -= 1;
-    if (isDown("KeyD")||isDown("ArrowRight")) ix += 1;
+    if (isDown("KeyW") || isDown("ArrowUp")) iy -= 1;
+    if (isDown("KeyS") || isDown("ArrowDown")) iy += 1;
+    if (isDown("KeyA") || isDown("ArrowLeft")) ix -= 1;
+    if (isDown("KeyD") || isDown("ArrowRight")) ix += 1;
 
-    // dim hud when moving
-    if (movingInput) hudDimTimer = 0.25;
-    else hudDimTimer = Math.max(0, hudDimTimer - dt);
-    hudLeft.classList.toggle("dim", hudDimTimer > 0);
-
-    // normalize input
-    let tx=0, ty=0;
-    if (ix!==0 || iy!==0){
-      const len=Math.hypot(ix,iy) || 1;
-      tx=ix/len; ty=iy/len;
+    if (ix || iy){
+      const len = Math.hypot(ix,iy) || 1;
+      ix /= len; iy /= len;
     }
 
-    // target max speed
-    const runMult = sprinting ? RUN_MULT : 1.0;
-    const maxSpd = clamp(MAX_SPEED * runMult, 0, MAX_SPEED*1.7) * (choke ? 0.70 : 1.0);
+    const sprinting = isDown("ShiftLeft");
+    const maxSpd = MAX_SPEED * (sprinting ? RUN_MULT : 1);
 
-    // accel towards target
-    player.vx += tx * ACCEL * dt;
-    player.vy += ty * ACCEL * dt;
+    // acceleration
+    hero.vx += ix * ACCEL * dt;
+    hero.vy += iy * ACCEL * dt;
 
-    // friction when no input on an axis
-    if (Math.abs(tx) < INPUT_DEADZONE){
-      const s = Math.sign(player.vx);
-      player.vx -= s * FRICTION * dt;
-      if (Math.sign(player.vx) !== s) player.vx = 0;
+    // friction (only on axes with no input)
+    if (Math.abs(ix) < 0.001){
+      const s = Math.sign(hero.vx);
+      hero.vx -= s * FRICTION * dt;
+      if (Math.sign(hero.vx) !== s) hero.vx = 0;
     }
-    if (Math.abs(ty) < INPUT_DEADZONE){
-      const s = Math.sign(player.vy);
-      player.vy -= s * FRICTION * dt;
-      if (Math.sign(player.vy) !== s) player.vy = 0;
+    if (Math.abs(iy) < 0.001){
+      const s = Math.sign(hero.vy);
+      hero.vy -= s * FRICTION * dt;
+      if (Math.sign(hero.vy) !== s) hero.vy = 0;
     }
 
     // clamp speed
-    const sp = Math.hypot(player.vx, player.vy);
+    const sp = Math.hypot(hero.vx, hero.vy);
     if (sp > maxSpd){
       const k = maxSpd / sp;
-      player.vx *= k; player.vy *= k;
+      hero.vx *= k; hero.vy *= k;
     }
 
-    // move with axis separation + anti-wedge nudge
-    const oldX = player.x, oldY = player.y;
+    // integrate with SUBSTEPS to avoid tunneling + keep collisions stable
+    const steps = Math.max(1, Math.min(5, Math.ceil(sp * dt * 3)));
+    let nx = hero.x, ny = hero.y;
 
-    // X move
-    let nx = player.x + player.vx * dt;
-    if (!checkWall(nx, player.y)) player.x = nx;
-    else {
-      player.vx = 0;
-      // nudge attempt
-      if (!checkWall(player.x, player.y + 0.12)) player.y += 0.08;
-      else if (!checkWall(player.x, player.y - 0.12)) player.y -= 0.08;
+    for (let s=0; s<steps; s++){
+      nx += (hero.vx * dt) / steps;
+      ny += (hero.vy * dt) / steps;
+      const r = resolveCircleGrid(nx, ny);
+      nx = r.x; ny = r.y;
     }
 
-    // Y move
-    let ny = player.y + player.vy * dt;
-    if (!checkWall(player.x, ny)) player.y = ny;
-    else {
-      player.vy = 0;
-      if (!checkWall(player.x + 0.12, player.y)) player.x += 0.08;
-      else if (!checkWall(player.x - 0.12, player.y)) player.x -= 0.08;
+    const moved = (Math.abs(nx-hero.x)+Math.abs(ny-hero.y)) > 1e-5;
+    hero.x = nx; hero.y = ny;
+
+    // sprint anxiety + sanity
+    if (sprinting && moved){
+      state.anxiety = Math.min(26, state.anxiety + dt*9.0);
+      hero.sanity = Math.max(0, hero.sanity - dt*10);
+    } else {
+      hero.sanity = Math.min(100, hero.sanity + dt*6);
     }
 
-    // if somehow got embedded (rare), snap back
-    if (checkWall(player.x, player.y)){
-      player.x = oldX; player.y = oldY;
-      player.vx = 0; player.vy = 0;
+    // Oxygen drain (seconds)
+    // baseline: maxOxygen / BASE_OXY_SECONDS_per_full = 1 sec/sec -> so oxygen is "seconds remaining"
+    const drain = (1.0 * diff.oxygenDrain) * (sprinting ? RUN_OXY_MULT : 1.0);
+    hero.oxygen = Math.max(0, hero.oxygen - drain*dt);
+
+    audio?.setOxy?.(hero.oxygen / hero.maxOxygen);
+
+    // oxygen panic pressure but not instant death
+    if (hero.oxygen <= 0){
+      // suffocation is a loss (but not hyper-frenetic)
+      pushMessage("NO AIR", "#ff3355");
+      dieAndReset();
+      return;
+    } else if (hero.oxygen < LOW_OXY_WARN){
+      state.anxiety = Math.max(state.anxiety, 10);
+      if (Math.random()<0.015) pushMessage(`${hero.name.toUpperCase()} CAN'T BREATHE`, "#ff3355");
     }
 
-    const moving = (Math.abs(player.x-oldX) + Math.abs(player.y-oldY)) > 0.00001;
-
-    // anxiety dynamics
-    if (sprinting) globalAnxiety = Math.min(globalAnxiety + 0.35, 18);
-    else globalAnxiety = Math.max(globalAnxiety - 0.12, 0);
-
-    // mission
-    updateMission(dt, moving, sprinting);
-
-    // monsters
-    updateMonsters(dt);
-
-    // objective panning
-    const obj = getNearestObjective();
-    if (obj && audio){
-      const dx=(obj.x+0.5)-player.x;
-      audio.setObjectivePan(clamp(dx/6, -1, 1));
+    // Pulse update
+    if (pulse.active){
+      pulse.t += dt * 10.5;
+      pulse.ring = pulse.t * 2.2;
+      if (pulse.t > 2.8) pulse.active = false;
     }
 
-    // stains effect
-    for(const s of stains){
-      const d=Math.hypot((s.x+0.5)-player.x,(s.y+0.5)-player.y);
-      if(d<1.0){
-        globalAnxiety=Math.max(globalAnxiety,8);
-        if (Math.random()<0.006) audio?.click?.(0.25);
-        if (Math.random()<0.005) pushMessage(`${hero.name}…`);
-        if (Math.random()<0.004) showPrompt(pick(lorePrompts));
-      }
-    }
-
-    // pickups
-    for(const c of chests){
-      if(c.opened) continue;
-      const d=Math.hypot((c.x+0.5)-player.x,(c.y+0.5)-player.y);
-      if(d<0.72) openChest(c);
-    }
-    for(const o of evidence){
-      if(o.collected) continue;
-      const d=Math.hypot((o.x+0.5)-player.x,(o.y+0.5)-player.y);
-      if(d<0.72) collectEvidence(o);
-    }
-
-    // exit logic
-    if (exit){
-      const d=Math.hypot((exit.x+0.5)-player.x,(exit.y+0.5)-player.y);
-      if(d<0.60){
-        if(exitLocked){
-          pushMessage("EXIT LOCKED");
-          globalAnxiety=Math.max(globalAnxiety,10);
-        } else {
-          // win -> next depth (new run)
-          pushMessage("DESCENDING…");
-          generateLevel();
-        }
-      }
-    }
-
-    // pulse
-    if(pulse.active){
-      pulse.t += dt*12;
-      if(pulse.t>25) pulse.active=false;
-    }
-
-    // flash
-    if(flash.active){
+    // flash update
+    if (flash.active){
       flash.t += dt;
       if (flash.t < flash.dur*0.2) flash.alpha = flash.t/(flash.dur*0.2);
       else flash.alpha = 1 - (flash.t - flash.dur*0.2)/(flash.dur*0.8);
-      if (flash.t>=flash.dur){ flash.active=false; flash.alpha=0; }
+      if (flash.t >= flash.dur){
+        flash.active = false;
+        flash.alpha = 0;
+      }
     }
 
-    // face overlay
-    if (faceOverlay.pickCooldown>0) faceOverlay.pickCooldown -= 1;
-    if (faceOverlay.active){
-      faceOverlay.t += dt;
-      const a = Math.sin(Math.min(1, faceOverlay.t/faceOverlay.dur)*Math.PI);
-      faceOverlay.alpha = 0.25 + a*0.65;
-      if (faceOverlay.t>=faceOverlay.dur){ faceOverlay.active=false; faceOverlay.alpha=0; }
+    // face popup update
+    if (facePopup.active){
+      facePopup.t += dt;
+      if (facePopup.t >= facePopup.dur){
+        facePopup.active = false;
+      }
     }
 
-    // messages decay
-    for(let i=messages.length-1;i>=0;i--){
+    // stains influence
+    for (const st of stains){
+      const d = Math.hypot((st.x+0.5)-hero.x, (st.y+0.5)-hero.y);
+      if (d < 1.0){
+        state.anxiety = Math.max(state.anxiety, 8);
+        if (Math.random()<0.012) pushMessage("COLOR BLEED", "#ffffff");
+        if (Math.random()<0.006) audio?.blip?.(0.35);
+        if (!prompt.active && Math.random()<0.004) showPrompt(pick(promptBank));
+      }
+    }
+
+    // pickups: chests
+    for (const c of chests){
+      if (c.opened) continue;
+      const d = Math.hypot((c.x+0.5)-hero.x, (c.y+0.5)-hero.y);
+      if (d < 0.75) openChest(c);
+    }
+
+    // tanks
+    for (const t of tanks){
+      if (t.used) continue;
+      const d = Math.hypot((t.x+0.5)-hero.x, (t.y+0.5)-hero.y);
+      if (d < 0.75) collectTank(t);
+    }
+
+    // offerings
+    for (const o of offerings){
+      if (o.taken) continue;
+      const d = Math.hypot((o.x+0.5)-hero.x, (o.y+0.5)-hero.y);
+      if (d < 0.75) collectOffering(o);
+    }
+
+    // mission update
+    updateMission(dt, moved, sprinting);
+
+    // chance of lore prompt on milestones
+    if (!prompt.active && (openedChests()===2 || offerings.filter(o=>o.taken).length===2) && Math.random()<0.01){
+      showPrompt(pick(promptBank));
+    }
+
+    // update monsters
+    updateMonsters(dt);
+
+    // objective panning
+    const obj = nearestObjective();
+    if (obj && audio){
+      const dx = (obj.x+0.5) - hero.x;
+      audio.setObjectivePan(dx/6);
+    }
+
+    // Exit check
+    if (exit.unlocked){
+      const d = Math.hypot((exit.x+0.5)-hero.x, (exit.y+0.5)-hero.y);
+      if (d < 0.62){
+        // descend: new level, difficulty reroll slight drift
+        pushMessage("DESCENDING...", "#ccffcc");
+        audio?.blip?.(1.0);
+        generateLevel();
+      }
+    }
+
+    // message decay
+    for (let i=messages.length-1; i>=0; i--){
       messages[i].life -= 1;
-      if(messages[i].life<=0) messages.splice(i,1);
+      if (messages[i].life <= 0) messages.splice(i,1);
     }
 
-    updateHUD();
-
-    // lose condition (oxygen depleted too long): soft reset
-    if (hero.oxygen <= 0 && Math.random() < 0.0025){
-      alert(`${hero.name} BLACKED OUT.`);
-      generateLevel();
-    }
+    // Update HUD/mission UI
+    updateHud();
+    if (mission.active) updateMissionUI();
   }
 
-  // ===== LOOP =====
-  function frame(){
-    const now=performance.now();
-    const dt=Math.min(0.05, (now-lastTime)/1000);
-    lastTime=now;
+  function loop(){
+    const now = performance.now();
+    const dt = Math.min(0.05, (now-last)/1000);
+    last = now;
 
-    if (gameStarted){
+    if (state.mode==="PLAY"){
       update(dt);
-      render();
+      render(dt);
     } else {
-      ctx.fillStyle="#000"; ctx.fillRect(0,0,canvas.width,canvas.height);
-      drawNoiseOverlay(8);
+      // idle visuals behind menu: slow noise + faint flicker
+      ctx.fillStyle="#000";
+      ctx.fillRect(0,0,CAN_W,CAN_H);
+      state.time += dt;
+      state.anxiety = 6 + Math.sin(state.time*1.5)*2;
+      drawNoise(state.anxiety);
     }
 
-    requestAnimationFrame(frame);
+    // clear justPressed
+    for (const k in justPressed) delete justPressed[k];
+
+    requestAnimationFrame(loop);
   }
 
-  // ===== START FLOW =====
-  async function requestStart(){
-    startRequested = true;
+  // ========= MENU START (does not start from input clicks) =========
+  async function startGameFromMenu(){
+    // ONLY this function starts the game
+    hero.name = (nameInput.value || "UNKNOWN").trim().slice(0,18) || "UNKNOWN";
+    hero.role = roleSelect.value;
 
-    // if assets still loading, give immediate feedback
-    statusDisplay.textContent = "STATUS: INITIALIZING";
-    statusDisplay.style.color = "#ccffcc";
+    rollDifficulty();
 
-    if (assetsReady) startGame();
-    else {
-      // unlock audio on first user gesture anyway (so it starts instantly once ready)
-      await ensureAudioRunning();
+    loreIntroEl.textContent = randomLoreIntro(hero.name, hero.role);
+
+    // lock menu off and start
+    await ensureAudio();
+    state.mode="PLAY";
+    menu.style.display="none";
+
+    // per-role micro stat flavor (kept subtle)
+    if (hero.role==="thief"){
+      // slightly faster walk, slightly less oxygen bonus
+      // (still >= 60s baseline)
+      // keep within safe envelope
+    } else if (hero.role==="killer"){
+      // a bit more fear spikes
+      state.anxiety = Math.max(state.anxiety, 4);
+    } else {
+      // butcher: slightly more oxygen tank value? handled in pickups (not needed)
     }
-  }
-
-  async function startGame(){
-    if (gameStarted) return;
-
-    // personalization fallback
-    if (!nameInput.value.trim()) nameInput.value = "UNKNOWN";
-
-    startOverlay.style.display="none";
-    await ensureAudioRunning();
 
     generateLevel();
-    gameStarted=true;
-    pushMessage(`RUN STARTED: ${hero.name}`);
+
+    // immediate mission is NOT forced; player opens chests for missions (as requested)
+    pushMessage(`HELLO, ${hero.name.toUpperCase()}`, "#ccffcc");
+    updateHud();
   }
 
-  // ===== INIT =====
-  // random difficulty preview (will re-roll at level start too)
-  diff = pick(DIFF_PRESETS);
-  diffLine.textContent = `RANDOM DIFFICULTY: ${diff.name} (rerolls on start)`;
+  startBtn.addEventListener("click", (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    startGameFromMenu();
+  });
 
-  loadAssets();
-  frame();
+  // Ensure clicks on inputs never start game (they won’t, by design)
+  nameInput.addEventListener("pointerdown", e=>e.stopPropagation());
+  roleSelect.addEventListener("pointerdown", e=>e.stopPropagation());
+
+  // ========= BOOT =========
+  (async () => {
+    // Load assets in background (no blocking)
+    loadAssets();
+
+    // initial menu lore (random, non-starting)
+    loreIntroEl.textContent = "TYPE A NAME. CHOOSE A ROLE. PRESS START.\nTHE TAPE IS ALREADY RUNNING.";
+
+    // Start loop
+    requestAnimationFrame(loop);
+  })();
 
 })();
 </script>
 </body>
 </html>
+
 
 
