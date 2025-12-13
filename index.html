@@ -1,2157 +1,1719 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1.0" />
-<title>ENTROPY.DAT</title>
-<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --bg:#050505;
-    --fg:#cfd6d3;
-    --green:#ccffcc;
-    --red:#ff3355;
-    --dim:rgba(255,255,255,.65);
-  }
-  html,body{
-    margin:0; height:100%;
-    background:var(--bg);
-    color:var(--fg);
-    font-family:'VT323',monospace;
-    overflow:hidden;
-    user-select:none;
-  }
-  .wrap{
-    height:100%;
-    display:grid;
-    place-items:center;
-  }
-  .crt{
-    width:640px; height:480px;
-    position:relative;
-    border:1px solid #333;
-    box-shadow:0 0 24px rgba(0,0,0,.85);
-    background:#000;
-  }
-  canvas{
-    width:100%; height:100%;
-    image-rendering:pixelated;
-    display:block;
-    background:#000;
-  }
-  .scanlines{
-    position:absolute; inset:0;
-    background:linear-gradient(to bottom,
-      rgba(255,255,255,0),
-      rgba(255,255,255,0) 50%,
-      rgba(0,0,0,.22) 50%,
-      rgba(0,0,0,.22)
-    );
-    background-size:100% 4px;
-    pointer-events:none;
-    z-index:10;
-  }
-  .crt::after{
-    content:"";
-    position:absolute; inset:0;
-    background:rgba(18,16,16,.10);
-    opacity:0;
-    pointer-events:none;
-    z-index:10;
-    animation:flicker .14s infinite;
-  }
-  @keyframes flicker{0%{opacity:.02}50%{opacity:.06}100%{opacity:.02}}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>ENTROPY.DAT</title>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 
-  /* HUD: keep it small */
-  .hud{
-    position:absolute;
-    top:8px; left:8px;
-    z-index:20;
-    font-size:18px;
-    color:var(--green);
-    text-shadow:0 0 6px rgba(204,255,204,.35);
-    pointer-events:none;
-    max-width: 240px;
-    line-height:1.05;
-  }
-  .hud .row{ display:flex; gap:10px; flex-wrap:wrap; }
-  .hud .pill{
-    background:rgba(0,0,0,.55);
-    border:1px solid rgba(204,255,204,.22);
-    padding:4px 6px;
-  }
-  .hud .status{ color:var(--dim); border-color:rgba(255,255,255,.12); }
-  .hud .warn{ color:var(--red); border-color:rgba(255,51,85,.25); }
+  <style>
+    :root{
+      --fg:#cfe2da;
+      --green:#ccffcc;
+      --red:#ff3355;
+      --bg:#050505;
+    }
+    body{
+      background:var(--bg); color:var(--fg); font-family:'VT323',monospace;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      height:100vh; margin:0; overflow:hidden; user-select:none;
+    }
+    .crt-monitor{
+      position:relative; border:1px solid #333; box-shadow:0 0 20px rgba(0,0,0,.8);
+      width:640px; height:480px; background:#000;
+    }
+    canvas{
+      width:100%; height:100%; background:#000; display:block; image-rendering:pixelated;
+    }
+    .scanlines{
+      position:absolute; inset:0;
+      background:linear-gradient(to bottom,
+        rgba(255,255,255,0),
+        rgba(255,255,255,0) 50%,
+        rgba(0,0,0,.22) 50%,
+        rgba(0,0,0,.22)
+      );
+      background-size:100% 4px; pointer-events:none; z-index:10;
+    }
+    .crt-monitor::after{
+      content:" "; position:absolute; inset:0;
+      background:rgba(18,16,16,.10); opacity:0; z-index:10; pointer-events:none;
+      animation:flicker .14s infinite;
+    }
+    @keyframes flicker{0%{opacity:.02}50%{opacity:.06}100%{opacity:.02}}
 
-  /* Mission box bottom-left but compact */
-  .missionBox{
-    position:absolute;
-    left:8px;
-    bottom:8px;
-    z-index:20;
-    width: 250px;
-    padding:8px;
-    background:rgba(0,0,0,.65);
-    border:1px solid rgba(255,255,255,.12);
-    color:rgba(255,255,255,.85);
-    pointer-events:none;
-    display:none;
-  }
-  .missionBox .title{
-    color:var(--green);
-    font-size:18px;
-    margin-bottom:2px;
-  }
-  .missionBox .desc{
-    opacity:.85;
-    font-size:16px;
-    white-space:pre-line;
-  }
-  .missionBox .bar{
-    height:4px;
-    background:rgba(255,255,255,.12);
-    margin-top:6px;
-    position:relative;
-  }
-  .missionBox .bar > i{
-    position:absolute; top:0; left:0; bottom:0;
-    background:rgba(204,255,204,.85);
-    width:0%;
-    display:block;
-  }
+    /* Small HUD so it doesn't cover view */
+    #hud{
+      position:absolute; top:8px; left:8px;
+      z-index:20; pointer-events:none;
+      color:var(--green); text-shadow:0 0 5px rgba(204,255,204,.6);
+      font-size:1.1rem; line-height:1.05;
+      background:rgba(0,0,0,0.35);
+      padding:6px 8px; border:1px solid rgba(204,255,204,.22);
+      border-radius:4px;
+      max-width:165px;
+    }
+    #hud .dim{opacity:.7}
+    #hud .red{color:var(--red); text-shadow:0 0 5px rgba(255,51,85,.65)}
+    #hud .bar{
+      height:4px; background:rgba(255,255,255,.12); margin-top:4px; position:relative;
+    }
+    #hud .bar > i{
+      display:block; height:100%; width:50%;
+      background:rgba(204,255,204,.9);
+    }
+    #hud .bar.red > i{ background:rgba(255,51,85,.85); }
 
-  /* Prompt box centered */
-  .promptBox{
-    position:absolute;
-    inset:auto 12px 110px 12px;
-    margin:auto;
-    width: 560px;
-    z-index:25;
-    padding:10px 12px;
-    background:rgba(0,0,0,.82);
-    border:1px solid rgba(204,255,204,.22);
-    color:rgba(255,255,255,.92);
-    text-align:center;
-    display:none;
-    pointer-events:none;
-  }
-  .promptBox .q{ font-size:20px; color:rgba(255,255,255,.95); }
-  .promptBox .a{ margin-top:6px; font-size:18px; opacity:.88; }
-  .promptBox .timer{
-    height:3px; margin-top:8px;
-    background:rgba(255,255,255,.10);
-    position:relative;
-  }
-  .promptBox .timer > i{
-    position:absolute; left:0; top:0; bottom:0;
-    width:100%;
-    background:rgba(255,51,85,.75);
-  }
+    .controls-hint{
+      margin-top:16px; text-align:center; opacity:.6; font-size:1.2rem;
+    }
 
-  /* Menu */
-  .menu{
-    position:absolute; inset:0;
-    z-index:30;
-    display:grid;
-    place-items:center;
-    background:radial-gradient(circle at center, rgba(0,0,0,.35), rgba(0,0,0,.92));
-  }
-  .panel{
-    width:min(520px, 92%);
-    padding:16px;
-    border:1px solid rgba(255,255,255,.12);
-    background:rgba(0,0,0,.65);
-    text-align:center;
-    box-shadow:0 0 18px rgba(0,0,0,.7);
-  }
-  .title{
-    font-size:56px;
-    letter-spacing:2px;
-    color:var(--green);
-    text-shadow:0 0 10px rgba(204,255,204,.25);
-    margin-bottom:6px;
-  }
-  .sub{ font-size:22px; opacity:.8; margin-bottom:10px; }
-  .grid{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:10px;
-    margin:12px 0;
-    text-align:left;
-  }
-  label{ font-size:18px; opacity:.85; display:block; margin-bottom:4px;}
-  input,select,button{
-    width:100%;
-    font-family:'VT323', monospace;
-    font-size:22px;
-    padding:8px 10px;
-    background:#000;
-    color:var(--fg);
-    border:1px solid rgba(255,255,255,.22);
-    box-sizing:border-box;
-  }
-  button{
-    cursor:pointer;
-    color:#000;
-    background:var(--green);
-    border-color:rgba(204,255,204,.35);
-  }
-  button:active{ transform:translateY(1px); }
-  .hint{
-    margin-top:10px;
-    font-size:18px;
-    opacity:.7;
-    line-height:1.1;
-  }
-  .tiny{ opacity:.55; font-size:16px; margin-top:8px; }
-
-  /* Simple bottom hint */
-  .controlsHint{
-    margin-top:10px;
-    text-align:center;
-    opacity:.55;
-    font-size:18px;
-  }
-
-</style>
+    /* Start overlay */
+    .start-overlay{
+      position:absolute; inset:0; z-index:30;
+      display:grid; place-items:center;
+      background:radial-gradient(circle at center, rgba(0,0,0,.35), rgba(0,0,0,.92));
+      color:var(--green); text-shadow:0 0 8px rgba(204,255,204,.35);
+    }
+    .panel{
+      width:min(520px,92%); border:1px solid rgba(204,255,204,.22);
+      background:rgba(0,0,0,.55);
+      padding:14px 14px 10px; border-radius:6px;
+    }
+    .start-title{font-size:3.4rem; letter-spacing:2px; text-align:center; margin:0 0 8px;}
+    .start-sub{font-size:1.4rem; opacity:.9; text-align:center; margin:6px 0;}
+    .row{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin:10px 0 6px;}
+    input,select,button{
+      font-family:'VT323'; font-size:1.25rem; padding:8px 10px;
+      background:#000; color:var(--fg);
+      border:1px solid rgba(255,255,255,.18);
+      outline:none;
+    }
+    input{min-width:220px}
+    button{cursor:pointer; border-color:rgba(204,255,204,.35); color:var(--green)}
+    button:hover{filter:brightness(1.15)}
+    .tiny{opacity:.65; text-align:center; font-size:1.05rem}
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="crt" id="crt">
+
+  <div class="crt-monitor" id="crt">
     <div class="scanlines"></div>
 
-    <div class="hud" id="hud">
-      <div class="row">
-        <div class="pill" id="hudLeft">NAME</div>
-        <div class="pill status" id="hudStatus">STATUS: IDLE</div>
+    <div id="hud">
+      <div id="hudName">NAME: ???</div>
+      <div class="dim" id="hudRole">ROLE: ???</div>
+      <div class="dim" id="hudRun">RUN: OFF</div>
+
+      <div style="margin-top:6px">
+        <div class="dim">OXYGEN</div>
+        <div class="bar red"><i id="oxyBar"></i></div>
       </div>
-      <div class="row" style="margin-top:6px;">
-        <div class="pill" id="hudOxy">O2: 100%</div>
-        <div class="pill" id="hudDiff">DIFF: ?</div>
+
+      <div style="margin-top:6px">
+        <div class="dim">MISSION</div>
+        <div id="hudMission" class="dim">NONE</div>
+        <div class="bar"><i id="misBar"></i></div>
       </div>
-      <div class="row" style="margin-top:6px;">
-        <div class="pill" id="hudItems">CHESTS: 0/0</div>
+
+      <div style="margin-top:6px">
+        <div class="dim">LOOT</div>
+        <div id="hudLoot" class="dim">CHESTS 0/0</div>
+        <div id="hudOffer" class="dim">OFFERINGS 0/0</div>
+      </div>
+
+      <div style="margin-top:6px" class="dim">
+        DIFFICULTY <span id="hudDiff"></span>
       </div>
     </div>
 
-    <div class="missionBox" id="missionBox">
-      <div class="title" id="missionTitle">MISSION</div>
-      <div class="desc" id="missionDesc">...</div>
-      <div class="bar"><i id="missionBar"></i></div>
-    </div>
+    <canvas id="gameCanvas" width="320" height="240"></canvas>
 
-    <div class="promptBox" id="promptBox">
-      <div class="q" id="promptQ">...</div>
-      <div class="a" id="promptA">...</div>
-      <div class="timer"><i id="promptBar"></i></div>
-    </div>
-
-    <canvas id="game" width="320" height="240"></canvas>
-
-    <div class="menu" id="menu">
+    <div id="startOverlay" class="start-overlay">
       <div class="panel">
-        <div class="title">ENTROPY.DAT</div>
-        <div class="sub" id="loreIntro">A corrupted tape is waiting.</div>
+        <div class="start-title">ENTROPY.DAT</div>
+        <div class="start-sub">TYPE YOUR NAME. CHOOSE YOUR ROLE.</div>
 
-        <div class="grid">
-          <div>
-            <label for="name">PROTAGONIST NAME</label>
-            <input id="name" autocomplete="off" placeholder="e.g. MARTA" />
-          </div>
-          <div>
-            <label for="role">ROLE</label>
-            <select id="role">
-              <option value="thief">THIEF</option>
-              <option value="killer">KILLER</option>
-              <option value="butcher">BUTCHER</option>
-            </select>
-          </div>
+        <div class="row">
+          <input id="nameInput" type="text" autocomplete="off" spellcheck="false" placeholder="PROTAGONIST NAME">
+          <select id="roleInput">
+            <option value="thief">THIEF</option>
+            <option value="killer">KILLER</option>
+            <option value="butcher">BUTCHER</option>
+          </select>
         </div>
 
-        <button id="startBtn">START</button>
-
-        <div class="hint">
-          WASD / Arrows · Shift = Run (louder) · E = Signal Pulse<br>
-          Chests unlock missions. Complete mission to unseal the exit.
+        <div class="row">
+          <button id="startBtn" type="button">CLICK TO INITIALIZE</button>
         </div>
+
         <div class="tiny">
-          Tip: If audio doesn’t start, click START again (browser gesture lock).
+          WASD / Arrows to move · Shift to run · E = Signal Pulse · 1/2 to answer.<br/>
+          Chests unlock missions. Clear mission to unseal exit. Oxygen lasts &gt; 60s.
         </div>
       </div>
     </div>
   </div>
 
-  <div class="controlsHint">
-    Low-res fog horror · abstract missions · choices matter · always different.
+  <div class="controls-hint">
+    Shift to run (louder) · E = Signal Pulse · 1/2 respond to messages.<br/>
+    The maze has loops. If you die, it’s because you hesitated.
   </div>
-</div>
 
 <script>
 (() => {
-  // ========= CONFIG =========
-  const TILE = 16, COLS = 20, ROWS = 15;
-  const CAN_W = 320, CAN_H = 240;
+  /* ============================================================
+     CONFIG
+  ============================================================ */
+  const TILE = 16;
+  const COLS = 20;
+  const ROWS = 15;
 
-  // Physics / movement
-  const PLAYER_R = 0.28;             // circle radius (tiles)
-  const ACCEL = 18.0;                // tiles/s^2
-  const FRICTION = 16.0;             // tiles/s^2
-  const MAX_SPEED = 2.25;            // tiles/s walk
-  const RUN_MULT = 1.55;
+  const TOTAL_OFFERINGS = 3;
+  const CHESTS_PER_LEVEL = 3;
 
-  // Visibility
-  const BASE_FOV = 6.2;
-  const MIN_FOV = 4.4;
-  const MAX_FOV = 7.2;
+  const BASE_FOV = 6.1;
+  const MIN_FOV  = 4.0;
+  const MAX_FOV  = 7.2;
 
-  // Oxygen baseline (>= 60s demanded)
-  const BASE_OXY_SECONDS = 90;       // walking ~90s baseline
-  const RUN_OXY_MULT = 1.75;         // running drains faster
-  const LOW_OXY_WARN = 15;           // seconds
+  // smooth movement + robust collision
+  const PLAYER_RADIUS = 0.28;      // smaller helps corners
+  const PLAYER_ACCEL  = 14.0;
+  const PLAYER_FRICTION = 0.80;
+  const PLAYER_MAX_WALK = 2.15;
+  const PLAYER_MAX_RUN  = 3.10;
 
-  // Level content
-  const CHESTS_PER_LEVEL_BASE = 3;
-  const TANKS_PER_LEVEL_BASE = 3;
-  const OFFERINGS_PER_LEVEL = 3;
+  // oxygen pacing: baseline must last >= 60s
+  const BASE_OXYGEN = 92;  // seconds at WALK drain 1.0
+  const RUN_OXY_MULT = 1.55;
+  const OXY_TANKS = 3;
+  const OXY_TANK_GAIN = 35;
 
-  // Monster tuning (winnable + abrasive)
-  const MONSTER_BASE_SPEED = 1.10;   // tiles/s
-  const MONSTER_HEAR_WALK = 4.7;
-  const MONSTER_HEAR_RUN  = 7.9;
-  const MONSTER_HIT_DIST  = 0.62;
-  const MONSTER_HIT_COOLDOWN = 1.2;  // seconds between hits
-  const STRIKES_TO_DIE = 2;
+  // difficulty randomization
+  const DIFF_LABELS = ["SICKLY", "MEAN", "FAMISHED", "RABID"];
+  // monsters per run: 1..3 (kept scary but sane)
+  // aggression + oxygen drain vary per run
 
-  // Visual noise
-  const GRAIN_PARTICLES = 160;
-
-  // ========= DOM =========
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d', { alpha:false });
-
-  const menu = document.getElementById('menu');
-  const startBtn = document.getElementById('startBtn');
-  const nameInput = document.getElementById('name');
-  const roleSelect = document.getElementById('role');
-  const loreIntroEl = document.getElementById('loreIntro');
-
-  const hudLeft = document.getElementById('hudLeft');
-  const hudStatus = document.getElementById('hudStatus');
-  const hudOxy = document.getElementById('hudOxy');
-  const hudDiff = document.getElementById('hudDiff');
-  const hudItems = document.getElementById('hudItems');
-
-  const missionBox = document.getElementById('missionBox');
-  const missionTitleEl = document.getElementById('missionTitle');
-  const missionDescEl = document.getElementById('missionDesc');
-  const missionBarEl = document.getElementById('missionBar');
-
-  const promptBox = document.getElementById('promptBox');
-  const promptQEl = document.getElementById('promptQ');
-  const promptAEl = document.getElementById('promptA');
-  const promptBarEl = document.getElementById('promptBar');
-
-  // ========= INPUT =========
-  const keys = Object.create(null);
-  const justPressed = Object.create(null);
-
-  function onKeyDown(e){
-    // Avoid page scrolling on arrows/space
-    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
-
-    if (!keys[e.code]) justPressed[e.code] = true;
-    keys[e.code] = true;
-
-    // Respond to prompt with 1/2 even if moving
-    if (state.mode === "PLAY" && prompt.active){
-      if (e.code === "Digit1") choosePrompt(1);
-      if (e.code === "Digit2") choosePrompt(2);
-    }
-
-    // Start from keyboard, but ONLY if not typing in inputs
-    if (state.mode === "MENU" && (e.code === "Enter")){
-      const ae = document.activeElement;
-      const typing = (ae === nameInput || ae === roleSelect);
-      if (!typing) startGameFromMenu();
-    }
-
-    // E pulse
-    if (state.mode === "PLAY" && e.code === "KeyE") triggerPulse();
-  }
-  function onKeyUp(e){ keys[e.code] = false; }
-  window.addEventListener('keydown', onKeyDown, { passive:false });
-  window.addEventListener('keyup', onKeyUp, { passive:true });
-
-  // ========= RNG helpers =========
-  const clamp = (v,a,b)=> v<a?a : v>b?b : v;
-  const rand = (a,b)=> a + Math.random()*(b-a);
-  const randi = (a,b)=> (a + Math.floor(Math.random()*(b-a+1)));
-  const pick = (arr)=> arr[(Math.random()*arr.length)|0];
-
-  // ========= STATE =========
-  const state = {
-    mode: "MENU", // MENU | PLAY
-    seed: (Math.random()*1e9)|0,
-    time: 0,
-    anxiety: 0,
-    strikes: 0,
-    camShake: 0,
+  // art / color
+  const PAL = {
+    wall:"#33353f",
+    floor:"#09090b",
+    stainA:"rgba(160,0,50,0.45)",
+    stainB:"rgba(80,0,120,0.35)",
+    ui:"#ccffcc",
+    danger:"#ff3355",
+    player:"#cfe2da"
   };
 
-  const hero = {
-    name: "UNKNOWN",
-    role: "thief",
-    x: 1.5, y: 1.5,
-    vx: 0, vy: 0,
-    oxygen: BASE_OXY_SECONDS,
-    maxOxygen: BASE_OXY_SECONDS,
-    hitCooldown: 0,
-    sanity: 100,
+  /* ============================================================
+     DOM
+  ============================================================ */
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d", { alpha:false });
+
+  const startOverlay = document.getElementById("startOverlay");
+  const startBtn = document.getElementById("startBtn");
+  const nameInput = document.getElementById("nameInput");
+  const roleInput = document.getElementById("roleInput");
+
+  const hudName = document.getElementById("hudName");
+  const hudRole = document.getElementById("hudRole");
+  const hudRun  = document.getElementById("hudRun");
+  const oxyBar  = document.getElementById("oxyBar");
+  const hudMission = document.getElementById("hudMission");
+  const misBar  = document.getElementById("misBar");
+  const hudLoot = document.getElementById("hudLoot");
+  const hudOffer= document.getElementById("hudOffer");
+  const hudDiff = document.getElementById("hudDiff");
+
+  /* ============================================================
+     STATE
+  ============================================================ */
+  let gameStarted=false;
+
+  let map=[];
+  let keys={};
+
+  let state={
+    anxiety:0,
+    diffIndex:0,
+    monstersCount:1,
+    aggression:1.0,
+    oxygenDrain:1.0,
+    seedSalt:(Math.random()*1e9)|0,
+    lore:""
   };
 
-  let map = [];
-  let stains = [];
-  let chests = [];
-  let tanks = [];
-  let offerings = [];
-  let exit = { x: 0, y: 0, unlocked:false };
+  const hero={
+    name:"UNKNOWN",
+    role:"thief",
+    x:1.5,y:1.5,
+    vx:0,vy:0,
+    oxygen:BASE_OXYGEN,
+    oxygenMax:BASE_OXYGEN,
+    panic:0,
+    hitCooldown:0,
+    // for animated sprite
+    animT:0
+  };
 
-  let messages = []; // floating glitch text
-  let flash = { active:false, t:0, dur:0.8, img:null, alpha:0, kind:"" };
-  let facePopup = { active:false, t:0, dur:0.55, img:null, intensity:0 };
+  let offerings=[];
+  let collected=0;
 
-  let pulse = { active:false, t:0, dirX:0, dirY:0, ring:0 };
+  let exit=null;
+  let exitLocked=true;
 
-  // Mission
-  const mission = {
+  let chests=[];
+  let stains=[];
+  let oxyTanks=[];
+
+  let messages=[]; // floating glitch text
+
+  // prompt (choice)
+  let prompt={
     active:false,
+    text:"",
+    a:"",
+    b:"",
+    onChoose:null,
+    timer:0
+  };
+
+  // mission
+  let mission={
+    active:false,
+    completed:false,
     title:"",
     desc:"",
     type:"",
     progress:0,
     goal:1,
-    extra:null,
-    completed:false,
+    extra:null
   };
 
-  // Prompt
-  const prompt = {
+  // pulse ring
+  let pulse={
     active:false,
-    q:"",
-    a:"",
-    timer:0,
-    onChoose:null,
-    maxTime: 6.5
+    t:0,
+    ring:0,
+    dirX:0, dirY:0
   };
 
-  // Difficulty per run
-  const diff = {
-    name:"NORMAL",
-    oxygenDrain: 1.0,
-    monsters: 1,
-    monsterSpeed: 1.0,
-    fog: 1.0,
-    missionHard: 1.0,
-    aggression: 1.0,
+  // image flash overlays (procedural for now; later you’ll plug in real images)
+  let flash={
+    active:false,
+    t:0,
+    dur:0.9,
+    img:null,
+    alpha:0
   };
 
-  // Monsters (multiple)
-  const monsters = [];
+  // monsters are “danger zones” (non-solid) to avoid corridor blocking
+  let monsters=[]; // {x,y,speed,stun,lastSeen,target,stepCd,faceJitter,faceMode}
 
-  // ========= TEXT BANKS =========
-  const cryptic = [
-    "NULL REFERENCE","FRAME DROP","DE-SYNC","SIGNAL BLEED","YOU ARE DATA",
-    "EYES IN THE FOG","DOOR IS NOT A DOOR","THE MAZE REMEMBERS","PAINTED AIR",
-    "NEGATIVE SPACE","UNSAFE POINTER","STATIC...","1997","DON'T LOOK",
-    "THE TAPE IS WATCHING","MISSING INDEX","SPOOL CORRUPTION"
+  /* ============================================================
+     TEXT / LORE
+  ============================================================ */
+  const crypticPhrases = [
+    "IT KNOWS","BEHIND YOU","NULL REFERENCE","WHERE AM I","DONT STOP","STATIC...","1997",
+    "DE-SYNC","LOST SIGNAL","FRAME DROP","NO CLIP","PAINTED AIR","NEGATIVE SPACE","FRACTURE","MUTE COLOR",
+    "DOOR IS NOT A DOOR","EYES IN THE FOG","YOU ARE DATA","THE MAZE REMEMBERS","THE FLOOR IS BREATHING"
   ];
 
-  function pushMessage(text, color=null){
-    messages.push({
-      text,
-      x: Math.random()*CAN_W,
-      y: Math.random()*CAN_H,
-      life: 70,
-      color: color || (Math.random()<0.55 ? "#ff3355" : "#ffffff")
-    });
-  }
-
-  function randomLoreIntro(name, role){
-    const victims = ["a kidnapped lady","a missing child","a vanished caretaker","a girl in a hospital gown","a witness in a motel"];
-    const places  = ["a fog-choked corridor","a service tunnel","a flooded archive","a dead shopping center","a basement with humming walls"];
-    const objects = ["a tape labeled ENTROPY.DAT","a ring of keys that aren’t yours","a bag of teeth","a bloodless apron","a broken pager"];
-    const hooks   = [
-      "The air tastes like old coins.",
-      "You can hear a siren that isn’t there.",
-      "Your footsteps arrive late.",
-      "The walls remember your name incorrectly.",
-      "Something keeps counting your breaths."
-    ];
-
-    const roleLine =
-      role==="thief"   ? "You steal locks. The locks steal you back." :
-      role==="killer"  ? "You know how to end people. The maze knows how to end you." :
-                         "You cut meat. Here, the meat looks back.";
-
-    const victim = pick(victims);
-    const place  = pick(places);
-    const obj    = pick(objects);
-    const hook   = pick(hooks);
-
-    const pro = name && name.trim() ? name.trim().toUpperCase() : "UNKNOWN";
-    return `${pro}: You came for ${victim}.\nYou woke up in ${place} holding ${obj}.\n${roleLine}\n${hook}\n\nOpen chests. Accept missions. Unseal the exit.`;
-  }
-
-  // ========= ASSET LOADER (your images) =========
-  function loadImage(src){
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => resolve(null);
-      img.src = src;
-    });
-  }
-
-  const assets = {
-    monster:null,
-    face1:null,
-    face2:null,
-    flashes:[],
+  const loreFragments = {
+    kidnapped: [
+      "They took her from a parking lot with a broken streetlight.",
+      "A van that smelled like wet carpet and old blood.",
+      "You heard the tape recorder start. You never heard it stop.",
+      "They said your name like they owned it."
+    ],
+    thief: [
+      "You stole keys you didn't understand.",
+      "You can pick locks, but not guilt.",
+      "Every door you open remembers your fingerprints."
+    ],
+    killer: [
+      "You did it clean. Too clean.",
+      "There are faces in the fog that look like your work.",
+      "You keep rehearsing apologies you will never speak."
+    ],
+    butcher: [
+      "You know the weight of meat when it stops being alive.",
+      "Your hands remember cuts your mind refuses.",
+      "The maze smells familiar."
+    ],
+    endings: [
+      "The exit is not escape. It's upload.",
+      "Something will wear your voice after you leave.",
+      "Your breath becomes the level geometry."
+    ]
   };
 
-  async function loadAssets(){
-    // These will resolve null if not present — game still works.
-    assets.monster = await loadImage("assets/monster.png");
-    assets.face1 = await loadImage("assets/face1.png");
-    assets.face2 = await loadImage("assets/face2.png");
-
-    const f1 = await loadImage("assets/flash1.png");
-    const f2 = await loadImage("assets/flash2.png");
-    const f3 = await loadImage("assets/flash3.png");
-    assets.flashes = [f1,f2,f3].filter(Boolean);
+  function generateLore(){
+    const base = loreFragments.kidnapped[(Math.random()*loreFragments.kidnapped.length)|0];
+    const roleLine = loreFragments[hero.role][(Math.random()*loreFragments[hero.role].length)|0];
+    const end = loreFragments.endings[(Math.random()*loreFragments.endings.length)|0];
+    const name = hero.name.toUpperCase();
+    return `${name}, ${base} ${roleLine} ${end}`;
   }
 
-  // ========= AUDIO (organic + abrasive) =========
-  let audio = null;
+  const lorePrompts = [
+    {
+      text: (n)=>`A smear on the wall spells: "${n}, DO YOU WANT TO BE SEEN?"`,
+      a: "1) YES (clearer view, louder)",
+      b: "2) NO  (safer, dimmer)",
+      choose: (c)=>{
+        if(c===1){ state.anxiety=Math.max(state.anxiety,10); exitLocked=true; state.aggression += 0.10; pushMessage("YOU ARE VISIBLE", PAL.danger); }
+        else     { state.aggression = Math.max(0.9, state.aggression-0.08); pushMessage("YOU ARE MISSING", PAL.ui); }
+      }
+    },
+    {
+      text: (n)=>`A radio click: "${n}. SACRIFICE OXYGEN FOR SPEED?"`,
+      a: "1) ACCEPT (faster, drains more)",
+      b: "2) REFUSE (slower, calmer)",
+      choose: (c)=>{
+        if(c===1){ state.oxygenDrain *= 1.18; pushMessage("HUNGER ENGINE", PAL.danger); }
+        else     { state.oxygenDrain = Math.max(0.85, state.oxygenDrain*0.92); state.aggression += 0.06; pushMessage("SLOW MERCY", PAL.ui); }
+      }
+    },
+    {
+      text: (n)=>`The CRT whispers: "${n}, WHICH PART OF YOU IS REAL?"`,
+      a: "1) HANDS",
+      b: "2) VOICE",
+      choose: (c)=>{
+        if(c===1){ hero.hitCooldown = Math.max(hero.hitCooldown, 0.6); pushMessage("HANDS REMEMBER", "#fff"); }
+        else     { state.anxiety = Math.max(state.anxiety, 14); pushMessage("VOICE LIES", PAL.danger); }
+      }
+    }
+  ];
 
+  /* ============================================================
+     INPUT (smooth + reliable)
+  ============================================================ */
+  window.addEventListener("keydown", (e)=>{
+    // IMPORTANT: Do not auto-start when typing name
+    // Start only via clicking START button.
+    keys[e.code]=true;
+
+    if(!gameStarted) return;
+
+    if(e.code==="KeyE") triggerPulse();
+
+    if(prompt.active){
+      if(e.code==="Digit1"||e.code==="Numpad1"||e.code==="KeyY") choosePrompt(1);
+      if(e.code==="Digit2"||e.code==="Numpad2"||e.code==="KeyN") choosePrompt(2);
+    }
+  }, {passive:true});
+  window.addEventListener("keyup",(e)=>keys[e.code]=false,{passive:true});
+
+  // Start ONLY from button click (not clicking input fields)
+  startBtn.addEventListener("pointerdown", (e)=>{
+    e.preventDefault();
+    e.stopPropagation();
+    startGame();
+  });
+
+  // Prevent overlay clicks from starting (only the button starts)
+  startOverlay.addEventListener("pointerdown",(e)=>{
+    // allow interacting with inputs/select, but don't start
+    e.stopPropagation();
+  });
+
+  /* ============================================================
+     AUDIO (organic + scary + non-repeating, fear-driven)
+  ============================================================ */
+  let audio=null;
   function initAudio(){
-    if (audio) return;
+    if(audio) return;
     const AC = window.AudioContext || window.webkitAudioContext;
     const ac = new AC();
 
     const master = ac.createGain();
-    master.gain.value = 0.70;
-
-    const limiter = ac.createDynamicsCompressor();
-    limiter.threshold.value = -18;
-    limiter.knee.value = 24;
-    limiter.ratio.value = 8;
-    limiter.attack.value = 0.004;
-    limiter.release.value = 0.18;
-
-    const pan = ac.createStereoPanner();
-    pan.pan.value = 0;
-
-    master.connect(limiter);
-    limiter.connect(pan);
-    pan.connect(ac.destination);
+    master.gain.value = 0.75;
+    master.connect(ac.destination);
 
     // noise buffer (pink-ish)
     const noiseBuf = ac.createBuffer(1, ac.sampleRate*2, ac.sampleRate);
     {
       const d = noiseBuf.getChannelData(0);
-      let last = 0;
-      for (let i=0;i<d.length;i++){
-        last = 0.985*last + 0.015*(Math.random()*2-1);
-        d[i] = last;
+      let last=0;
+      for(let i=0;i<d.length;i++){
+        last = 0.965*last + 0.035*(Math.random()*2-1);
+        d[i]=last;
       }
     }
 
-    // Wind bed
     const wind = ac.createBufferSource();
-    wind.buffer = noiseBuf; wind.loop = true;
+    wind.buffer=noiseBuf; wind.loop=true;
     const windLP = ac.createBiquadFilter();
-    windLP.type = "lowpass";
-    windLP.frequency.value = 200;
-    const windGain = ac.createGain();
-    windGain.gain.value = 0.05;
+    windLP.type="lowpass"; windLP.frequency.value=260;
+    const windGain=ac.createGain(); windGain.gain.value=0.04;
     wind.connect(windLP); windLP.connect(windGain); windGain.connect(master);
     wind.start();
 
-    // Radio static
-    const stat = ac.createBufferSource();
-    stat.buffer = noiseBuf; stat.loop = true;
-    const statBP = ac.createBiquadFilter();
-    statBP.type = "bandpass";
-    statBP.frequency.value = 1100;
-    statBP.Q.value = 0.9;
-    const statGain = ac.createGain();
-    statGain.gain.value = 0.018;
-    stat.connect(statBP); statBP.connect(statGain); statGain.connect(master);
-    stat.start();
+    const radio = ac.createBufferSource();
+    radio.buffer=noiseBuf; radio.loop=true;
+    const radioBP=ac.createBiquadFilter();
+    radioBP.type="bandpass"; radioBP.frequency.value=1200; radioBP.Q.value=0.9;
+    const radioGain=ac.createGain(); radioGain.gain.value=0.015;
+    radio.connect(radioBP); radioBP.connect(radioGain); radioGain.connect(master);
+    radio.start();
 
-    // Organic drone (two detuned sines + slow FM)
-    const d1 = ac.createOscillator(); d1.type = "sine"; d1.frequency.value = 47;
-    const d2 = ac.createOscillator(); d2.type = "sine"; d2.frequency.value = 47.6;
-    const fm = ac.createOscillator(); fm.type = "sine"; fm.frequency.value = 0.09;
-    const fmG = ac.createGain(); fmG.gain.value = 9.5;
-    fm.connect(fmG); fmG.connect(d1.frequency); fmG.connect(d2.frequency);
+    // organic drone (two oscillators + slow FM)
+    const o1=ac.createOscillator(); o1.type="sine"; o1.frequency.value=46;
+    const o2=ac.createOscillator(); o2.type="triangle"; o2.frequency.value=69;
 
-    const droneLP = ac.createBiquadFilter();
-    droneLP.type = "lowpass";
-    droneLP.frequency.value = 420;
+    const fm=ac.createOscillator(); fm.type="sine"; fm.frequency.value=0.11;
+    const fmGain=ac.createGain(); fmGain.gain.value=11;
+    fm.connect(fmGain); fmGain.connect(o1.frequency);
 
-    const droneGain = ac.createGain();
-    droneGain.gain.value = 0.026;
+    const droneLP=ac.createBiquadFilter();
+    droneLP.type="lowpass"; droneLP.frequency.value=600;
 
-    d1.connect(droneLP); d2.connect(droneLP);
-    droneLP.connect(droneGain); droneGain.connect(master);
+    const droneGain=ac.createGain(); droneGain.gain.value=0.022;
 
-    d1.start(); d2.start(); fm.start();
+    const mix=ac.createGain(); mix.gain.value=1;
 
-    // Heart / breathing (amplitude pulses)
-    const breathOsc = ac.createOscillator();
-    breathOsc.type = "triangle";
-    breathOsc.frequency.value = 0.22;
-    const breathGain = ac.createGain();
-    breathGain.gain.value = 0.0; // modulates static/wind/drone subtle
-    breathOsc.connect(breathGain);
-    breathGain.connect(windGain.gain);
-    breathGain.connect(droneGain.gain);
-    breathOsc.start();
+    o1.connect(mix); o2.connect(mix);
+    mix.connect(droneLP); droneLP.connect(droneGain); droneGain.connect(master);
 
-    // Abrasive ticks / glitches
+    o1.start(); o2.start(); fm.start();
+
     function blip(intensity=0.4){
-      const t = ac.currentTime;
-      const o = ac.createOscillator();
-      o.type = Math.random()<0.5 ? "square" : "triangle";
-      o.frequency.value = 140 + Math.random()*2200;
+      const t=ac.currentTime;
+      const osc=ac.createOscillator();
+      osc.type = Math.random()<0.5 ? "square":"triangle";
+      osc.frequency.value = 80 + Math.random()*2200;
 
-      const bp = ac.createBiquadFilter();
-      bp.type="bandpass";
-      bp.frequency.value = 500 + Math.random()*3200;
-      bp.Q.value = 10;
+      const bp=ac.createBiquadFilter();
+      bp.type="bandpass"; bp.frequency.value = 400 + Math.random()*3200; bp.Q.value=7+Math.random()*5;
 
-      const g = ac.createGain();
+      const g=ac.createGain();
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.08*intensity, t+0.002);
-      g.gain.exponentialRampToValueAtTime(0.0001, t+0.09);
+      g.gain.linearRampToValueAtTime(0.08*intensity, t+0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.11);
 
-      o.connect(bp); bp.connect(g); g.connect(master);
-      o.start(t); o.stop(t+0.1);
+      osc.connect(bp); bp.connect(g); g.connect(master);
+      osc.start(t); osc.stop(t+0.12);
     }
 
-    // Thump (for tanks / chest)
-    function thump(intensity=0.25){
-      const t = ac.currentTime;
-      const o = ac.createOscillator();
-      o.type="sine";
-      o.frequency.setValueAtTime(60 + Math.random()*20, t);
-      o.frequency.exponentialRampToValueAtTime(26, t+0.18);
-
-      const g = ac.createGain();
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.linearRampToValueAtTime(0.10*intensity, t+0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t+0.22);
-
-      o.connect(g); g.connect(master);
-      o.start(t); o.stop(t+0.25);
+    function throb(intensity=0.4){
+      const t=ac.currentTime;
+      const osc=ac.createOscillator();
+      osc.type="sine";
+      osc.frequency.value = 24 + Math.random()*18;
+      const g=ac.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.05*intensity, t+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.35);
+      osc.connect(g); g.connect(master);
+      osc.start(t); osc.stop(t+0.36);
     }
 
-    // Mutations (non-repeating)
     function mutate(){
-      const t = ac.currentTime;
-      statBP.frequency.setTargetAtTime(650 + Math.random()*3200, t, 1.6);
-      statGain.gain.setTargetAtTime(0.010 + Math.random()*0.045, t, 1.0);
-      windLP.frequency.setTargetAtTime(120 + Math.random()*320, t, 2.4);
+      const t=ac.currentTime;
+      const fear=audio?.fear ?? 0;
 
-      const base = 34 + Math.random()*65;
-      d1.frequency.setTargetAtTime(base, t, 2.2);
-      d2.frequency.setTargetAtTime(base + (Math.random()*1.4), t, 2.2);
-      droneLP.frequency.setTargetAtTime(220 + Math.random()*1100, t, 2.1);
+      radioBP.frequency.setTargetAtTime(600 + Math.random()*3200, t, 1.4);
+      radioBP.Q.setTargetAtTime(0.8 + fear*9 + Math.random()*1.2, t, 0.9);
+      radioGain.gain.setTargetAtTime(0.010 + 0.03*Math.random() + fear*0.08, t, 0.25);
 
-      if (Math.random()<0.18){
-        d1.detune.setTargetAtTime((Math.random()<0.5?-1:1)*(90+Math.random()*220), t, 0.7);
-        d2.detune.setTargetAtTime((Math.random()<0.5?-1:1)*(90+Math.random()*220), t, 0.7);
-        setTimeout(()=>{
-          d1.detune.setTargetAtTime(0, ac.currentTime, 1.0);
-          d2.detune.setTargetAtTime(0, ac.currentTime, 1.0);
-        }, 900 + Math.random()*1600);
-      }
+      windLP.frequency.setTargetAtTime(120 + Math.random()*360, t, 2.2);
+      windGain.gain.setTargetAtTime(0.03 + 0.06*Math.random() + fear*0.08, t, 0.6);
 
-      setTimeout(mutate, 900 + Math.random()*1700);
+      droneLP.frequency.setTargetAtTime(240 + Math.random()*1100 + fear*600, t, 1.7);
+      droneGain.gain.setTargetAtTime(0.016 + 0.03*Math.random() + fear*0.08, t, 1.1);
+
+      o1.frequency.setTargetAtTime(36 + Math.random()*40, t, 1.5);
+      o2.frequency.setTargetAtTime(54 + Math.random()*70, t, 1.8);
+
+      if(Math.random() < 0.15 + fear*0.25) blip(0.25 + Math.random()*(0.4+fear));
+      if(Math.random() < 0.10 + fear*0.18) throb(0.25 + fear*0.9);
+
+      setTimeout(mutate, 800 + Math.random()*1600);
     }
 
     function eventTick(){
-      const fear = audio?.fear ?? 0;
-      const oxy = audio?.oxy ?? 1;
-      const chaos = fear*0.85 + (1-oxy)*0.9;
-      if (Math.random() < 0.12 + chaos*0.35) blip(0.25 + Math.random()*(0.6+chaos));
-      setTimeout(eventTick, 240 + Math.random()*(940 - chaos*520));
+      const fear=audio?.fear ?? 0;
+      if(Math.random() < 0.09 + fear*0.25) blip(0.15 + Math.random()*(0.35+fear));
+      setTimeout(eventTick, 260 + Math.random()*(950 - fear*450));
     }
 
     audio = {
-      ac,
-      fear: 0,
-      oxy: 1,
+      ac, fear:0,
       blip,
-      thump,
       setFear(f){
-        audio.fear = clamp(f,0,1);
-        const t = ac.currentTime;
-        // More fear = more static + sharper bandpass + louder drone
-        statGain.gain.setTargetAtTime(0.012 + audio.fear*0.12, t, 0.08);
-        statBP.Q.setTargetAtTime(0.9 + audio.fear*12, t, 0.12);
-        droneGain.gain.setTargetAtTime(0.020 + audio.fear*0.10, t, 0.2);
-        windGain.gain.setTargetAtTime(0.04 + audio.fear*0.10, t, 0.15);
-        if (audio.fear>0.72 && Math.random()<0.07) blip(0.85*audio.fear);
-      },
-      setOxy(x){
-        audio.oxy = clamp(x,0,1);
-        const t = ac.currentTime;
-        // Lower oxygen -> breathing modulation increases + lowpass moves
-        const strain = (1-audio.oxy);
-        breathOsc.frequency.setTargetAtTime(0.18 + strain*0.55, t, 0.22);
-        breathGain.gain.setTargetAtTime(0.008 + strain*0.045, t, 0.18);
-        windLP.frequency.setTargetAtTime(140 + (1-strain)*220, t, 1.0);
-      },
-      setObjectivePan(p){
-        pan.pan.setTargetAtTime(clamp(p,-1,1), ac.currentTime, 0.12);
+        audio.fear = f;
       }
     };
 
-    setTimeout(mutate, 450);
-    setTimeout(eventTick, 800);
+    setTimeout(mutate, 600);
+    setTimeout(eventTick, 900);
   }
 
-  async function ensureAudio(){
+  async function ensureAudioRunning(){
     initAudio();
-    if (audio?.ac?.state === "suspended"){
+    if(audio?.ac?.state==="suspended"){
       try { await audio.ac.resume(); } catch {}
     }
   }
 
-  // ========= DIFFICULTY PER RUN =========
-  function rollDifficulty(){
-    const r = Math.random();
-    if (r < 0.55){
-      diff.name="NORMAL";
-      diff.oxygenDrain = 1.00;
-      diff.monsters = 1;
-      diff.monsterSpeed = 1.00;
-      diff.fog = 1.00;
-      diff.missionHard = 1.00;
-      diff.aggression = 1.00;
-    } else if (r < 0.85){
-      diff.name="HARD";
-      diff.oxygenDrain = 1.20;
-      diff.monsters = 2;
-      diff.monsterSpeed = 1.10;
-      diff.fog = 1.08;
-      diff.missionHard = 1.25;
-      diff.aggression = 1.12;
-    } else {
-      diff.name="HELL";
-      diff.oxygenDrain = 1.40;
-      diff.monsters = 3;
-      diff.monsterSpeed = 1.22;
-      diff.fog = 1.15;
-      diff.missionHard = 1.45;
-      diff.aggression = 1.22;
-    }
-  }
+  /* ============================================================
+     HELPERS
+  ============================================================ */
+  const clamp=(v,a,b)=> v<a?a : v>b?b : v;
+  const inBounds=(x,y)=> x>=0&&y>=0&&x<COLS&&y<ROWS;
+  const isFloor=(x,y)=> inBounds(x,y) && map[y][x]===0;
 
-  // ========= MAP GEN =========
-  function inBounds(x,y){ return x>=0 && y>=0 && x<COLS && y<ROWS; }
-  function isWall(tx,ty){
-    if (!inBounds(tx,ty)) return true;
-    return map[ty][tx] === 1;
-  }
-  function isFloor(tx,ty){
-    return inBounds(tx,ty) && map[ty][tx] === 0;
-  }
-
-  function randomFloorFarFrom(px,py,minManhattan){
-    for (let i=0;i<900;i++){
-      const x = (Math.random()*COLS)|0;
-      const y = (Math.random()*ROWS)|0;
-      if (!isFloor(x,y)) continue;
-      if (Math.abs(x-px)+Math.abs(y-py) < minManhattan) continue;
+  function randomFloorFar(px,py,manh){
+    for(let i=0;i<900;i++){
+      const x=(Math.random()*COLS)|0;
+      const y=(Math.random()*ROWS)|0;
+      if(!isFloor(x,y)) continue;
+      if(Math.abs(x-px)+Math.abs(y-py) < manh) continue;
       return {x,y};
     }
-    // fallback scan
-    for (let y=1;y<ROWS-1;y++){
-      for (let x=1;x<COLS-1;x++){
-        if (isFloor(x,y) && Math.abs(x-px)+Math.abs(y-py) >= minManhattan) return {x,y};
-      }
+    for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
+      if(isFloor(x,y) && Math.abs(x-px)+Math.abs(y-py) >= manh) return {x,y};
     }
     return {x:1,y:1};
   }
 
-  function generateLevel(){
-    // Maze (recursive backtracker)
-    map = Array(ROWS).fill(0).map(()=>Array(COLS).fill(1));
-    const stack = [];
-    const start = {x:1,y:1};
-    map[start.y][start.x] = 0;
-    stack.push(start);
-    while (stack.length){
-      const c = stack[stack.length-1];
-      const dirs = [{dx:0,dy:-2},{dx:0,dy:2},{dx:-2,dy:0},{dx:2,dy:0}].sort(()=>Math.random()-0.5);
-      let carved=false;
-      for (const d of dirs){
-        const nx=c.x+d.dx, ny=c.y+d.dy;
-        if (nx>0 && nx<COLS-1 && ny>0 && ny<ROWS-1 && map[ny][nx]===1){
-          map[ny][nx]=0;
-          map[c.y + d.dy/2][c.x + d.dx/2]=0;
-          stack.push({x:nx,y:ny});
-          carved=true;
-          break;
-        }
-      }
-      if (!carved) stack.pop();
-    }
-
-    // Reset hero position / motion
-    hero.x=1.5; hero.y=1.5;
-    hero.vx=0; hero.vy=0;
-    hero.hitCooldown=0;
-    hero.sanity=100;
-    state.strikes=0;
-
-    // Oxygen base
-    hero.maxOxygen = BASE_OXY_SECONDS; // seconds
-    hero.oxygen = hero.maxOxygen;
-
-    // Stains
-    stains = [];
-    const stainCount = 8 + (diff.name==="HELL"?3:0);
-    for (let i=0;i<stainCount;i++){
-      stains.push(randomFloorFarFrom(1,1,4));
-    }
-
-    // Offerings (used in some missions)
-    offerings = [];
-    while (offerings.length < OFFERINGS_PER_LEVEL){
-      const r = randomFloorFarFrom(1,1,6);
-      if (offerings.some(o=>o.x===r.x && o.y===r.y)) continue;
-      offerings.push({x:r.x,y:r.y, taken:false, order:0});
-    }
-
-    // Chests unlock missions
-    const chCount = CHESTS_PER_LEVEL_BASE + (diff.name==="HARD"?1:0) + (diff.name==="HELL"?2:0);
-    chests = [];
-    while (chests.length < chCount){
-      const r = randomFloorFarFrom(1,1,5);
-      if (chests.some(c=>c.x===r.x && c.y===r.y)) continue;
-      if (offerings.some(o=>o.x===r.x && o.y===r.y)) continue;
-      chests.push({x:r.x,y:r.y, opened:false});
-    }
-
-    // Oxygen tanks
-    const tankCount = TANKS_PER_LEVEL_BASE + (diff.name==="HELL"?2:0);
-    tanks = [];
-    while (tanks.length < tankCount){
-      const r = randomFloorFarFrom(1,1,5);
-      if (tanks.some(t=>t.x===r.x && t.y===r.y)) continue;
-      if (chests.some(c=>c.x===r.x && c.y===r.y)) continue;
-      if (offerings.some(o=>o.x===r.x && o.y===r.y)) continue;
-      tanks.push({x:r.x,y:r.y, used:false, amount: randi(25,40)}); // seconds
-    }
-
-    // Exit locked until mission complete
-    exit = randomFloorFarFrom(1,1,12);
-    exit.unlocked = false;
-
-    // Mission / prompt / effects reset
-    mission.active=false; mission.completed=false;
-    prompt.active=false;
-    pulse.active=false;
-    flash.active=false;
-    facePopup.active=false;
-    messages = [];
-    state.anxiety = 0;
-    state.camShake = 0;
-
-    // Spawn monsters
-    monsters.length = 0;
-    for (let i=0;i<diff.monsters;i++){
-      const r = randomFloorFarFrom(1,1,14);
-      monsters.push({
-        x: r.x+0.5, y: r.y+0.5,
-        vx: 0, vy: 0,
-        speed: MONSTER_BASE_SPEED * diff.monsterSpeed * rand(0.92, 1.08),
-        stun: 0,
-        lastHeard: 0,
-        target: null,
-        stepCooldown: 0,
-        aggression: diff.aggression * rand(0.90, 1.15),
-        id: i,
-      });
-    }
-
-    hudStatus.textContent = "STATUS: ALONE";
-    hudStatus.className = "pill status";
-    pushMessage("BOOT SECTOR OK", "#ffffff");
-    pushMessage(pick(cryptic));
-    updateHud();
-    updateMissionUI();
-    updatePromptUI();
+  function pushMessage(text,color="#fff"){
+    messages.push({
+      text,
+      x: 10 + Math.random()*(canvas.width-20),
+      y: 20 + Math.random()*(canvas.height-20),
+      life: 70,
+      color
+    });
   }
 
-  // ========= COLLISION FIX (NO STICKING) =========
-  function resolveCircleGrid(px,py){
-    let x = px, y = py;
+  function triggerMessage(text=null){
+    if(Math.random()>0.38 && !text) return;
+    const phrase = text || crypticPhrases[(Math.random()*crypticPhrases.length)|0];
+    pushMessage(phrase, Math.random()>0.5 ? PAL.danger : "#fff");
+  }
 
-    // Iterative resolution helps with deep overlaps + corner cases
-    for (let iter=0; iter<4; iter++){
-      let pushed = false;
-      const minX = Math.floor(x - PLAYER_R - 1);
-      const maxX = Math.floor(x + PLAYER_R + 1);
-      const minY = Math.floor(y - PLAYER_R - 1);
-      const maxY = Math.floor(y + PLAYER_R + 1);
+  /* ============================================================
+     BRAIDED MAZE
+  ============================================================ */
+  function generateBraidedMaze(){
+    map = Array(ROWS).fill(0).map(()=>Array(COLS).fill(1));
+    const stack=[{x:1,y:1}];
+    map[1][1]=0;
 
-      for (let ty=minY; ty<=maxY; ty++){
-        for (let tx=minX; tx<=maxX; tx++){
-          if (!isWall(tx,ty)) continue;
+    while(stack.length){
+      const c=stack[stack.length-1];
+      const dirs=[[2,0],[-2,0],[0,2],[0,-2]].sort(()=>Math.random()-0.5);
+      let carved=false;
+      for(const[dx,dy] of dirs){
+        const nx=c.x+dx, ny=c.y+dy;
+        if(nx>0&&ny>0&&nx<COLS-1&&ny<ROWS-1&&map[ny][nx]===1){
+          map[ny][nx]=0;
+          map[c.y+dy/2][c.x+dx/2]=0;
+          stack.push({x:nx,y:ny});
+          carved=true;break;
+        }
+      }
+      if(!carved) stack.pop();
+    }
 
-          // tile AABB [tx,tx+1]x[ty,ty+1]
-          const cx = Math.max(tx, Math.min(x, tx+1));
-          const cy = Math.max(ty, Math.min(y, ty+1));
-          const dx = x - cx;
-          const dy = y - cy;
-          const d2 = dx*dx + dy*dy;
-
-          if (d2 < PLAYER_R*PLAYER_R){
-            const d = Math.max(1e-6, Math.sqrt(d2));
-            const push = (PLAYER_R - d);
-            const nx = dx / d;
-            const ny = dy / d;
-            x += nx * push;
-            y += ny * push;
-            pushed = true;
+    // braid dead ends
+    for(let y=1;y<ROWS-1;y++){
+      for(let x=1;x<COLS-1;x++){
+        if(map[y][x]!==0) continue;
+        let exits=0;
+        const neigh=[[1,0],[-1,0],[0,1],[0,-1]];
+        for(const[dX,dY] of neigh){
+          if(map[y+dY][x+dX]===0) exits++;
+        }
+        if(exits===1 && Math.random()<0.62){
+          const dirs=neigh.sort(()=>Math.random()-0.5);
+          for(const[dX,dY] of dirs){
+            if(map[y+dY][x+dX]===1){
+              map[y+dY][x+dX]=0;
+              break;
+            }
           }
         }
       }
-      if (!pushed) break;
+    }
+
+    // small extra random loops
+    for(let i=0;i<16;i++){
+      const x=1+((Math.random()*(COLS-2))|0);
+      const y=1+((Math.random()*(ROWS-2))|0);
+      if(map[y][x]===1 && Math.random()<0.5){
+        map[y][x]=0;
+      }
+    }
+  }
+
+  /* ============================================================
+     COLLISION: circle vs walls, robust (no corner sticking)
+  ============================================================ */
+  function resolveCircleGrid(px,py,r){
+    let x=px,y=py;
+
+    // check nearby tiles
+    const minX=Math.floor(x-1), maxX=Math.floor(x+1);
+    const minY=Math.floor(y-1), maxY=Math.floor(y+1);
+
+    for(let ty=minY; ty<=maxY; ty++){
+      for(let tx=minX; tx<=maxX; tx++){
+        if(!inBounds(tx,ty) || map[ty][tx]===1){
+          // nearest point on tile AABB
+          const cx = clamp(x, tx, tx+1);
+          const cy = clamp(y, ty, ty+1);
+          const dx = x - cx;
+          const dy = y - cy;
+          const d = Math.hypot(dx,dy);
+
+          if(d < r){
+            const push = (r - d) / (d || 1);
+            x += dx * push;
+            y += dy * push;
+          }
+        }
+      }
     }
     return {x,y};
   }
 
-  // ========= MONSTER AI (tile-guided drift) =========
-  function pickMonsterStepToward(mx,my, tx,ty){
-    const cx = Math.floor(mx);
-    const cy = Math.floor(my);
-    const opts = [
-      {x:cx+1,y:cy},{x:cx-1,y:cy},{x:cx,y:cy+1},{x:cx,y:cy-1}
-    ].filter(p=>isFloor(p.x,p.y));
-    if (!opts.length) return null;
+  /* ============================================================
+     OBJECTIVES / SIGNAL PULSE
+  ============================================================ */
+  function nearestObjective(){
+    let best=null, bestD=1e9;
 
-    let best = opts[0], bestScore = 1e9;
-    for (const o of opts){
-      const d = Math.hypot((o.x+0.5)-tx, (o.y+0.5)-ty);
-      const wob = (Math.random()-0.5)*0.35;
-      const score = d + wob;
-      if (score < bestScore){
-        bestScore = score;
-        best = o;
+    for(const c of chests){
+      if(c.opened) continue;
+      const d = Math.hypot((c.x+0.5)-hero.x, (c.y+0.5)-hero.y);
+      if(d<bestD){ bestD=d; best={x:c.x,y:c.y}; }
+    }
+    if(best) return best;
+
+    for(const o of offerings){
+      if(o.collected) continue;
+      const d = Math.hypot((o.x+0.5)-hero.x, (o.y+0.5)-hero.y);
+      if(d<bestD){ bestD=d; best={x:o.x,y:o.y}; }
+    }
+    if(!best && exit) best={x:exit.x,y:exit.y};
+    return best;
+  }
+
+  function triggerPulse(){
+    if(!gameStarted) return;
+    if(pulse.active) return;
+
+    const target = nearestObjective();
+    if(!target) return;
+
+    const dx=(target.x+0.5)-hero.x;
+    const dy=(target.y+0.5)-hero.y;
+    const d=Math.max(1e-6, Math.hypot(dx,dy));
+
+    pulse.active=true;
+    pulse.t=0;
+    pulse.ring=0;
+    pulse.dirX=dx/d;
+    pulse.dirY=dy/d;
+
+    state.anxiety = Math.max(state.anxiety, 10);
+    audio?.blip?.(1.0);
+    pushMessage("ECHO PULSE", "#fff");
+
+    if(mission.active && mission.type==="ECHO_COUNT"){
+      mission.extra.used++;
+      if(mission.extra.used > mission.extra.max){
+        mission.extra.used=0;
+        state.anxiety = Math.max(state.anxiety, 16);
+        pushMessage("ECHO OVERFLOW", PAL.danger);
       }
+    }
+  }
+
+  /* ============================================================
+     MISSIONS
+  ============================================================ */
+  function setMission(m){
+    mission.active=true;
+    mission.completed=false;
+    mission.title=m.title;
+    mission.desc=m.desc;
+    mission.type=m.type;
+    mission.progress=0;
+    mission.goal=m.goal ?? 1;
+    mission.extra=m.extra ?? null;
+
+    exitLocked=true;
+    pushMessage(`${hero.name.toUpperCase()}: NEW MISSION`, PAL.ui);
+    triggerMessage("NEW TASK LOADED");
+  }
+
+  function completeMission(){
+    mission.completed=true;
+    mission.active=false;
+    exitLocked=false;
+    triggerMessage("TASK COMPLETE");
+    triggerMessage("EXIT UNSEALED");
+    audio?.blip?.(1.0);
+    state.anxiety = Math.max(0, state.anxiety-4);
+  }
+
+  function generateRandomMission(){
+    // difficulty scales goals slightly
+    const d = state.diffIndex;
+    const types=["STILLNESS","NO_RUN","STAIN_TOUCH","ECHO_COUNT","FOLLOW_ORDER"];
+    const t=types[(Math.random()*types.length)|0];
+
+    if(t==="STILLNESS"){
+      const seconds = 2.2 + Math.random()*2.3 + d*0.35;
+      return {
+        type:"STILLNESS",
+        title:"STILLNESS RITUAL",
+        desc:`Stand still near a stain for ${seconds.toFixed(1)}s.\n(Don't move.)`,
+        goal:seconds
+      };
+    }
+
+    if(t==="NO_RUN"){
+      const time = 9 + ((Math.random()*9)|0) + d*2;
+      return {
+        type:"NO_RUN",
+        title:"SILENT WALK",
+        desc:`Survive ${time}s without sprinting.\n(Shift forbidden.)`,
+        goal:time
+      };
+    }
+
+    if(t==="STAIN_TOUCH"){
+      const count = 2 + ((Math.random()*2)|0) + (d>1?1:0);
+      return {
+        type:"STAIN_TOUCH",
+        title:"TOUCH THE CORRUPTION",
+        desc:`Step into ${count} different stains.\n(Each counts once.)`,
+        goal:count,
+        extra:{touched:new Set()}
+      };
+    }
+
+    if(t==="ECHO_COUNT"){
+      const pulses = 2 + ((Math.random()*2)|0) + (d>2?1:0);
+      return {
+        type:"ECHO_COUNT",
+        title:"ECHO TEST",
+        desc:`Use Signal Pulse (E) exactly ${pulses} times.\n(Too many resets.)`,
+        goal:pulses,
+        extra:{used:0,max:pulses}
+      };
+    }
+
+    // FOLLOW_ORDER
+    const order=[1,2,3].sort(()=>Math.random()-0.5);
+    offerings.forEach((o,i)=>o.order=order[i]);
+    return {
+      type:"FOLLOW_ORDER",
+      title:"SEQUENCE OF OFFERINGS",
+      desc:`Collect offerings in correct sequence.\n(Colors indicate order.)`,
+      goal:TOTAL_OFFERINGS,
+      extra:{needed:1}
+    };
+  }
+
+  function updateMission(dt, moving, sprinting){
+    if(!mission.active) return;
+
+    if(mission.type==="STILLNESS"){
+      const near = stains.some(s=>Math.hypot((s.x+0.5)-hero.x,(s.y+0.5)-hero.y)<2.0);
+      if(!moving && near) mission.progress += dt;
+      else mission.progress = Math.max(0, mission.progress - dt*0.9);
+      if(mission.progress >= mission.goal) completeMission();
+      return;
+    }
+
+    if(mission.type==="NO_RUN"){
+      if(sprinting){
+        mission.progress = Math.max(0, mission.progress - dt*2.2);
+        if(Math.random()<0.02) triggerMessage("TOO LOUD");
+        state.anxiety = Math.max(state.anxiety, 12);
+      } else {
+        mission.progress += dt;
+      }
+      if(mission.progress >= mission.goal) completeMission();
+      return;
+    }
+
+    if(mission.type==="STAIN_TOUCH"){
+      for(const s of stains){
+        if(Math.hypot((s.x+0.5)-hero.x,(s.y+0.5)-hero.y) < 0.95){
+          mission.extra.touched.add(`${s.x},${s.y}`);
+        }
+      }
+      mission.progress = mission.extra.touched.size;
+      if(mission.progress >= mission.goal) completeMission();
+      return;
+    }
+
+    if(mission.type==="ECHO_COUNT"){
+      mission.progress = mission.extra.used;
+      if(mission.progress >= mission.goal) completeMission();
+      return;
+    }
+
+    if(mission.type==="FOLLOW_ORDER"){
+      mission.progress = collected;
+      return;
+    }
+  }
+
+  /* ============================================================
+     PROMPT (choices)
+  ============================================================ */
+  function showPrompt(p){
+    if(prompt.active) return;
+    prompt.active=true;
+    prompt.text = p.text(hero.name.toUpperCase());
+    prompt.a = p.a;
+    prompt.b = p.b;
+    prompt.onChoose = p.choose;
+    prompt.timer = 6.6;
+    pushMessage("INPUT REQUIRED", PAL.ui);
+    state.anxiety = Math.max(state.anxiety, 10);
+  }
+
+  function choosePrompt(choice){
+    if(!prompt.active) return;
+    const fn=prompt.onChoose;
+    prompt.active=false;
+    if(fn) fn(choice);
+    audio?.blip?.(0.9);
+  }
+
+  /* ============================================================
+     CREEPY IMAGE FLASH (procedural now; later swap with your images)
+  ============================================================ */
+  function generateCreepyImage(kind="face"){
+    const c=document.createElement("canvas");
+    c.width=160; c.height=120;
+    const g=c.getContext("2d");
+    g.fillStyle="#000"; g.fillRect(0,0,c.width,c.height);
+
+    // noisy base
+    for(let i=0;i<3200;i++){
+      const x=(Math.random()*c.width)|0;
+      const y=(Math.random()*c.height)|0;
+      const v=(Math.random()*60)|0;
+      g.fillStyle=`rgb(${v},${v},${v})`;
+      g.fillRect(x,y,1,1);
+    }
+
+    // red smears
+    g.globalAlpha=0.25;
+    for(let i=0;i<10;i++){
+      g.fillStyle = Math.random()<0.5 ? "rgb(140,0,30)" : "rgb(80,0,120)";
+      g.fillRect((Math.random()*c.width)|0, (Math.random()*c.height)|0, 10+(Math.random()*70|0), 2+(Math.random()*10|0));
+    }
+    g.globalAlpha=1;
+
+    // abstract face
+    if(kind==="face"){
+      const cx=c.width/2 + (Math.random()*18-9);
+      const cy=c.height/2 + (Math.random()*12-6);
+      const eyeY=cy-10 + Math.random()*6;
+      const eyeDX=28 + Math.random()*12;
+
+      g.fillStyle="rgba(255,60,90,0.65)";
+      g.fillRect(cx-eyeDX, eyeY, 9, 4);
+      g.fillRect(cx+eyeDX-9, eyeY, 9, 4);
+
+      g.fillStyle="rgba(0,0,0,0.9)";
+      g.fillRect(cx-eyeDX+4, eyeY+1, 2, 2);
+      g.fillRect(cx+eyeDX-6, eyeY+1, 2, 2);
+
+      g.fillStyle="rgba(255,255,255,0.12)";
+      g.fillRect(cx-22, cy+14, 44, 3);
+
+      g.fillStyle="rgba(255,60,90,0.22)";
+      for(let i=0;i<7;i++){
+        const x=cx+(Math.random()*90-45);
+        const y=(Math.random()*c.height)|0;
+        g.fillRect(x,y,1,10+(Math.random()*40|0));
+      }
+    }
+
+    // glitch smear
+    g.globalAlpha=0.22;
+    for(let i=0;i<7;i++){
+      const y=(Math.random()*c.height)|0;
+      const dx=(Math.random()*26-13);
+      g.drawImage(c, 0, y, c.width, 2, dx, y, c.width, 2);
+    }
+    g.globalAlpha=1;
+
+    return c;
+  }
+
+  function triggerFlash(kind="face"){
+    flash.active=true;
+    flash.t=0;
+    flash.dur=0.65 + Math.random()*0.8;
+    flash.img=generateCreepyImage(kind);
+    flash.alpha=0;
+  }
+
+  /* ============================================================
+     MONSTER SPRITE (procedural image, jitter)
+  ============================================================ */
+  function makeMonsterSprite(){
+    const c=document.createElement("canvas");
+    c.width=20; c.height=20;
+    const g=c.getContext("2d");
+    g.clearRect(0,0,20,20);
+    g.fillStyle="rgba(30,30,42,0.95)";
+    g.fillRect(4,4,12,12);
+
+    // eyes
+    g.fillStyle="rgba(255,60,90,0.85)";
+    g.fillRect(7,10,2,1);
+    g.fillRect(11,10,2,1);
+
+    // mouth void
+    g.fillStyle="rgba(0,0,0,0.9)";
+    g.fillRect(8,13,4,2);
+
+    for(let i=0;i<30;i++){
+      const x=(Math.random()*20)|0;
+      const y=(Math.random()*20)|0;
+      g.fillStyle = Math.random()<0.5 ? "rgba(255,60,90,0.10)" : "rgba(255,255,255,0.08)";
+      g.fillRect(x,y,1,1);
+    }
+    return c;
+  }
+  const monsterSprite = makeMonsterSprite();
+
+  /* ============================================================
+     MONSTERS (aggressive, but cannot physically block)
+  ============================================================ */
+  function spawnMonsters(){
+    monsters=[];
+    for(let i=0;i<state.monstersCount;i++){
+      const r=randomFloorFar(1,1, 12 + i*2);
+      monsters.push({
+        x:r.x+0.5,
+        y:r.y+0.5,
+        speed:(0.95 + Math.random()*0.35) * (0.55 + state.diffIndex*0.16),
+        stun:0,
+        lastSeen:0,
+        stepCd:0,
+        target:null,
+        faceJitter:0,
+        faceMode:0 // used to trigger face flashes when close
+      });
+    }
+  }
+
+  function pickNeighborStep(mx,my,tx,ty){
+    const gx=Math.floor(mx), gy=Math.floor(my);
+    const opts=[
+      {x:gx+1,y:gy},{x:gx-1,y:gy},{x:gx,y:gy+1},{x:gx,y:gy-1}
+    ].filter(p=>isFloor(p.x,p.y));
+    if(!opts.length) return null;
+    let best=opts[0], bestScore=1e9;
+    for(const o of opts){
+      const d=Math.hypot((o.x+0.5)-tx,(o.y+0.5)-ty);
+      const wob=(Math.random()-0.5)*0.35;
+      const score=d+wob;
+      if(score<bestScore){ bestScore=score; best=o; }
     }
     return best;
   }
 
   function updateMonsters(dt){
-    // fear based on nearest monster
-    let nearest = 999;
-    for (const m of monsters){
-      const d = Math.hypot(m.x-hero.x, m.y-hero.y);
-      if (d < nearest) nearest = d;
-    }
-    const fear = clamp(1 - nearest/6, 0, 1);
-    audio?.setFear?.(fear);
+    // distance to closest monster controls fear/audio and some visuals
+    let closest=999;
 
-    // faces when very close
-    if (nearest < 2.3 && Math.random() < 0.05){
-      triggerFacePopup(nearest);
-    }
+    for(const m of monsters){
+      const dx=hero.x-m.x, dy=hero.y-m.y;
+      const dist=Math.max(1e-6, Math.hypot(dx,dy));
+      closest=Math.min(closest, dist);
 
-    // monster motion
-    const sprinting = !!keys["ShiftLeft"];
-    const hear = sprinting ? MONSTER_HEAR_RUN : MONSTER_HEAR_WALK;
+      if(m.stun>0){ m.stun=Math.max(0, m.stun-dt); continue; }
 
-    for (const m of monsters){
-      if (m.stun > 0){
-        m.stun -= dt;
-        continue;
-      }
+      const sprinting=!!keys.ShiftLeft;
+      const hearRadius = sprinting ? 7.8 : 4.8;
 
-      const dx = hero.x - m.x;
-      const dy = hero.y - m.y;
-      const dist = Math.max(1e-6, Math.hypot(dx,dy));
+      let tx=m.x, ty=m.y;
 
-      // decide target
-      let tx = m.x, ty = m.y;
-      if (dist < hear){
-        m.lastHeard = 1.2;
-        tx = hero.x; ty = hero.y;
-      } else if (m.lastHeard > 0){
-        m.lastHeard -= dt;
-        tx = m.x + (dx/dist) * 1.2;
-        ty = m.y + (dy/dist) * 1.2;
+      if(dist < hearRadius){
+        m.lastSeen=1.4;
+        tx=hero.x; ty=hero.y;
+      } else if(m.lastSeen>0){
+        m.lastSeen=Math.max(0, m.lastSeen-dt);
+        tx = m.x + (dx/dist)*1.0;
+        ty = m.y + (dy/dist)*1.0;
       } else {
-        // drift to stains
-        const s = stains[(Math.random()*stains.length)|0];
-        tx = s.x+0.5; ty = s.y+0.5;
+        const s=stains[(Math.random()*stains.length)|0];
+        tx=s.x+0.5; ty=s.y+0.5;
       }
 
-      m.stepCooldown -= dt;
-      if (m.stepCooldown <= 0 || !m.target){
-        m.stepCooldown = 0.10 + Math.random()*0.22;
-        const step = pickMonsterStepToward(m.x, m.y, tx, ty);
-        if (step) m.target = step;
+      m.stepCd -= dt;
+      if(m.stepCd<=0 || !m.target){
+        m.stepCd = 0.14 + Math.random()*0.20;
+        const step=pickNeighborStep(m.x,m.y,tx,ty);
+        if(step) m.target=step;
       }
 
-      const spd = m.speed * m.aggression;
-      if (m.target){
-        const gx = m.target.x+0.5;
-        const gy = m.target.y+0.5;
-        const mdx = gx - m.x;
-        const mdy = gy - m.y;
-        const md = Math.max(1e-6, Math.hypot(mdx,mdy));
-        m.x += (mdx/md) * spd * dt;
-        m.y += (mdy/md) * spd * dt;
-        if (md < 0.10) m.stepCooldown = 0;
+      if(m.target){
+        const cx=m.target.x+0.5, cy=m.target.y+0.5;
+        const mdx=cx-m.x, mdy=cy-m.y;
+        const md=Math.max(1e-6, Math.hypot(mdx,mdy));
+        m.x += (mdx/md) * (m.speed*state.aggression) * dt * 3.3;
+        m.y += (mdy/md) * (m.speed*state.aggression) * dt * 3.3;
+        if(md<0.08) m.stepCd=0;
       }
 
-      // sprint lurch
-      if (sprinting && fear>0.45 && Math.random() < 0.0035){
-        m.x += (dx/dist)*0.55;
-        m.y += (dy/dist)*0.55;
-        state.anxiety = Math.max(state.anxiety, 18);
+      // close-range horror without “blocking”
+      if(dist < 3.2){
+        state.anxiety = Math.max(state.anxiety, 9 + (3.2-dist)*4.5);
+        if(Math.random()<0.035) triggerMessage();
+      }
+
+      // face flash when very close (your future uploaded images plug here)
+      if(dist < 2.0 && Math.random() < 0.006 + state.diffIndex*0.003){
+        triggerFlash("face");
+      }
+
+      // damage zone (but never an impassable wall: you *can* risk running through)
+      if(hero.hitCooldown>0) hero.hitCooldown = Math.max(0, hero.hitCooldown-dt);
+      if(dist < 0.62 && hero.hitCooldown<=0){
+        hero.hitCooldown=0.75;
+        hero.panic++;
+        hero.oxygen = Math.max(0, hero.oxygen - (12 + state.diffIndex*4));
+        triggerMessage("DON'T LOOK");
         audio?.blip?.(1.0);
-        pushMessage("IMAGE TEAR");
-        triggerFlash("tear");
-      }
+        triggerFlash("face");
 
-      // hit
-      if (hero.hitCooldown > 0) hero.hitCooldown -= dt;
-      if (dist < MONSTER_HIT_DIST && hero.hitCooldown <= 0){
-        hero.hitCooldown = MONSTER_HIT_COOLDOWN;
-        m.stun = 0.28; // brief pause
-        state.anxiety = Math.max(state.anxiety, 22);
-        state.camShake = Math.max(state.camShake, 12);
-        audio?.blip?.(1.0);
-        triggerFlash("hit");
-        pushMessage("DON'T LOOK", "#ff3355");
+        // shove the player away slightly (no corner stick thanks to collision resolver)
+        hero.x += (dx/dist)*0.40;
+        hero.y += (dy/dist)*0.40;
+        const r=resolveCircleGrid(hero.x, hero.y, PLAYER_RADIUS);
+        hero.x=r.x; hero.y=r.y;
 
-        // shove
-        hero.x -= (dx/dist)*0.35;
-        hero.y -= (dy/dist)*0.35;
-        const r = resolveCircleGrid(hero.x, hero.y);
-        hero.x = r.x; hero.y = r.y;
-
-        state.strikes++;
-        hero.sanity = Math.max(0, hero.sanity - 18);
-
-        if (state.strikes >= STRIKES_TO_DIE){
-          dieAndReset();
+        if(hero.panic>=3){
+          gameOver("CAUGHT IN THE BUFFER");
           return;
-        } else {
-          hudStatus.textContent = "STATUS: PANICKING";
-          hudStatus.className = "pill warn";
-          setTimeout(()=>{
-            if (state.mode==="PLAY"){
-              hudStatus.textContent = mission.active ? "STATUS: MISSION ACTIVE" : "STATUS: WATCHED";
-              hudStatus.className = mission.active ? "pill" : "pill warn";
-            }
-          }, 650);
         }
       }
     }
+
+    const fear = clamp(1 - closest/6, 0, 1);
+    audio?.setFear?.(fear);
   }
 
-  function dieAndReset(){
-    state.mode = "MENU";
-    menu.style.display = "grid";
-    loreIntroEl.textContent = "CAUGHT. THE TAPE REWINDS.";
-    pushMessage("RESET");
+  /* ============================================================
+     LEVEL GEN
+  ============================================================ */
+  function generateLevel(){
+    generateBraidedMaze();
+
+    // stains
+    stains=[];
+    for(let i=0;i<8;i++) stains.push(randomFloorFar(1,1,4));
+
+    // offerings
+    offerings=[];
+    while(offerings.length<TOTAL_OFFERINGS){
+      const r=randomFloorFar(1,1,6);
+      if(offerings.some(o=>o.x===r.x&&o.y===r.y)) continue;
+      offerings.push({x:r.x,y:r.y,collected:false,order:0});
+    }
+
+    // chests
+    chests=[];
+    while(chests.length<CHESTS_PER_LEVEL){
+      const r=randomFloorFar(1,1,5);
+      if(chests.some(c=>c.x===r.x&&c.y===r.y)) continue;
+      if(offerings.some(o=>o.x===r.x&&o.y===r.y)) continue;
+      chests.push({x:r.x,y:r.y,opened:false});
+    }
+
+    // oxygen tanks
+    oxyTanks=[];
+    while(oxyTanks.length<OXY_TANKS){
+      const r=randomFloorFar(1,1,6);
+      if(offerings.some(o=>o.x===r.x&&o.y===r.y)) continue;
+      if(chests.some(c=>c.x===r.x&&c.y===r.y)) continue;
+      oxyTanks.push({x:r.x,y:r.y,used:false});
+    }
+
+    // exit
+    exit=randomFloorFar(1,1,12);
+    exitLocked=true;
+
+    collected=0;
+    messages=[];
+    state.anxiety=0;
+
+    hero.x=1.5; hero.y=1.5;
+    hero.vx=0; hero.vy=0;
+    hero.oxygen=hero.oxygenMax;
+    hero.panic=0;
+    hero.hitCooldown=0;
+    hero.animT=0;
+
+    mission.active=false;
+    mission.completed=false;
+    prompt.active=false;
+    pulse.active=false;
+    flash.active=false;
+
+    spawnMonsters();
+    updateHUD();
   }
 
-  // ========= OBJECTIVES =========
-  function openedChests(){ return chests.filter(c=>c.opened).length; }
-  function nearestObjective(){
-    // unopened chest -> mission completion stuff -> exit
-    let best=null, bestD=1e9;
-
-    for (const c of chests){
-      if (c.opened) continue;
-      const d = Math.hypot((c.x+0.5)-hero.x, (c.y+0.5)-hero.y);
-      if (d<bestD){ bestD=d; best={x:c.x,y:c.y,type:"chest"}; }
-    }
-    if (best) return best;
-
-    for (const o of offerings){
-      if (o.taken) continue;
-      const d = Math.hypot((o.x+0.5)-hero.x, (o.y+0.5)-hero.y);
-      if (d<bestD){ bestD=d; best={x:o.x,y:o.y,type:"offering"}; }
-    }
-    if (exit && exit.unlocked){
-      const d = Math.hypot((exit.x+0.5)-hero.x, (exit.y+0.5)-hero.y);
-      if (d<bestD){ bestD=d; best={x:exit.x,y:exit.y,type:"exit"}; }
-    }
-    return best;
-  }
-
-  // ========= PULSE =========
-  function triggerPulse(){
-    if (pulse.active) return;
-    const obj = nearestObjective();
-    if (!obj) return;
-
-    const dx = (obj.x+0.5) - hero.x;
-    const dy = (obj.y+0.5) - hero.y;
-    const d = Math.max(1e-6, Math.hypot(dx,dy));
-    pulse.active = true;
-    pulse.t = 0;
-    pulse.ring = 0;
-    pulse.dirX = dx/d;
-    pulse.dirY = dy/d;
-
-    state.anxiety = Math.max(state.anxiety, 10);
-    audio?.blip?.(1.0);
-    pushMessage("ECHO PULSE", "#ffffff");
-
-    if (mission.active && mission.type === "ECHO_COUNT"){
-      mission.extra.used++;
-      if (mission.extra.used > mission.extra.max){
-        mission.extra.used = 0;
-        state.anxiety = Math.max(state.anxiety, 16);
-        pushMessage("ECHO OVERFLOW", "#ff3355");
-      }
-    }
-  }
-
-  // ========= MISSIONS (unlocked by chests) =========
-  function setMission(m){
-    mission.active = true;
-    mission.completed = false;
-    mission.title = m.title;
-    mission.desc = m.desc;
-    mission.type = m.type;
-    mission.progress = 0;
-    mission.goal = m.goal ?? 1;
-    mission.extra = m.extra ?? null;
-
-    exit.unlocked = false;
-
-    hudStatus.textContent = "STATUS: MISSION ACTIVE";
-    hudStatus.className = "pill";
-    pushMessage("NEW TASK LOADED", "#ffffff");
-    updateMissionUI();
-  }
-
-  function completeMission(){
-    mission.completed = true;
-    mission.active = false;
-    exit.unlocked = true;
-
-    pushMessage("TASK COMPLETE", "#ccffcc");
-    pushMessage("EXIT UNSEALED", "#ccffcc");
-    audio?.blip?.(1.0);
-
-    hudStatus.textContent = "STATUS: EXIT UNLOCKED";
-    hudStatus.className = "pill status";
-
-    // small reward
-    state.anxiety = Math.max(0, state.anxiety - 4);
-    for (const m of monsters) m.aggression = Math.max(0.92, m.aggression - 0.06);
-
-    updateMissionUI();
-  }
-
-  function genMission(){
-    // always different missions; scaled by difficulty
-    const t = pick(["STILLNESS","NO_RUN","STAIN_TOUCH","ECHO_COUNT","FOLLOW_ORDER","STATIC_PURGE"]);
-    const hard = diff.missionHard;
-
-    if (t==="STILLNESS"){
-      const sec = clamp(2.0*hard + rand(0.0, 2.2), 2.0, 5.5);
-      return {
-        type:"STILLNESS",
-        title:"STILLNESS RITUAL",
-        desc:`Stand still near a stain for ${sec.toFixed(1)}s.\n(Do not move.)`,
-        goal: sec,
-        extra:{}
-      };
-    }
-
-    if (t==="NO_RUN"){
-      const sec = clamp(10*hard + randi(0,8), 10, 26);
-      return {
-        type:"NO_RUN",
-        title:"SILENT WALK",
-        desc:`Survive ${sec.toFixed(0)}s without sprinting.\n(Shift forbidden.)`,
-        goal: sec,
-        extra:{}
-      };
-    }
-
-    if (t==="STAIN_TOUCH"){
-      const count = clamp(Math.round(2*hard + rand(0,2)), 2, 6);
-      return {
-        type:"STAIN_TOUCH",
-        title:"TOUCH THE CORRUPTION",
-        desc:`Step into ${count} different stains.\n(Each stain counts once.)`,
-        goal: count,
-        extra:{ touched:new Set() }
-      };
-    }
-
-    if (t==="ECHO_COUNT"){
-      const pulses = clamp(Math.round(2*hard + rand(0,2)), 2, 6);
-      return {
-        type:"ECHO_COUNT",
-        title:"ECHO TEST",
-        desc:`Use Signal Pulse (E) exactly ${pulses} times.\n(Too many resets.)`,
-        goal: pulses,
-        extra:{ used:0, max:pulses }
-      };
-    }
-
-    if (t==="FOLLOW_ORDER"){
-      const order = [1,2,3].sort(()=>Math.random()-0.5);
-      offerings.forEach((o,i)=>o.order = order[i]);
-      return {
-        type:"FOLLOW_ORDER",
-        title:"SEQUENCE OF OFFERINGS",
-        desc:`Collect offerings in the correct sequence.\n(Colors indicate order.)`,
-        goal: OFFERINGS_PER_LEVEL,
-        extra:{ needed:1 }
-      };
-    }
-
-    // STATIC_PURGE: stand still while holding breath (oxygen low-ish)
-    const sec = clamp(2.5*hard + rand(0,2.8), 2.5, 6.2);
-    return {
-      type:"STATIC_PURGE",
-      title:"STATIC PURGE",
-      desc:`When O2 < 40s, stand still for ${sec.toFixed(1)}s.\n(Wait for the tape to clear.)`,
-      goal: sec,
-      extra:{}
-    };
-  }
-
-  function updateMission(dt, moving, sprinting){
-    if (!mission.active) return;
-
-    if (mission.type==="STILLNESS"){
-      const near = stains.some(s => Math.hypot((s.x+0.5)-hero.x, (s.y+0.5)-hero.y) < 2.0);
-      if (!moving && near) mission.progress += dt;
-      else mission.progress = Math.max(0, mission.progress - dt*0.9);
-
-      if (mission.progress >= mission.goal) completeMission();
-      return;
-    }
-
-    if (mission.type==="NO_RUN"){
-      if (sprinting){
-        mission.progress = Math.max(0, mission.progress - dt*2.2);
-        state.anxiety = Math.max(state.anxiety, 12);
-        if (Math.random()<0.02) pushMessage("TOO LOUD", "#ff3355");
-      } else {
-        mission.progress += dt;
-      }
-      if (mission.progress >= mission.goal) completeMission();
-      return;
-    }
-
-    if (mission.type==="STAIN_TOUCH"){
-      for (const s of stains){
-        const d = Math.hypot((s.x+0.5)-hero.x, (s.y+0.5)-hero.y);
-        if (d < 0.9) mission.extra.touched.add(`${s.x},${s.y}`);
-      }
-      mission.progress = mission.extra.touched.size;
-      if (mission.progress >= mission.goal) completeMission();
-      return;
-    }
-
-    if (mission.type==="ECHO_COUNT"){
-      mission.progress = mission.extra.used;
-      if (mission.progress >= mission.goal) completeMission();
-      return;
-    }
-
-    if (mission.type==="FOLLOW_ORDER"){
-      // handled by pickups
-      mission.progress = offerings.filter(o=>o.taken).length;
-      return;
-    }
-
-    if (mission.type==="STATIC_PURGE"){
-      const okOxy = hero.oxygen < 40;
-      if (okOxy && !moving) mission.progress += dt;
-      else mission.progress = Math.max(0, mission.progress - dt*0.9);
-      if (!okOxy && Math.random()<0.01) pushMessage("WAIT FOR LOW AIR", "#ffffff");
-      if (mission.progress >= mission.goal) completeMission();
-      return;
-    }
-  }
-
-  // ========= PROMPTS (lore choices) =========
-  const promptBank = [
-    {
-      q:`A whisper says: "DO YOU WANT TO BE SEEN, {NAME}?"`,
-      a:`1) YES (more clarity)\n2) NO (more safety)`,
-      choose:(c)=>{
-        if (c===1){
-          state.anxiety = Math.max(state.anxiety, 12);
-          for (const m of monsters) m.aggression += 0.08;
-          pushMessage("YOU ARE VISIBLE", "#ff3355");
-        } else {
-          for (const m of monsters) m.aggression = Math.max(0.92, m.aggression - 0.07);
-          pushMessage("YOU ARE MISSING", "#ffffff");
-        }
-      }
-    },
-    {
-      q:`The CRT hisses: "SACRIFICE SPEED FOR SILENCE, {NAME}?"`,
-      a:`1) ACCEPT\n2) REFUSE`,
-      choose:(c)=>{
-        if (c===1){
-          pushMessage("SILENCE TRADE", "#ffffff");
-          state.anxiety = Math.max(0, state.anxiety - 4);
-        } else {
-          pushMessage("LOUD TRADE", "#ff3355");
-          for (const m of monsters) m.aggression += 0.10;
-        }
-      }
-    },
-    {
-      q:`A stain pulses: "NAME THE COLOR."`,
-      a:`1) RED\n2) NONE`,
-      choose:(c)=>{
-        if (c===1){
-          pushMessage("WRONG", "#ff3355");
-          state.anxiety = Math.max(state.anxiety, 16);
-          triggerFlash("wrong");
-        } else {
-          pushMessage("CORRECT", "#ccffcc");
-          hero.sanity = Math.min(100, hero.sanity + 10);
-        }
-      }
-    },
-    {
-      q:`A voice counts your breaths: "STOP BREATHING?"`,
-      a:`1) STOP\n2) KEEP GOING`,
-      choose:(c)=>{
-        if (c===1){
-          // risky: less oxygen drain briefly, but more fear spikes
-          pushMessage("HOLDING", "#ffffff");
-          hero.oxygen = Math.min(hero.maxOxygen, hero.oxygen + 6);
-          state.anxiety = Math.max(state.anxiety, 14);
-        } else {
-          pushMessage("GOOD DOG", "#ff3355");
-          for (const m of monsters) m.aggression += 0.06;
-        }
-      }
-    }
-  ];
-
-  function showPrompt(p){
-    if (prompt.active) return;
-    prompt.active = true;
-    prompt.timer = prompt.maxTime;
-    prompt.onChoose = p.choose;
-
-    const name = hero.name.toUpperCase();
-    prompt.q = p.q.replaceAll("{NAME}", name);
-    prompt.a = p.a;
-
-    pushMessage("INPUT REQUIRED", "#ffffff");
-    state.anxiety = Math.max(state.anxiety, 10);
-    updatePromptUI();
-  }
-
-  function choosePrompt(choice){
-    if (!prompt.active) return;
-    const fn = prompt.onChoose;
-    prompt.active = false;
-    prompt.onChoose = null;
-    audio?.blip?.(0.9);
-    if (fn) fn(choice);
-    updatePromptUI();
-  }
-
-  function updatePromptUI(){
-    promptBox.style.display = prompt.active ? "block" : "none";
-    if (!prompt.active) return;
-    promptQEl.textContent = prompt.q;
-    promptAEl.textContent = prompt.a;
-    promptBarEl.style.width = "100%";
-  }
-
-  // ========= FLASH / DISTORTION =========
-  function proceduralCreepyCanvas(kind=""){
-    const c = document.createElement('canvas');
-    c.width = 160; c.height = 120;
-    const g = c.getContext('2d');
-
-    g.fillStyle="#000"; g.fillRect(0,0,c.width,c.height);
-
-    // grain
-    for (let i=0;i<2800;i++){
-      const x=(Math.random()*c.width)|0;
-      const y=(Math.random()*c.height)|0;
-      const v=(Math.random()*70)|0;
-      g.fillStyle=`rgb(${v},${v},${v})`;
-      g.fillRect(x,y,1,1);
-    }
-
-    // abstract face-ish
-    const cx = c.width/2 + rand(-14,14);
-    const cy = c.height/2 + rand(-10,10);
-    g.fillStyle="rgba(255,51,85,0.65)";
-    g.fillRect(cx-32, cy-10, 10, 4);
-    g.fillRect(cx+22, cy-10, 10, 4);
-    g.fillStyle="rgba(0,0,0,0.85)";
-    g.fillRect(cx-28, cy-9, 2, 2);
-    g.fillRect(cx+26, cy-9, 2, 2);
-
-    g.fillStyle="rgba(255,255,255,0.10)";
-    g.fillRect(cx-22, cy+14, 44, 3);
-
-    // tears
-    g.fillStyle="rgba(255,51,85,0.20)";
-    for (let i=0;i<8;i++){
-      const x=cx + rand(-55,55);
-      const y=rand(0,c.height);
-      g.fillRect(x, y, 1, rand(12,55));
-    }
-
-    // smear rows
-    g.globalAlpha=0.22;
-    for (let i=0;i<7;i++){
-      const y=(Math.random()*c.height)|0;
-      const dx=rand(-14,14);
-      g.drawImage(c, 0, y, c.width, 2, dx, y, c.width, 2);
-    }
-    g.globalAlpha=1;
-
-    // kind-specific highlight
-    if (kind==="hit" || kind==="wrong"){
-      g.fillStyle="rgba(255,51,85,0.08)";
-      g.fillRect(0,0,c.width,c.height);
-    }
-    return c;
-  }
-
-  function distortDrawImage(img, x, y, w, h, intensity){
-    // slice jitter + channel-ish offsets (cheap & creepy)
-    const slices = 10 + ((intensity*16)|0);
-    for (let i=0;i<slices;i++){
-      const sy = (i/slices)*h;
-      const sh = h/slices;
-      const dx = rand(-1,1) * (2 + intensity*10);
-      const dy = rand(-1,1) * (1 + intensity*6);
-      const sx = rand(-1,1) * (1 + intensity*4);
-
-      ctx.globalAlpha = 0.55 + Math.random()*0.45;
-      ctx.drawImage(img,
-        0, sy, img.width, (img.height/slices),
-        x + dx + sx, y + sy + dy, w, sh
-      );
-    }
-
-    // red veil / burn
-    ctx.globalAlpha = 0.12 + intensity*0.18;
-    ctx.fillStyle = "rgba(255,51,85,1)";
-    ctx.fillRect(x,y,w,h);
-    ctx.globalAlpha = 1;
-  }
-
-  function triggerFlash(kind="pickup"){
-    flash.active = true;
-    flash.t = 0;
-    flash.dur = 0.65 + Math.random()*0.75;
-    flash.kind = kind;
-
-    // choose image: your flashes -> else procedural
-    if (assets.flashes.length){
-      flash.img = pick(assets.flashes);
-    } else {
-      flash.img = proceduralCreepyCanvas(kind);
-    }
-    flash.alpha = 0;
-  }
-
-  function triggerFacePopup(dist){
-    if (facePopup.active) return;
-    const img = (Math.random()<0.5 ? assets.face1 : assets.face2);
-    facePopup.active = true;
-    facePopup.t = 0;
-    facePopup.dur = 0.48 + Math.random()*0.35;
-    facePopup.img = img || proceduralCreepyCanvas("face");
-    facePopup.intensity = clamp(1 - dist/2.3, 0.15, 1);
-  }
-
-  // Monster sprite: use your monster image if present, else procedural tiny sprite
-  const fallbackMonster = (() => {
-    const c = document.createElement('canvas');
-    c.width=24; c.height=24;
-    const g=c.getContext('2d');
-    g.clearRect(0,0,24,24);
-    g.fillStyle="rgba(40,40,55,0.92)";
-    g.fillRect(6,6,12,12);
-    g.fillStyle="rgba(255,51,85,0.85)";
-    g.fillRect(9,12,2,1);
-    g.fillRect(13,12,2,1);
-    g.fillStyle="rgba(0,0,0,0.85)";
-    g.fillRect(10,15,4,2);
-    for (let i=0;i<30;i++){
-      g.fillStyle = Math.random()<0.5 ? "rgba(255,51,85,0.12)" : "rgba(255,255,255,0.08)";
-      g.fillRect((Math.random()*24)|0, (Math.random()*24)|0, 1,1);
-    }
-    return c;
-  })();
-
-  // ========= PICKUPS =========
+  /* ============================================================
+     PICKUPS / INTERACTIONS
+  ============================================================ */
   function openChest(c){
-    c.opened = true;
-    audio?.thump?.(0.40);
-    audio?.blip?.(0.8);
-    pushMessage("CHEST OPENED", "#ffffff");
+    c.opened=true;
+    triggerMessage("CHEST OPENED");
+    audio?.blip?.(1.0);
+    if(Math.random()<0.78) triggerFlash("face");
 
-    // chest always causes some visual offense
-    if (Math.random() < 0.8) triggerFlash("chest");
-
-    // if no mission active and exit locked -> unlock mission
-    if (!mission.active && !exit.unlocked){
-      setMission(genMission());
-    } else {
-      // otherwise likely prompt
-      if (Math.random() < 0.7) showPrompt(pick(promptBank));
+    // chest unlocks mission if locked; else triggers lore prompt
+    if(!mission.active && exitLocked){
+      setMission(generateRandomMission());
+    } else if(Math.random()<0.6){
+      showPrompt(lorePrompts[(Math.random()*lorePrompts.length)|0]);
     }
-
-    updateHud();
-    updateMissionUI();
-  }
-
-  function collectTank(t){
-    t.used = true;
-    hero.oxygen = Math.min(hero.maxOxygen, hero.oxygen + t.amount);
-    audio?.thump?.(0.28);
-    pushMessage(`OXYGEN +${t.amount}s`, "#ccffcc");
-    if (Math.random()<0.35) triggerFlash("tank");
-    updateHud();
   }
 
   function collectOffering(o){
-    if (mission.active && mission.type==="FOLLOW_ORDER"){
-      const needed = mission.extra.needed;
-      if (o.order !== needed){
-        pushMessage("WRONG SEQUENCE", "#ff3355");
+    // FOLLOW_ORDER enforcement
+    if(mission.active && mission.type==="FOLLOW_ORDER"){
+      const needed = (mission.extra?.needed ?? 1);
+      if(o.order !== needed){
+        triggerMessage("WRONG SEQUENCE");
+        state.anxiety = Math.max(state.anxiety, 18);
         audio?.blip?.(1.0);
-        triggerFlash("wrong");
-        // punish: rewind level
+        triggerFlash("face");
+        // reset level: cruel but fair
         generateLevel();
         return;
       }
-      mission.extra.needed = needed + 1;
-      if (mission.extra.needed > OFFERINGS_PER_LEVEL){
+      mission.extra.needed = needed+1;
+      if(mission.extra.needed > TOTAL_OFFERINGS){
         completeMission();
       }
     }
 
-    o.taken = true;
-    audio?.blip?.(0.95);
-    pushMessage("OFFERING ACCEPTED", "#ffffff");
-    pushMessage(pick(["FOUND FOOTAGE OK","INDEX CORRUPTED","MEMORY FRAME LOST","AUDIO DESCENDS"]), "#ffffff");
+    o.collected=true;
+    collected++;
+    triggerMessage("OFFERING ACCEPTED");
+    pushMessage(`${hero.name.toUpperCase()}: MEMORY INDEXED`, "#fff");
+    audio?.blip?.(0.9);
 
-    if (Math.random() < 0.60) triggerFlash("pickup");
-    if (Math.random() < 0.30) showPrompt(pick(promptBank));
+    if(Math.random()<0.55) triggerFlash("face");
+    if(Math.random()<0.32) showPrompt(lorePrompts[(Math.random()*lorePrompts.length)|0]);
 
-    updateHud();
+    // spawn exit only when mission completed/unlocked (exitLocked=false)
+    updateHUD();
   }
 
-  // ========= HUD =========
-  function updateHud(){
-    hudLeft.textContent = `${hero.name.toUpperCase()} · ${hero.role.toUpperCase()} · STRIKES ${state.strikes}/${STRIKES_TO_DIE}`;
-    hudDiff.textContent = `DIFF: ${diff.name}`;
-    hudItems.textContent = `CHESTS: ${openedChests()}/${chests.length} · EXIT: ${exit.unlocked ? "OPEN" : "SEALED"}`;
-
-    const oxyPct = clamp(hero.oxygen / hero.maxOxygen, 0, 1);
-    hudOxy.textContent = `O2: ${(oxyPct*100)|0}% (${hero.oxygen.toFixed(0)}s)`;
-
-    // warn style
-    if (hero.oxygen < LOW_OXY_WARN){
-      hudOxy.className = "pill warn";
-    } else {
-      hudOxy.className = "pill";
-    }
+  function takeOxy(t){
+    t.used=true;
+    hero.oxygen = Math.min(hero.oxygenMax, hero.oxygen + OXY_TANK_GAIN);
+    pushMessage("OXYGEN TANK", PAL.ui);
+    audio?.blip?.(0.6);
   }
 
-  function updateMissionUI(){
-    missionBox.style.display = mission.active ? "block" : "none";
-    if (!mission.active) return;
-    missionTitleEl.textContent = mission.title;
-    missionDescEl.textContent = mission.desc;
-    const pct = clamp(mission.progress / mission.goal, 0, 1);
-    missionBarEl.style.width = `${(pct*100).toFixed(0)}%`;
+  /* ============================================================
+     UI / HUD
+  ============================================================ */
+  function updateHUD(){
+    hudName.textContent = `NAME: ${hero.name.toUpperCase()}`;
+    hudRole.textContent = `ROLE: ${hero.role.toUpperCase()}`;
+    hudLoot.textContent = `CHESTS ${chests.filter(c=>c.opened).length}/${CHESTS_PER_LEVEL}`;
+    hudOffer.textContent = `OFFERINGS ${collected}/${TOTAL_OFFERINGS}`;
+
+    hudMission.textContent = mission.active ? mission.title : (exitLocked ? "LOCKED" : "UNSEALED");
+    const mpct = mission.active ? clamp(mission.progress/mission.goal,0,1) : (exitLocked?0:1);
+    misBar.style.width = `${(mpct*100)|0}%`;
+
+    const opct = clamp(hero.oxygen/hero.oxygenMax,0,1);
+    oxyBar.style.width = `${(opct*100)|0}%`;
+
+    hudDiff.textContent = DIFF_LABELS[state.diffIndex] + ` · M${state.monstersCount}`;
   }
 
-  // ========= PLAYER DRAW (animated creepy figure) =========
-  function drawPlayer(px,py,t){
-    // player is screen-centered (camera), so px/py are already camera-space
-    const role = hero.role;
-    const wob = Math.sin(t*6.2)*0.8 + Math.sin(t*2.1)*0.6;
-    const flick = Math.random()<0.20 ? 1 : 0;
-
-    // small trailing smear
-    ctx.globalAlpha = 0.18;
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.fillRect(px-2 - wob*0.4, py-2 + wob*0.2, 4, 4);
-    ctx.globalAlpha = 1;
-
-    if (role==="thief"){
-      // thin, angular
-      ctx.fillStyle = "#e6eefc";
-      ctx.beginPath();
-      ctx.moveTo(px, py-5-wob*0.3);
-      ctx.lineTo(px+4+wob*0.2, py+4);
-      ctx.lineTo(px-4-wob*0.2, py+4);
-      ctx.closePath();
-      ctx.fill();
-      if (flick){
-        ctx.fillStyle="rgba(255,51,85,0.35)";
-        ctx.fillRect(px-1, py-1, 2, 2);
-      }
-    } else if (role==="killer"){
-      // compact “mask” square with blinking red dot
-      ctx.fillStyle = "#f2f2f2";
-      ctx.fillRect(px-4, py-4, 8, 8);
-      ctx.fillStyle = "rgba(0,0,0,0.85)";
-      ctx.fillRect(px-2, py-1, 4, 2);
-      ctx.fillStyle = flick ? "rgba(255,51,85,0.85)" : "rgba(255,51,85,0.45)";
-      ctx.fillRect(px-1, py-3, 2, 1);
-    } else {
-      // butcher: heavier, “apron” look
-      ctx.fillStyle="#f2f2f2";
-      ctx.fillRect(px-4, py-5, 8, 10);
-      ctx.fillStyle="rgba(255,51,85,0.45)";
-      ctx.fillRect(px-3, py+1, 6, 2);
-      ctx.fillStyle="rgba(0,0,0,0.85)";
-      ctx.fillRect(px-2, py-2, 4, 1);
-      if (flick){
-        ctx.fillStyle="rgba(255,51,85,0.25)";
-        ctx.fillRect(px-4, py-5, 8, 10);
-      }
-    }
-  }
-
-  // ========= RENDER =========
+  /* ============================================================
+     NOISE / VISUAL FX
+  ============================================================ */
   function drawNoise(amount){
-    if (amount<=0) return;
+    if(amount<=0) return;
     ctx.save();
-    ctx.globalAlpha = Math.min(0.26, amount/50);
-    for (let i=0;i<GRAIN_PARTICLES;i++){
-      const x=Math.random()*CAN_W;
-      const y=Math.random()*CAN_H;
+    ctx.globalAlpha = Math.min(0.24, amount/50);
+    for(let i=0;i<140;i++){
+      const x=Math.random()*canvas.width;
+      const y=Math.random()*canvas.height;
       const w=1+Math.random()*2;
       const h=1+Math.random()*2;
-      ctx.fillStyle = Math.random()<0.5 ? "#0d0d0d" : "#1a1a1a";
+      ctx.fillStyle = Math.random()<0.5 ? "#0b0b0b" : "#171717";
       ctx.fillRect(x,y,w,h);
     }
     ctx.restore();
   }
 
-  function render(dt){
-    // Clear
+  /* ============================================================
+     UPDATE LOOP
+  ============================================================ */
+  let lastT=performance.now();
+
+  function update(){
+    const now=performance.now();
+    const dt=Math.min(0.05,(now-lastT)/1000);
+    lastT=now;
+
+    // prompt timer
+    if(prompt.active){
+      prompt.timer -= dt;
+      if(prompt.timer<=0){
+        prompt.active=false;
+        triggerMessage("NO RESPONSE");
+        state.anxiety = Math.max(state.anxiety, 14);
+        state.aggression += 0.06;
+      }
+    }
+
+    // oxygen drain
+    const sprinting = !!keys.ShiftLeft;
+    hudRun.textContent = `RUN: ${sprinting?"ON":"OFF"}`;
+
+    const drain = state.oxygenDrain * (sprinting ? RUN_OXY_MULT : 1.0);
+    hero.oxygen = Math.max(0, hero.oxygen - drain*dt);
+
+    if(hero.oxygen<=0){
+      gameOver("NO AIR LEFT");
+      return;
+    }
+
+    // movement (smooth acceleration)
+    let ix=0,iy=0;
+    if(keys.KeyW||keys.ArrowUp) iy -= 1;
+    if(keys.KeyS||keys.ArrowDown) iy += 1;
+    if(keys.KeyA||keys.ArrowLeft) ix -= 1;
+    if(keys.KeyD||keys.ArrowRight) ix += 1;
+
+    if(ix||iy){
+      const l=Math.hypot(ix,iy); ix/=l; iy/=l;
+    }
+
+    const maxSpeed = sprinting ? PLAYER_MAX_RUN : PLAYER_MAX_WALK;
+
+    // accel -> velocity
+    hero.vx += ix * PLAYER_ACCEL * dt;
+    hero.vy += iy * PLAYER_ACCEL * dt;
+
+    // clamp speed
+    const sp=Math.hypot(hero.vx, hero.vy);
+    if(sp > maxSpeed){
+      hero.vx *= maxSpeed/sp;
+      hero.vy *= maxSpeed/sp;
+    }
+
+    // friction
+    hero.vx *= Math.pow(PLAYER_FRICTION, dt*60);
+    hero.vy *= Math.pow(PLAYER_FRICTION, dt*60);
+
+    // integrate + resolve collisions robustly
+    let nx = hero.x + hero.vx*dt;
+    let ny = hero.y + hero.vy*dt;
+    let r = resolveCircleGrid(nx, ny, PLAYER_RADIUS);
+    hero.x=r.x; hero.y=r.y;
+
+    const moving = Math.abs(hero.vx)+Math.abs(hero.vy) > 0.01;
+
+    // anxiety rises with sprinting + proximity to stains
+    if(sprinting) state.anxiety = Math.min(state.anxiety + 0.35, 18);
+    else state.anxiety = Math.max(state.anxiety - 0.12, 0);
+
+    for(const s of stains){
+      const d=Math.hypot((s.x+0.5)-hero.x, (s.y+0.5)-hero.y);
+      if(d<1.05){
+        state.anxiety = Math.max(state.anxiety, 7);
+        if(Math.random()<0.014) triggerMessage("COLOR BLEED");
+        if(Math.random()<0.005) showPrompt(lorePrompts[(Math.random()*lorePrompts.length)|0]);
+      }
+    }
+
+    // mission logic
+    updateMission(dt, moving, sprinting);
+
+    // monsters
+    updateMonsters(dt);
+
+    // pickups
+    for(const c of chests){
+      if(c.opened) continue;
+      if(Math.hypot((c.x+0.5)-hero.x,(c.y+0.5)-hero.y) < 0.72) openChest(c);
+    }
+
+    for(const o of offerings){
+      if(o.collected) continue;
+      if(Math.hypot((o.x+0.5)-hero.x,(o.y+0.5)-hero.y) < 0.72) collectOffering(o);
+    }
+
+    for(const t of oxyTanks){
+      if(t.used) continue;
+      if(Math.hypot((t.x+0.5)-hero.x,(t.y+0.5)-hero.y) < 0.72) takeOxy(t);
+    }
+
+    // exit
+    if(exit && !exitLocked){
+      if(Math.hypot((exit.x+0.5)-hero.x,(exit.y+0.5)-hero.y) < 0.62){
+        win();
+        return;
+      }
+    }
+
+    // pulse ring
+    if(pulse.active){
+      pulse.t += dt*12;
+      pulse.ring = pulse.t;
+      if(pulse.t > 25) pulse.active=false;
+    }
+
+    // flash fade
+    if(flash.active){
+      flash.t += dt;
+      if(flash.t < flash.dur*0.2) flash.alpha = flash.t/(flash.dur*0.2);
+      else flash.alpha = 1 - (flash.t - flash.dur*0.2)/(flash.dur*0.8);
+
+      if(flash.t >= flash.dur){
+        flash.active=false;
+        flash.alpha=0;
+      }
+    }
+
+    // messages
+    for(let i=messages.length-1;i>=0;i--){
+      messages[i].life--;
+      if(messages[i].life<=0) messages.splice(i,1);
+    }
+
+    // animate hero sprite
+    hero.animT += dt;
+
+    updateHUD();
+  }
+
+  /* ============================================================
+     RENDER
+  ============================================================ */
+  function render(){
     ctx.fillStyle="#000";
-    ctx.fillRect(0,0,CAN_W,CAN_H);
+    ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    // Determine view radius (fog)
-    const viewRadius = clamp(BASE_FOV - (state.anxiety/6)*diff.fog + (pulse.active?2.3:0), MIN_FOV, MAX_FOV);
+    // camera centered on hero (but no huge shakes; keep playable)
+    const shake = Math.min(6, state.anxiety*0.45);
+    const sx = (Math.random()-0.5)*shake;
+    const sy = (Math.random()-0.5)*shake;
 
-    // Camera centered on hero + shake
-    const shake = Math.min(10, state.camShake + state.anxiety*0.22);
-    const shakeX = (Math.random()-0.5)*shake;
-    const shakeY = (Math.random()-0.5)*shake;
-    const camX = CAN_W/2 - hero.x*TILE + shakeX;
-    const camY = CAN_H/2 - hero.y*TILE + shakeY;
+    const camX = -hero.x*TILE + canvas.width/2 + sx;
+    const camY = -hero.y*TILE + canvas.height/2 + sy;
 
-    // Tiles
-    for (let y=0;y<ROWS;y++){
-      for (let x=0;x<COLS;x++){
-        const dist = Math.hypot((x+0.5)-hero.x, (y+0.5)-hero.y);
-        let vis = 0;
-        if (dist < viewRadius){
+    // dynamic FOV by anxiety + pulse
+    const viewRadius = clamp(BASE_FOV - (state.anxiety/5) + (pulse.active?2.4:0), MIN_FOV, MAX_FOV);
+
+    // map layer
+    for(let y=0;y<ROWS;y++){
+      for(let x=0;x<COLS;x++){
+        const dist = Math.hypot((x+0.5)-hero.x,(y+0.5)-hero.y);
+
+        let vis=0;
+        if(dist < viewRadius){
           vis = 1 - (dist/viewRadius);
           vis = Math.pow(vis, 0.62);
         }
 
-        // pulse ring
-        if (pulse.active){
-          const ring = pulse.ring;
-          const delta = Math.abs(dist - ring);
-          if (delta < 1.6){
-            vis += 0.55*(1 - delta/1.6);
+        // pulse ring lighting
+        if(pulse.active){
+          const pd=dist;
+          if(Math.abs(pd - pulse.ring) < 1.5){
+            vis += 0.48 * (1 - (Math.abs(pd-pulse.ring)/1.5));
           }
         }
 
-        if (vis <= 0.01) continue;
+        if(vis <= 0.01) continue;
         vis = clamp(vis,0,1);
 
-        const sx = camX + x*TILE;
-        const sy = camY + y*TILE;
+        const px = camX + x*TILE;
+        const py = camY + y*TILE;
 
         ctx.save();
         ctx.globalAlpha = vis;
 
-        if (map[y][x]===1){
-          ctx.fillStyle = "#333";
-          ctx.fillRect(sx,sy,TILE,TILE);
-          ctx.strokeStyle = "#1a1a1a";
-          ctx.strokeRect(sx,sy,TILE,TILE);
+        if(map[y][x]===1){
+          ctx.fillStyle = PAL.wall;
+          ctx.fillRect(px,py,TILE,TILE);
+          ctx.strokeStyle = "rgba(0,0,0,0.35)";
+          ctx.strokeRect(px,py,TILE,TILE);
         } else {
-          ctx.fillStyle = "#0a0a0a";
-          ctx.fillRect(sx,sy,TILE,TILE);
+          ctx.fillStyle = PAL.floor;
+          ctx.fillRect(px,py,TILE,TILE);
 
-          // stains
-          if (stains.some(s=>s.x===x && s.y===y)){
-            ctx.fillStyle = `rgba(${120+Math.random()*40|0},0,${40+Math.random()*40|0},0.35)`;
-            ctx.fillRect(sx,sy,TILE,TILE);
+          const st = stains.find(s=>s.x===x && s.y===y);
+          if(st){
+            ctx.fillStyle = Math.random()<0.5 ? PAL.stainA : PAL.stainB;
+            ctx.fillRect(px,py,TILE,TILE);
           }
         }
         ctx.restore();
       }
     }
 
-    // Helper to draw objects (respect visibility)
-    function drawObj(tx,ty, color, shape){
-      const dist = Math.hypot((tx+0.5)-hero.x, (ty+0.5)-hero.y);
-      if (dist > viewRadius && !(pulse.active && Math.abs(dist-pulse.ring)<1.6)) return;
+    // objects
+    function drawObj(tx,ty,color,shape){
+      const dist = Math.hypot((tx+0.5)-hero.x,(ty+0.5)-hero.y);
+      if(dist > viewRadius && !(pulse.active && Math.abs(dist-pulse.ring)<1.5)) return;
 
-      const sx = camX + tx*TILE;
-      const sy = camY + ty*TILE;
+      const x = camX + tx*TILE;
+      const y = camY + ty*TILE;
 
-      ctx.fillStyle = color;
-      if (shape==="box"){
-        ctx.fillRect(sx+4, sy+4, 8, 8);
-      } else if (shape==="circle"){
+      ctx.fillStyle=color;
+      if(shape==="box") ctx.fillRect(x+4,y+4,8,8);
+      else if(shape==="circle"){
+        ctx.beginPath(); ctx.arc(x+8,y+8,4,0,Math.PI*2); ctx.fill();
+      } else if(shape==="diamond"){
         ctx.beginPath();
-        ctx.arc(sx+8, sy+8, 4, 0, Math.PI*2);
-        ctx.fill();
-      } else if (shape==="diamond"){
-        ctx.beginPath();
-        ctx.moveTo(sx+8, sy+2);
-        ctx.lineTo(sx+14, sy+8);
-        ctx.lineTo(sx+8, sy+14);
-        ctx.lineTo(sx+2, sy+8);
-        ctx.closePath();
-        ctx.fill();
+        ctx.moveTo(x+8,y+2); ctx.lineTo(x+14,y+8);
+        ctx.lineTo(x+8,y+14); ctx.lineTo(x+2,y+8);
+        ctx.closePath(); ctx.fill();
       }
     }
 
-    // Chests
-    for (const c of chests){
-      if (!c.opened) drawObj(c.x,c.y,"#4488aa","box");
-    }
-    // Tanks
-    for (const t of tanks){
-      if (!t.used) drawObj(t.x,t.y,"#5cf","box");
-    }
-    // Offerings (color sequence if mission)
-    for (const o of offerings){
-      if (o.taken) continue;
-      if (mission.active && mission.type==="FOLLOW_ORDER"){
-        const col = o.order===1 ? "#ff3355" : o.order===2 ? "#55ff88" : "#3388ff";
-        drawObj(o.x,o.y,col,"circle");
-      } else {
-        drawObj(o.x,o.y,"#ddcc44","circle");
-      }
-    }
-    // Exit
-    if (exit){
-      drawObj(exit.x, exit.y, exit.unlocked ? "#ffffff" : "#550000", "diamond");
-      if (exit.unlocked){
-        const sx = camX + exit.x*TILE;
-        const sy = camY + exit.y*TILE;
-        ctx.fillStyle = "rgba(255,51,85,0.65)";
-        ctx.fillRect(sx+7, sy+3, 2, TILE-6);
+    chests.forEach(c=>{ if(!c.opened) drawObj(c.x,c.y,"#3a88aa","box"); });
+
+    offerings.forEach(o=>{
+      if(o.collected) return;
+      const col = (mission.active && mission.type==="FOLLOW_ORDER")
+        ? (o.order===1 ? "#ff3355" : o.order===2 ? "#44ff88" : "#4488ff")
+        : "#ddcc44";
+      drawObj(o.x,o.y,col,"circle");
+    });
+
+    oxyTanks.forEach(t=>{
+      if(!t.used) drawObj(t.x,t.y,"#55ddff","box");
+    });
+
+    if(exit){
+      drawObj(exit.x, exit.y, exitLocked ? "#550000" : "#ffffff", "diamond");
+      if(!exitLocked){
+        // “door slit”
+        const x = camX + exit.x*TILE;
+        const y = camY + exit.y*TILE;
+        ctx.fillStyle="rgba(255,60,90,0.7)";
+        ctx.fillRect(x+7,y+3,2,TILE-6);
       }
     }
 
-    // Monsters (image sprite following)
-    for (const m of monsters){
+    // monsters
+    for(const m of monsters){
       const dist = Math.hypot(m.x-hero.x, m.y-hero.y);
-      if (dist > viewRadius + 1.6) continue;
-
-      const sx = camX + m.x*TILE - 12;
-      const sy = camY + m.y*TILE - 12;
-
-      const img = assets.monster || fallbackMonster;
-
-      // subtle jitter & distortion increases as it approaches
-      const intensity = clamp(1 - dist/6, 0, 1);
-      const jx = (Math.random()-0.5)*(2 + intensity*4);
-      const jy = (Math.random()-0.5)*(2 + intensity*4);
-
-      ctx.save();
-      ctx.globalAlpha = 0.72 + intensity*0.25;
-      distortDrawImage(img, sx+jx, sy+jy, 24, 24, intensity*0.9);
-      ctx.restore();
-    }
-
-    // Player at center
-    const px = CAN_W/2;
-    const py = CAN_H/2;
-    drawPlayer(px, py, state.time);
-
-    // Pulse line direction (subtle)
-    if (pulse.active){
-      ctx.save();
-      ctx.globalAlpha = 0.18;
-      ctx.strokeStyle = "#ccffcc";
-      ctx.beginPath();
-      ctx.moveTo(px,py);
-      ctx.lineTo(px + pulse.dirX*60, py + pulse.dirY*60);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // Flash overlay
-    if (flash.active && flash.img){
-      const a = flash.alpha * 0.85;
-      ctx.save();
-      ctx.globalAlpha = a;
-      const img = flash.img;
-      // if it's an <img> scale to full; if canvas same
-      ctx.drawImage(img, 0, 0, CAN_W, CAN_H);
-      // extra distortion on top when intense
-      if (flash.kind==="hit" || flash.kind==="wrong"){
-        ctx.globalAlpha = a*0.45;
-        distortDrawImage(img, 0, 0, CAN_W, CAN_H, 0.85);
+      if(dist < viewRadius + 1.6){
+        const x = camX + m.x*TILE - 10;
+        const y = camY + m.y*TILE - 10;
+        const jx=(Math.random()-0.5)*2;
+        const jy=(Math.random()-0.5)*2;
+        ctx.globalAlpha = 0.85;
+        ctx.drawImage(monsterSprite, x+jx, y+jy);
+        ctx.globalAlpha = 1;
       }
-      ctx.restore();
     }
 
-    // Face popup overlay when near monster
-    if (facePopup.active && facePopup.img){
-      const a = (1 - (facePopup.t/facePopup.dur)) * 0.95;
-      const intensity = facePopup.intensity;
+    // hero sprite (animated creepy figure, role-based tint)
+    const hx = canvas.width/2;
+    const hy = canvas.height/2;
+    const breath = 1 + Math.sin(hero.animT*3.2)*0.08;
+    const jitter = (Math.random()-0.5) * (0.6 + state.anxiety*0.08);
 
-      ctx.save();
-      ctx.globalAlpha = a;
-      const w = CAN_W;
-      const h = CAN_H;
-      distortDrawImage(facePopup.img, 0, 0, w, h, intensity);
-      ctx.restore();
-    }
+    // base body
+    let tint = hero.role==="thief" ? "rgba(180,220,210,0.95)"
+             : hero.role==="killer" ? "rgba(220,190,200,0.95)"
+             : "rgba(220,210,180,0.95)";
 
-    // Messages
     ctx.save();
-    ctx.font = "18px VT323";
-    for (const m of messages){
-      ctx.globalAlpha = Math.min(1, m.life/20);
-      ctx.fillStyle = m.color;
-      ctx.fillText(m.text, m.x, m.y);
-    }
+    ctx.translate(hx+jitter, hy+jitter);
+
+    // shadow smear
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = "rgba(255,60,90,0.35)";
+    ctx.fillRect(-4, -3, 8, 8);
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = tint;
+    ctx.fillRect(-2, -2, 4, 4*breath);
+
+    // “head” pixel
+    ctx.fillStyle = "rgba(0,0,0,0.85)";
+    ctx.fillRect(-1, -4, 2, 2);
+
+    // role mark
+    ctx.fillStyle = hero.role==="thief" ? "rgba(80,255,200,0.65)"
+               : hero.role==="killer" ? "rgba(255,80,140,0.65)"
+               : "rgba(255,210,80,0.65)";
+    ctx.fillRect(-3, 1, 1, 1);
+    ctx.fillRect( 2, 1, 1, 1);
+
     ctx.restore();
 
-    // Noise
+    // flash overlay
+    if(flash.active && flash.img){
+      ctx.globalAlpha = flash.alpha*0.85;
+      ctx.drawImage(flash.img, 0,0, canvas.width, canvas.height);
+      ctx.globalAlpha = 1;
+    }
+
+    // anxiety noise
     drawNoise(state.anxiety);
 
-    // Prompt bar updates (UI)
-    if (prompt.active){
-      const pct = clamp(prompt.timer / prompt.maxTime, 0, 1);
-      promptBarEl.style.width = `${(pct*100).toFixed(0)}%`;
+    // floating messages
+    ctx.font="14px VT323";
+    ctx.textAlign="left";
+    for(const m of messages){
+      ctx.fillStyle=m.color;
+      ctx.globalAlpha = Math.min(1, m.life/20);
+      ctx.fillText(m.text, m.x, m.y);
+    }
+    ctx.globalAlpha=1;
+
+    // prompt / mission UI (in-canvas, centered, readable)
+    if(prompt.active){
+      ctx.fillStyle="rgba(0,0,0,0.88)";
+      ctx.fillRect(18, 150, 284, 76);
+      ctx.strokeStyle="rgba(204,255,204,0.65)";
+      ctx.strokeRect(18, 150, 284, 76);
+
+      ctx.fillStyle="#fff";
+      ctx.textAlign="center";
+      ctx.fillText(prompt.text, 160, 170);
+      ctx.fillStyle="#bbb";
+      ctx.fillText(prompt.a, 160, 192);
+      ctx.fillText(prompt.b, 160, 208);
+
+      // timer bar
+      ctx.fillStyle=PAL.danger;
+      ctx.fillRect(20, 222, 280*clamp(prompt.timer/6.6,0,1), 2);
+
+      ctx.textAlign="left";
+    } else if(mission.active){
+      // small mission box, bottom left-ish but not blocking
+      ctx.fillStyle="rgba(0,0,0,0.55)";
+      ctx.fillRect(6, 200, 170, 34);
+      ctx.strokeStyle="rgba(204,255,204,0.25)";
+      ctx.strokeRect(6, 200, 170, 34);
+
+      ctx.fillStyle=PAL.ui;
+      ctx.fillText(mission.title, 10, 212);
+
+      const pct=clamp(mission.progress/mission.goal,0,1);
+      ctx.fillStyle="rgba(255,255,255,0.16)";
+      ctx.fillRect(10, 217, 100, 4);
+      ctx.fillStyle=PAL.ui;
+      ctx.fillRect(10, 217, 100*pct, 4);
+
+      ctx.fillStyle="#aaa";
+      const line = mission.desc.split("\n")[1] || "";
+      ctx.fillText(line, 10, 232);
     }
   }
 
-  // ========= UPDATE LOOP =========
-  let last = performance.now();
-
-  function isDown(code){ return !!keys[code]; }
-
-  function update(dt){
-    state.time += dt;
-
-    // decay cam shake + anxiety
-    state.camShake = Math.max(0, state.camShake - dt*18);
-    state.anxiety = Math.max(0, state.anxiety - dt*2.2);
-
-    // prompt timer
-    if (prompt.active){
-      prompt.timer -= dt;
-      if (prompt.timer <= 0){
-        prompt.active = false;
-        pushMessage("NO RESPONSE", "#ff3355");
-        state.anxiety = Math.max(state.anxiety, 14);
-        // punish: monsters get bolder
-        for (const m of monsters) m.aggression += 0.06;
-        updatePromptUI();
-      }
-    }
-
-    // movement input
-    let ix=0, iy=0;
-    if (isDown("KeyW") || isDown("ArrowUp")) iy -= 1;
-    if (isDown("KeyS") || isDown("ArrowDown")) iy += 1;
-    if (isDown("KeyA") || isDown("ArrowLeft")) ix -= 1;
-    if (isDown("KeyD") || isDown("ArrowRight")) ix += 1;
-
-    if (ix || iy){
-      const len = Math.hypot(ix,iy) || 1;
-      ix /= len; iy /= len;
-    }
-
-    const sprinting = isDown("ShiftLeft");
-    const maxSpd = MAX_SPEED * (sprinting ? RUN_MULT : 1);
-
-    // acceleration
-    hero.vx += ix * ACCEL * dt;
-    hero.vy += iy * ACCEL * dt;
-
-    // friction (only on axes with no input)
-    if (Math.abs(ix) < 0.001){
-      const s = Math.sign(hero.vx);
-      hero.vx -= s * FRICTION * dt;
-      if (Math.sign(hero.vx) !== s) hero.vx = 0;
-    }
-    if (Math.abs(iy) < 0.001){
-      const s = Math.sign(hero.vy);
-      hero.vy -= s * FRICTION * dt;
-      if (Math.sign(hero.vy) !== s) hero.vy = 0;
-    }
-
-    // clamp speed
-    const sp = Math.hypot(hero.vx, hero.vy);
-    if (sp > maxSpd){
-      const k = maxSpd / sp;
-      hero.vx *= k; hero.vy *= k;
-    }
-
-    // integrate with SUBSTEPS to avoid tunneling + keep collisions stable
-    const steps = Math.max(1, Math.min(5, Math.ceil(sp * dt * 3)));
-    let nx = hero.x, ny = hero.y;
-
-    for (let s=0; s<steps; s++){
-      nx += (hero.vx * dt) / steps;
-      ny += (hero.vy * dt) / steps;
-      const r = resolveCircleGrid(nx, ny);
-      nx = r.x; ny = r.y;
-    }
-
-    const moved = (Math.abs(nx-hero.x)+Math.abs(ny-hero.y)) > 1e-5;
-    hero.x = nx; hero.y = ny;
-
-    // sprint anxiety + sanity
-    if (sprinting && moved){
-      state.anxiety = Math.min(26, state.anxiety + dt*9.0);
-      hero.sanity = Math.max(0, hero.sanity - dt*10);
+  /* ============================================================
+     MAIN LOOP
+  ============================================================ */
+  function tick(){
+    if(gameStarted){
+      update();
+      render();
     } else {
-      hero.sanity = Math.min(100, hero.sanity + dt*6);
-    }
-
-    // Oxygen drain (seconds)
-    // baseline: maxOxygen / BASE_OXY_SECONDS_per_full = 1 sec/sec -> so oxygen is "seconds remaining"
-    const drain = (1.0 * diff.oxygenDrain) * (sprinting ? RUN_OXY_MULT : 1.0);
-    hero.oxygen = Math.max(0, hero.oxygen - drain*dt);
-
-    audio?.setOxy?.(hero.oxygen / hero.maxOxygen);
-
-    // oxygen panic pressure but not instant death
-    if (hero.oxygen <= 0){
-      // suffocation is a loss (but not hyper-frenetic)
-      pushMessage("NO AIR", "#ff3355");
-      dieAndReset();
-      return;
-    } else if (hero.oxygen < LOW_OXY_WARN){
-      state.anxiety = Math.max(state.anxiety, 10);
-      if (Math.random()<0.015) pushMessage(`${hero.name.toUpperCase()} CAN'T BREATHE`, "#ff3355");
-    }
-
-    // Pulse update
-    if (pulse.active){
-      pulse.t += dt * 10.5;
-      pulse.ring = pulse.t * 2.2;
-      if (pulse.t > 2.8) pulse.active = false;
-    }
-
-    // flash update
-    if (flash.active){
-      flash.t += dt;
-      if (flash.t < flash.dur*0.2) flash.alpha = flash.t/(flash.dur*0.2);
-      else flash.alpha = 1 - (flash.t - flash.dur*0.2)/(flash.dur*0.8);
-      if (flash.t >= flash.dur){
-        flash.active = false;
-        flash.alpha = 0;
-      }
-    }
-
-    // face popup update
-    if (facePopup.active){
-      facePopup.t += dt;
-      if (facePopup.t >= facePopup.dur){
-        facePopup.active = false;
-      }
-    }
-
-    // stains influence
-    for (const st of stains){
-      const d = Math.hypot((st.x+0.5)-hero.x, (st.y+0.5)-hero.y);
-      if (d < 1.0){
-        state.anxiety = Math.max(state.anxiety, 8);
-        if (Math.random()<0.012) pushMessage("COLOR BLEED", "#ffffff");
-        if (Math.random()<0.006) audio?.blip?.(0.35);
-        if (!prompt.active && Math.random()<0.004) showPrompt(pick(promptBank));
-      }
-    }
-
-    // pickups: chests
-    for (const c of chests){
-      if (c.opened) continue;
-      const d = Math.hypot((c.x+0.5)-hero.x, (c.y+0.5)-hero.y);
-      if (d < 0.75) openChest(c);
-    }
-
-    // tanks
-    for (const t of tanks){
-      if (t.used) continue;
-      const d = Math.hypot((t.x+0.5)-hero.x, (t.y+0.5)-hero.y);
-      if (d < 0.75) collectTank(t);
-    }
-
-    // offerings
-    for (const o of offerings){
-      if (o.taken) continue;
-      const d = Math.hypot((o.x+0.5)-hero.x, (o.y+0.5)-hero.y);
-      if (d < 0.75) collectOffering(o);
-    }
-
-    // mission update
-    updateMission(dt, moved, sprinting);
-
-    // chance of lore prompt on milestones
-    if (!prompt.active && (openedChests()===2 || offerings.filter(o=>o.taken).length===2) && Math.random()<0.01){
-      showPrompt(pick(promptBank));
-    }
-
-    // update monsters
-    updateMonsters(dt);
-
-    // objective panning
-    const obj = nearestObjective();
-    if (obj && audio){
-      const dx = (obj.x+0.5) - hero.x;
-      audio.setObjectivePan(dx/6);
-    }
-
-    // Exit check
-    if (exit.unlocked){
-      const d = Math.hypot((exit.x+0.5)-hero.x, (exit.y+0.5)-hero.y);
-      if (d < 0.62){
-        // descend: new level, difficulty reroll slight drift
-        pushMessage("DESCENDING...", "#ccffcc");
-        audio?.blip?.(1.0);
-        generateLevel();
-      }
-    }
-
-    // message decay
-    for (let i=messages.length-1; i>=0; i--){
-      messages[i].life -= 1;
-      if (messages[i].life <= 0) messages.splice(i,1);
-    }
-
-    // Update HUD/mission UI
-    updateHud();
-    if (mission.active) updateMissionUI();
-  }
-
-  function loop(){
-    const now = performance.now();
-    const dt = Math.min(0.05, (now-last)/1000);
-    last = now;
-
-    if (state.mode==="PLAY"){
-      update(dt);
-      render(dt);
-    } else {
-      // idle visuals behind menu: slow noise + faint flicker
+      // idle background noise
       ctx.fillStyle="#000";
-      ctx.fillRect(0,0,CAN_W,CAN_H);
-      state.time += dt;
-      state.anxiety = 6 + Math.sin(state.time*1.5)*2;
-      drawNoise(state.anxiety);
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      drawNoise(6);
     }
-
-    // clear justPressed
-    for (const k in justPressed) delete justPressed[k];
-
-    requestAnimationFrame(loop);
+    requestAnimationFrame(tick);
   }
 
-  // ========= MENU START (does not start from input clicks) =========
-  async function startGameFromMenu(){
-    // ONLY this function starts the game
-    hero.name = (nameInput.value || "UNKNOWN").trim().slice(0,18) || "UNKNOWN";
-    hero.role = roleSelect.value;
+  /* ============================================================
+     GAME START / END
+  ============================================================ */
+  function pickDifficulty(){
+    // 0..3
+    state.diffIndex = (Math.random()*4)|0;
+    state.monstersCount = 1 + ((Math.random()*2)|0) + (state.diffIndex>1?1:0); // 1..3
+    state.aggression = 0.95 + state.diffIndex*0.12 + Math.random()*0.08;
+    state.oxygenDrain = 0.92 + state.diffIndex*0.12 + Math.random()*0.10;
 
-    rollDifficulty();
-
-    loreIntroEl.textContent = randomLoreIntro(hero.name, hero.role);
-
-    // lock menu off and start
-    await ensureAudio();
-    state.mode="PLAY";
-    menu.style.display="none";
-
-    // per-role micro stat flavor (kept subtle)
-    if (hero.role==="thief"){
-      // slightly faster walk, slightly less oxygen bonus
-      // (still >= 60s baseline)
-      // keep within safe envelope
-    } else if (hero.role==="killer"){
-      // a bit more fear spikes
-      state.anxiety = Math.max(state.anxiety, 4);
-    } else {
-      // butcher: slightly more oxygen tank value? handled in pickups (not needed)
+    // role tweaks (subtle)
+    if(hero.role==="thief"){
+      // slightly better oxygen economy
+      state.oxygenDrain *= 0.94;
+    } else if(hero.role==="killer"){
+      // more aggressive monsters
+      state.aggression *= 1.06;
+    } else if(hero.role==="butcher"){
+      // oxygen tanks more valuable (same gain, but max slightly higher)
+      hero.oxygenMax = BASE_OXYGEN + 10;
     }
+  }
+
+  async function startGame(){
+    if(gameStarted) return;
+
+    // read inputs (typing should NOT start, only button does)
+    const nm = (nameInput.value || "").trim();
+    hero.name = nm ? nm.slice(0,18) : "UNKNOWN";
+    hero.role = roleInput.value || "thief";
+    hero.oxygenMax = BASE_OXYGEN;
+    hero.oxygen = hero.oxygenMax;
+
+    state.lore = generateLore();
+
+    startOverlay.style.display="none";
+    await ensureAudioRunning();
+
+    pickDifficulty();
+    pushMessage(state.lore, "#fff");
+    triggerMessage("BOOTING LEVEL");
 
     generateLevel();
-
-    // immediate mission is NOT forced; player opens chests for missions (as requested)
-    pushMessage(`HELLO, ${hero.name.toUpperCase()}`, "#ccffcc");
-    updateHud();
+    gameStarted=true;
   }
 
-  startBtn.addEventListener("click", (e)=>{
-    e.preventDefault();
-    e.stopPropagation();
-    startGameFromMenu();
-  });
+  function gameOver(reason){
+    gameStarted=false;
+    alert(`${reason}\n\nRUN END.\n${hero.name.toUpperCase()} WAS ARCHIVED.`);
+    location.reload();
+  }
 
-  // Ensure clicks on inputs never start game (they won’t, by design)
-  nameInput.addEventListener("pointerdown", e=>e.stopPropagation());
-  roleSelect.addEventListener("pointerdown", e=>e.stopPropagation());
+  function win(){
+    gameStarted=false;
+    alert(`EXIT UNSEALED.\n${hero.name.toUpperCase()} WAS UPLOADED.\n\nTHE MAZE SAVES COPIES.`);
+    location.reload();
+  }
 
-  // ========= BOOT =========
-  (async () => {
-    // Load assets in background (no blocking)
-    loadAssets();
-
-    // initial menu lore (random, non-starting)
-    loreIntroEl.textContent = "TYPE A NAME. CHOOSE A ROLE. PRESS START.\nTHE TAPE IS ALREADY RUNNING.";
-
-    // Start loop
-    requestAnimationFrame(loop);
-  })();
+  /* ============================================================
+     BOOT
+  ============================================================ */
+  // Start idle loop immediately
+  updateHUD();
+  tick();
 
 })();
 </script>
+
 </body>
 </html>
-
-
 
