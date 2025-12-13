@@ -27,20 +27,77 @@
       z-index:10;pointer-events:none;animation:flicker .14s infinite
     }
     @keyframes flicker{0%{opacity:.02}50%{opacity:.06}100%{opacity:.02}}
+
+    /* Compact UI */
     #game-ui{
-      position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;
-      z-index:20;color:#ccffcc;text-shadow:0 0 5px #ccffcc;font-size:1.5rem;pointer-events:none
+      position:absolute;top:8px;left:8px;right:8px;
+      display:flex;justify-content:space-between;align-items:flex-start;
+      z-index:20;color:#ccffcc;text-shadow:0 0 5px #ccffcc;font-size:1.25rem;pointer-events:none;
     }
+    .hud-left{
+      background:rgba(0,0,0,0.45);
+      padding:6px 8px;border:1px solid rgba(204,255,204,0.18);
+      border-radius:6px;max-width:46%;
+      transition:opacity .18s linear;
+    }
+    .hud-left.dim{opacity:0.25;}
+    .hud-right{
+      text-align:right;
+      background:rgba(0,0,0,0.45);
+      padding:6px 8px;border:1px solid rgba(204,255,204,0.18);
+      border-radius:6px;max-width:46%;
+    }
+    .hud-sub{opacity:0.7;font-size:1.0rem;line-height:1.05;}
     .controls-hint{margin-top:20px;text-align:center;opacity:.55;font-size:1.2rem}
+
+    /* Start overlay */
     .start-overlay{
       position:absolute;inset:0;z-index:30;display:grid;place-items:center;
       background:radial-gradient(circle at center,rgba(0,0,0,.35),rgba(0,0,0,.92));
-      color:#ccffcc;text-shadow:0 0 8px rgba(204,255,204,.35);cursor:pointer
+      color:#ccffcc;text-shadow:0 0 8px rgba(204,255,204,.35);cursor:pointer;
+      padding:18px;
     }
-    .start-title{font-size:4rem;letter-spacing:2px;margin-bottom:10px;text-align:center}
-    .start-sub{font-size:1.6rem;opacity:.95;text-align:center}
-    .small{font-size:1.15rem;opacity:.70}
-    .tiny{font-size:1.0rem;opacity:.60}
+    .start-title{font-size:4rem;letter-spacing:2px;margin-bottom:8px;text-align:center}
+    .start-sub{font-size:1.45rem;opacity:.95;text-align:center;line-height:1.15}
+    .small{font-size:1.08rem;opacity:.75}
+    .tiny{font-size:0.98rem;opacity:.62}
+
+    .panel{
+      width:min(520px, 92vw);
+      background:rgba(0,0,0,0.55);
+      border:1px solid rgba(204,255,204,0.20);
+      border-radius:10px;
+      padding:12px 14px;
+      box-shadow:0 0 18px rgba(0,0,0,0.55);
+    }
+    .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:10px;}
+    .chip{
+      padding:6px 10px;border:1px solid rgba(204,255,204,0.25);
+      border-radius:999px;cursor:pointer;opacity:0.92;
+      background:rgba(0,0,0,0.25);
+    }
+    .chip.active{border-color:#ccffcc;box-shadow:0 0 8px rgba(204,255,204,0.18);opacity:1;}
+    .field{
+      width:min(360px, 84vw);
+      font-family:'VT323',monospace;
+      font-size:1.35rem;
+      padding:6px 10px;
+      border-radius:8px;
+      border:1px solid rgba(204,255,204,0.25);
+      background:rgba(0,0,0,0.35);
+      color:#ccffcc;
+      outline:none;
+    }
+    .btn{
+      margin-top:10px;
+      display:inline-block;
+      padding:8px 14px;
+      border-radius:10px;
+      border:1px solid rgba(204,255,204,0.35);
+      background:rgba(0,0,0,0.25);
+      cursor:pointer;
+      font-size:1.4rem;
+    }
   </style>
 </head>
 <body>
@@ -48,55 +105,100 @@
     <div class="scanlines"></div>
 
     <div id="game-ui">
-      <span id="score-display">EVIDENCE: 0/3</span>
-      <span id="status-display">STATUS: OFFLINE</span>
+      <div id="hudLeft" class="hud-left">
+        <div id="score-display">EVIDENCE: 0/3</div>
+        <div id="mission-line" class="hud-sub"></div>
+      </div>
+      <div class="hud-right">
+        <div id="status-display">STATUS: OFFLINE</div>
+        <div id="stats-line" class="hud-sub"></div>
+      </div>
     </div>
 
     <canvas id="gameCanvas" width="320" height="240"></canvas>
 
     <div id="startOverlay" class="start-overlay" tabindex="0" role="button" aria-label="Start game">
-      <div>
+      <div class="panel" id="startPanel">
         <div class="start-title">ENTROPY.DAT</div>
         <div id="loreLine1" class="start-sub">LOADING…</div>
         <div id="loreLine2" class="start-sub small"></div>
         <div id="loreLine3" class="start-sub small"></div>
+
+        <div style="height:10px"></div>
+
+        <div class="start-sub">PROTAGONIST NAME</div>
+        <div class="row">
+          <input id="nameInput" class="field" maxlength="18" placeholder="type a name…" />
+        </div>
+
+        <div style="height:10px"></div>
+
+        <div class="start-sub">CHOOSE A ROLE</div>
+        <div class="row">
+          <div class="chip active" data-role="THIEF" id="roleThief">THIEF</div>
+          <div class="chip" data-role="KILLER" id="roleKiller">KILLER</div>
+          <div class="chip" data-role="BUTCHER" id="roleButcher">BUTCHER</div>
+        </div>
+
+        <div id="diffLine" class="start-sub small" style="margin-top:10px;"></div>
         <div id="loadLine" class="start-sub tiny">assets: 0/0</div>
-        <div class="start-sub small" style="margin-top:10px;">CLICK / TAP / ENTER TO INITIALIZE</div>
+
+        <div class="row">
+          <div class="btn" id="startBtn">CLICK TO INITIALIZE</div>
+        </div>
         <div class="start-sub tiny">WASD/Arrows · Shift run · E pulse · 1/2 respond</div>
       </div>
     </div>
   </div>
 
   <div class="controls-hint">
-    Find chests to unlock missions. Clear mission to unseal the exit.<br/>
-    When the face appears, keep moving. Do not stare.
+    Chests unlock missions. Clear mission to unseal exit. Oxygen drains faster on harder runs.<br/>
+    When the face appears: do NOT stop.
   </div>
 
 <script>
 (() => {
   // =======================
-  // ASSET SETUP (YOU EDIT)
+  // ASSET MANIFEST (edit)
   // =======================
-  // Put your images inside /assets/ in your GitHub Pages repo.
-  // Example:
-  //   /assets/flash_01.png
-  //   /assets/flash_02.png
-  //   /assets/monster_face_01.png
-  //   /assets/monster_face_02.png
-
   const ASSET_MANIFEST = {
-    // Your creepy images that can flash on pickups:
     creepyFlashes: [
       "assets/flash_01.png",
       "assets/flash_02.png",
       "assets/flash_03.png"
     ],
-    // Two face images you will upload (these appear/distort when monster is close):
     monsterFaces: [
       "assets/monster_face_01.png",
       "assets/monster_face_02.png"
+    ],
+    // OPTIONAL: if you upload a monster body image, put it here (else procedural)
+    monsterBody: [
+      // "assets/monster_body.png"
     ]
   };
+
+  // ===== DOM =====
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d', { alpha:false });
+
+  const statusDisplay = document.getElementById('status-display');
+  const scoreDisplay  = document.getElementById('score-display');
+  const missionLine   = document.getElementById('mission-line');
+  const statsLine     = document.getElementById('stats-line');
+  const hudLeft       = document.getElementById('hudLeft');
+
+  const startOverlay  = document.getElementById('startOverlay');
+  const startBtn      = document.getElementById('startBtn');
+  const nameInput     = document.getElementById('nameInput');
+  const loreLine1     = document.getElementById('loreLine1');
+  const loreLine2     = document.getElementById('loreLine2');
+  const loreLine3     = document.getElementById('loreLine3');
+  const diffLine      = document.getElementById('diffLine');
+  const loadLine      = document.getElementById('loadLine');
+
+  const roleThief     = document.getElementById('roleThief');
+  const roleKiller    = document.getElementById('roleKiller');
+  const roleButcher   = document.getElementById('roleButcher');
 
   // ===== CONFIG =====
   const TILE_SIZE = 16;
@@ -104,166 +206,92 @@
   const ROWS = 15;
 
   const TOTAL_EVIDENCE = 3;
-  const CHESTS_PER_LEVEL = 3;
+  const CHESTS_BASE = 3;
 
   const BASE_FOV = 6;
-  const MIN_FOV  = 4.2;
-  const MAX_FOV  = 7.0;
+  const MIN_FOV  = 4.0;
+  const MAX_FOV  = 7.2;
 
-  // Movement is now dt-based (tiles/second)
-  const PLAYER_SPEED = 3.2;         // tiles/sec
-  const PLAYER_RUN_MULT = 1.55;     // run multiplier
+  // smooth movement
+  const MAX_SPEED = 4.2;               // tiles/sec cap (with run)
+  const ACCEL = 22.0;                  // tiles/sec^2
+  const FRICTION = 18.0;               // tiles/sec^2
+  const RUN_MULT = 1.55;
+  const INPUT_DEADZONE = 0.001;
 
-  // ===== DOM / CANVAS =====
-  const canvas = document.getElementById('gameCanvas');
-  const ctx = canvas.getContext('2d', { alpha:false });
+  // difficulty presets (random each run)
+  const DIFF_PRESETS = [
+    { name:"EASY",   monsters:1, oxygenDrain:0.55, taskMult:0.85, enemyAggro:0.92 },
+    { name:"NORMAL", monsters:1, oxygenDrain:0.80, taskMult:1.00, enemyAggro:1.00 },
+    { name:"HARD",   monsters:2, oxygenDrain:1.05, taskMult:1.15, enemyAggro:1.12 },
+    { name:"HELL",   monsters:3, oxygenDrain:1.28, taskMult:1.35, enemyAggro:1.25 }
+  ];
 
-  const statusDisplay = document.getElementById('status-display');
-  const scoreDisplay  = document.getElementById('score-display');
-
-  const startOverlay  = document.getElementById('startOverlay');
-  const loreLine1     = document.getElementById('loreLine1');
-  const loreLine2     = document.getElementById('loreLine2');
-  const loreLine3     = document.getElementById('loreLine3');
-  const loadLine      = document.getElementById('loadLine');
-
-  // ===== STATE =====
-  let map = [];
-  const keys = new Map(); // reliable pressed-state store
-
-  const player = {
-    x: 1, y: 1,
-    speed: PLAYER_SPEED,
-    panicHits: 0,
-    panicGrace: 0,
-    sanity: 100
+  // ===== ASSETS =====
+  const assets = {
+    creepyFlashes: [],
+    monsterFaces: [],
+    monsterBody: null
   };
-
-  let evidence = [];          // formerly offerings
-  let collectedCount = 0;
-
-  let exit = null;            // {x,y}
-  let exitLocked = true;
-
-  let chests = [];            // {x,y,opened:false}
-  let stains = [];            // corruption zones (now lore-themed)
-  let messages = [];
-  let globalAnxiety = 0;
-
-  // lore prompt with choice
-  let prompt = { active:false, text:"", a:"", b:"", onChoose:null, timer:0 };
-
-  // mission
-  let mission = { active:false, title:"", desc:"", type:"", progress:0, goal:1, extra:null, completed:false };
-
-  // signal pulse
-  let pulse = { active:false, t:0, dirX:0, dirY:0 };
-
-  // flash overlay (your images OR procedural fallback)
-  let flash = { active:false, t:0, dur:0.9, img:null, alpha:0, procedural:null };
-
-  // face overlay when monster is close
-  let faceOverlay = {
-    active:false,
-    t:0,
-    dur:0.55,
-    img:null,
-    intensity:0,
-    alpha:0,
-    pickCooldown:0
-  };
-
-  // Enemy
-  let enemy = {
-    x:-1, y:-1,
-    active:false,
-    speed:2.10,     // tiles/sec (dt-based)
-    stun:0,
-    lastSeen:0,
-    stepCooldown:0,
-    targetTile:null,
-    aggression:1.0
-  };
-
-  // Start / load flow
-  let gameStarted = false;
   let assetsReady = false;
   let startRequested = false;
 
-  // Assets container
-  const assets = {
-    creepyFlashes: [],
-    monsterFaces: []
-  };
+  function loadImage(url){
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve({ ok:true, img, url });
+      img.onerror = () => resolve({ ok:false, img:null, url });
+      img.src = url + (url.includes("?") ? "" : `?v=${Date.now()}`);
+    });
+  }
 
-  // =======================
-  // LORE GENERATOR (dark)
-  // =======================
-  function pick(arr){ return arr[(Math.random()*arr.length)|0]; }
-  function pad(n){ return String(n).padStart(4,"0"); }
-
-  function generateLore() {
-    const caseNo = pad((Math.random()*9999)|0);
-    const cities = ["SANTA CROCE", "PORTO VECCHIO", "GREYHOLLOW", "VIA NERA", "OLD QUARRY", "ASHFIELD", "COLDWATER"];
-    const victims = ["ELENA", "MARTA", "SOFIA", "LUCIA", "GIULIA", "IRENE", "VALERIA"];
-    const surnames = ["ROSSI", "FERRI", "BIANCHI", "MORETTI", "CONTINI", "GALLI", "RINALDI"];
-    const places = ["service tunnel", "abandoned clinic", "flooded stairwell", "maintenance maze", "sealed corridor", "sub-basement"];
-    const hooks = [
-      "Her phone kept recording after she screamed.",
-      "The last frame is a hallway that does not exist.",
-      "The audio is wind—until it isn't.",
-      "A door appears only when nobody looks at it."
+  async function loadAssets(){
+    const list = [
+      ...ASSET_MANIFEST.creepyFlashes.map(url => ({type:"creepyFlashes", url})),
+      ...ASSET_MANIFEST.monsterFaces.map(url => ({type:"monsterFaces", url})),
+      ...ASSET_MANIFEST.monsterBody.map(url => ({type:"monsterBody", url}))
     ];
-    // Keep it creepy and dark without graphic instructions.
-    const motifs = [
-      "blood-rust stains", "wet footprints", "hair caught in vents", "a torn lanyard", "tape hiss", "metal teeth marks"
-    ];
+    let done=0;
+    loadLine.textContent = `assets: ${done}/${list.length}`;
 
-    const victim = `${pick(victims)} ${pick(surnames)}`;
-    const city = pick(cities);
-    const where = pick(places);
-    const hook = pick(hooks);
-    const motif = pick(motifs);
-
-    return {
-      line1: `CASE ${caseNo} · ${city}`,
-      line2: `${victim} was taken into the ${where}.`,
-      line3: `${hook} You follow ${motif}.`
-    };
-  }
-
-  const runLore = generateLore();
-
-  // =======================
-  // INPUT (robust)
-  // =======================
-  const MOVE_KEYS = new Set([
-    "KeyW","KeyA","KeyS","KeyD",
-    "ArrowUp","ArrowLeft","ArrowDown","ArrowRight"
-  ]);
-
-  function setKey(code, down){
-    keys.set(code, down);
-  }
-  function isDown(code){
-    return keys.get(code) === true;
-  }
-
-  function preventIfMovementKey(e){
-    if (MOVE_KEYS.has(e.code) || e.code==="Space") {
-      e.preventDefault(); // stop arrow keys from stealing focus/scrolling
+    const results=[];
+    for(const entry of list){
+      const res = await loadImage(entry.url);
+      done++;
+      loadLine.textContent = `assets: ${done}/${list.length}`;
+      results.push({...entry, ...res});
     }
+
+    assets.creepyFlashes = results.filter(r=>r.type==="creepyFlashes" && r.ok).map(r=>r.img);
+    assets.monsterFaces  = results.filter(r=>r.type==="monsterFaces" && r.ok).map(r=>r.img);
+    const mb = results.find(r=>r.type==="monsterBody" && r.ok);
+    assets.monsterBody = mb ? mb.img : null;
+
+    assetsReady = true;
+    if (startRequested) startGame();
+  }
+
+  // ===== HELPERS =====
+  const clamp = (v,a,b)=> v<a?a : v>b?b : v;
+  function pick(arr){ return arr[(Math.random()*arr.length)|0]; }
+
+  // ===== INPUT (robust) =====
+  const keys = new Map();
+  const MOVE_KEYS = new Set(["KeyW","KeyA","KeyS","KeyD","ArrowUp","ArrowLeft","ArrowDown","ArrowRight","Space"]);
+
+  function isDown(code){ return keys.get(code)===true; }
+  function preventIfMovementKey(e){
+    if (MOVE_KEYS.has(e.code)) e.preventDefault();
   }
 
   window.addEventListener("keydown", (e) => {
     preventIfMovementKey(e);
-    setKey(e.code, true);
+    keys.set(e.code, true);
 
     if (!gameStarted && (e.code==="Enter" || e.code==="Space")) requestStart();
-
     if (gameStarted && e.code==="KeyE") triggerPulse();
 
-    if (prompt.active) {
+    if (prompt.active){
       if (e.code==="Digit1" || e.code==="KeyY") choosePrompt(1);
       if (e.code==="Digit2" || e.code==="KeyN") choosePrompt(2);
     }
@@ -271,66 +299,116 @@
 
   window.addEventListener("keyup", (e) => {
     preventIfMovementKey(e);
-    setKey(e.code, false);
+    keys.set(e.code, false);
   }, { passive:false });
 
-  // Clear stuck keys if tab loses focus (this fixes “sometimes doesn’t react”)
   window.addEventListener("blur", () => keys.clear());
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) keys.clear();
-  });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) keys.clear(); });
 
-  // Make overlay always clickable/tappable
-  startOverlay.addEventListener("pointerdown", (e) => { e.preventDefault(); requestStart(); });
-  startOverlay.addEventListener("click", (e) => { e.preventDefault(); requestStart(); });
-  canvas.addEventListener("pointerdown", (e) => { e.preventDefault(); if(!gameStarted) requestStart(); });
-
-  // =======================
-  // ASSET LOADER
-  // =======================
-  function loadImage(url){
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => resolve({ ok:true, img, url });
-      img.onerror = () => resolve({ ok:false, img:null, url });
-      img.src = url + (url.includes("?") ? "" : `?v=${Date.now()}`); // cache-bust during dev
-    });
+  // ===== START UI interaction =====
+  let chosenRole = "THIEF";
+  function setRole(role){
+    chosenRole = role;
+    for (const el of [roleThief, roleKiller, roleButcher]) el.classList.remove("active");
+    if (role==="THIEF") roleThief.classList.add("active");
+    if (role==="KILLER") roleKiller.classList.add("active");
+    if (role==="BUTCHER") roleButcher.classList.add("active");
+    // refresh lore preview (small personalization)
+    updateLorePreview();
   }
 
-  async function loadAssets(){
-    const list = [
-      ...ASSET_MANIFEST.creepyFlashes.map(u => ({type:"creepyFlashes", url:u})),
-      ...ASSET_MANIFEST.monsterFaces.map(u => ({type:"monsterFaces", url:u}))
+  roleThief.addEventListener("click", (e)=>{ e.stopPropagation(); setRole("THIEF"); });
+  roleKiller.addEventListener("click", (e)=>{ e.stopPropagation(); setRole("KILLER"); });
+  roleButcher.addEventListener("click", (e)=>{ e.stopPropagation(); setRole("BUTCHER"); });
+
+  // prevent overlay click from blurring input weirdly
+  document.getElementById("startPanel").addEventListener("pointerdown", (e)=> e.stopPropagation());
+
+  startOverlay.addEventListener("pointerdown", (e)=>{ e.preventDefault(); requestStart(); });
+  startOverlay.addEventListener("click", (e)=>{ e.preventDefault(); requestStart(); });
+  startBtn.addEventListener("pointerdown", (e)=>{ e.preventDefault(); e.stopPropagation(); requestStart(); });
+
+  // ===== GAME STATE =====
+  let map = [];
+  let stains = [];
+  let chests = [];
+  let evidence = [];
+  let exit = null;
+  let exitLocked = true;
+
+  let messages = [];
+  let globalAnxiety = 0;
+
+  // personalization
+  let hero = {
+    name: "UNKNOWN",
+    role: "THIEF",
+    tint: "#ccffcc",
+    maxOxygen: 100,
+    oxygen: 100,
+    oxygenDrainBase: 0.9,
+    stealth: 1.0
+  };
+
+  // difficulty (random each run)
+  let diff = pick(DIFF_PRESETS);
+
+  // movement smoothing
+  const player = {
+    x:1, y:1,
+    vx:0, vy:0,
+    panicHits:0,
+    panicGrace:0,
+    sanity:100
+  };
+
+  // prompts + mission
+  let prompt = { active:false, text:"", a:"", b:"", onChoose:null, timer:0 };
+  let mission = { active:false, title:"", desc:"", type:"", progress:0, goal:1, extra:null, completed:false };
+
+  // pulse + flash
+  let pulse = { active:false, t:0, dirX:0, dirY:0 };
+  let flash = { active:false, t:0, dur:0.9, img:null, alpha:0, procedural:null };
+
+  // face overlay
+  let faceOverlay = { active:false, t:0, dur:0.55, img:null, intensity:0, alpha:0, pickCooldown:0 };
+
+  // monsters: array (difficulty can spawn more)
+  let monsters = []; // each: {x,y,active,speed,aggression,stun,lastSeen,stepCooldown,targetTile,seed}
+
+  let collectedCount = 0;
+  let gameStarted = false;
+
+  // ===== LORE =====
+  function pad(n){ return String(n).padStart(4,"0"); }
+  function updateLorePreview(){
+    const nm = (nameInput.value || "UNKNOWN").trim().slice(0,18) || "UNKNOWN";
+    const role = chosenRole;
+    const caseNo = pad((Math.random()*9999)|0);
+    const cities = ["SANTA CROCE", "PORTO VECCHIO", "GREYHOLLOW", "VIA NERA", "ASHFIELD", "COLDWATER", "NULL DISTRICT"];
+    const victims = ["ELENA", "MARTA", "SOFIA", "LUCIA", "GIULIA", "IRENE", "VALERIA"];
+    const surnames = ["ROSSI","FERRI","BIANCHI","MORETTI","CONTINI","GALLI","RINALDI"];
+    const places = ["service tunnel","abandoned clinic","flooded stairwell","maintenance maze","sealed corridor","sub-basement"];
+    const hooks = [
+      `The tape says: "${nm}, don't come."`,
+      `A door appears only when ${nm} stops breathing.`,
+      `Someone wrote: "${nm} was here first."`,
+      `The CRT calls you by name. Then by role.`,
     ];
-
-    let done = 0;
-    loadLine.textContent = `assets: ${done}/${list.length}`;
-
-    const results = [];
-    for (const entry of list){
-      const res = await loadImage(entry.url);
-      done++;
-      loadLine.textContent = `assets: ${done}/${list.length}`;
-      results.push({ ...entry, ...res });
-    }
-
-    assets.creepyFlashes = results.filter(r=>r.type==="creepyFlashes" && r.ok).map(r=>r.img);
-    assets.monsterFaces  = results.filter(r=>r.type==="monsterFaces"  && r.ok).map(r=>r.img);
-
-    assetsReady = true;
-
-    // If user already clicked while loading, start now.
-    if (startRequested) startGame();
+    const victim = `${pick(victims)} ${pick(surnames)}`;
+    loreLine1.textContent = `CASE ${caseNo} · ${pick(cities)} · ${role}`;
+    loreLine2.textContent = `${victim} vanished into the ${pick(places)}.`;
+    loreLine3.textContent = pick(hooks);
   }
 
-  // =======================
-  // AUDIO (more organic)
-  // =======================
+  nameInput.addEventListener("input", ()=> updateLorePreview());
+  updateLorePreview();
+
+  // ===== AUDIO (same as before, with oxygen/role influence) =====
   let audio = null;
 
   function initAudio(){
     if (audio) return;
-
     const AC = window.AudioContext || window.webkitAudioContext;
     const ac = new AC();
 
@@ -342,7 +420,6 @@
     master.connect(pan);
     pan.connect(ac.destination);
 
-    // noise buffer
     const noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
     {
       const d = noiseBuf.getChannelData(0);
@@ -353,21 +430,16 @@
       }
     }
 
-    // Wind bed (lowpassed noise)
     const wind = ac.createBufferSource(); wind.buffer = noiseBuf; wind.loop = true;
-    const windLP = ac.createBiquadFilter(); windLP.type="lowpass"; windLP.frequency.value=260;
-    const windGain = ac.createGain(); windGain.gain.value=0.045;
-    wind.connect(windLP); windLP.connect(windGain); windGain.connect(master);
-    wind.start();
+    const windLP = ac.createBiquadFilter(); windLP.type="lowpass"; windLP.frequency.value=250;
+    const windGain = ac.createGain(); windGain.gain.value=0.040;
+    wind.connect(windLP); windLP.connect(windGain); windGain.connect(master); wind.start();
 
-    // Distant static (bandpass noise)
     const stat = ac.createBufferSource(); stat.buffer=noiseBuf; stat.loop=true;
     const statBP = ac.createBiquadFilter(); statBP.type="bandpass"; statBP.frequency.value=1200; statBP.Q.value=0.9;
     const statGain = ac.createGain(); statGain.gain.value=0.020;
-    stat.connect(statBP); statBP.connect(statGain); statGain.connect(master);
-    stat.start();
+    stat.connect(statBP); statBP.connect(statGain); statGain.connect(master); stat.start();
 
-    // Organic drone (sine + soft FM)
     const drone = ac.createOscillator(); drone.type="sine"; drone.frequency.value=48;
     const lfo = ac.createOscillator(); lfo.type="sine"; lfo.frequency.value=0.09;
     const lfoGain = ac.createGain(); lfoGain.gain.value=14;
@@ -375,51 +447,39 @@
 
     const droneLP = ac.createBiquadFilter(); droneLP.type="lowpass"; droneLP.frequency.value=520;
     const droneGain = ac.createGain(); droneGain.gain.value=0.030;
-
     drone.connect(droneLP); droneLP.connect(droneGain); droneGain.connect(master);
     drone.start(); lfo.start();
 
-    // Siren-ish far tone (very quiet, slow glide)
     const siren = ac.createOscillator(); siren.type="triangle"; siren.frequency.value=190;
     const sirenGain = ac.createGain(); sirenGain.gain.value=0.0001;
     const sirenLP = ac.createBiquadFilter(); sirenLP.type="lowpass"; sirenLP.frequency.value=700;
     siren.connect(sirenLP); sirenLP.connect(sirenGain); sirenGain.connect(master);
     siren.start();
 
-    // Heartbeat (fear-driven thump)
     function thump(intensity){
       const t = ac.currentTime;
       const o = ac.createOscillator();
       o.type="sine";
-      o.frequency.value = 62 - Math.random()*6;
-
+      o.frequency.value = 60 - Math.random()*6;
       const g = ac.createGain();
       g.gain.setValueAtTime(0, t);
       g.gain.linearRampToValueAtTime(0.10*intensity, t+0.008);
       g.gain.exponentialRampToValueAtTime(0.0001, t+0.18);
-
-      const lp = ac.createBiquadFilter();
-      lp.type="lowpass"; lp.frequency.value = 140;
-
+      const lp = ac.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value = 140;
       o.connect(lp); lp.connect(g); g.connect(master);
       o.start(t); o.stop(t+0.22);
     }
 
-    // Wet click (needle/tape)
     function click(intensity){
       const t = ac.currentTime;
       const o = ac.createOscillator();
       o.type = Math.random()<0.5 ? "square" : "triangle";
       o.frequency.value = 400 + Math.random()*2600;
-
-      const bp = ac.createBiquadFilter();
-      bp.type="bandpass"; bp.frequency.value = 800 + Math.random()*2400; bp.Q.value = 10;
-
+      const bp = ac.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value = 800 + Math.random()*2400; bp.Q.value = 10;
       const g = ac.createGain();
       g.gain.setValueAtTime(0, t);
       g.gain.linearRampToValueAtTime(0.07*intensity, t+0.002);
       g.gain.exponentialRampToValueAtTime(0.0001, t+0.06);
-
       o.connect(bp); bp.connect(g); g.connect(master);
       o.start(t); o.stop(t+0.07);
     }
@@ -427,48 +487,41 @@
     function mutate(){
       const t = ac.currentTime;
       const fear = audio?.fear ?? 0;
+      const air = audio?.air ?? 1;
 
-      // wind / static evolve
-      statBP.frequency.setTargetAtTime(700 + Math.random()*2800, t, 1.6);
+      statBP.frequency.setTargetAtTime(650 + Math.random()*2800, t, 1.4);
       statBP.Q.setTargetAtTime(0.8 + fear*10, t, 0.3);
-      statGain.gain.setTargetAtTime(0.012 + fear*0.10, t, 0.2);
+      statGain.gain.setTargetAtTime(0.010 + fear*0.11, t, 0.2);
 
-      windLP.frequency.setTargetAtTime(140 + Math.random()*260, t, 2.2);
-      windGain.gain.setTargetAtTime(0.030 + fear*0.090, t, 0.3);
+      windLP.frequency.setTargetAtTime(120 + Math.random()*300, t, 2.0);
+      windGain.gain.setTargetAtTime(0.030 + fear*0.090, t, 0.25);
 
-      drone.frequency.setTargetAtTime(34 + Math.random()*40, t, 1.8);
-      droneLP.frequency.setTargetAtTime(220 + Math.random()*900, t, 1.8);
-      droneGain.gain.setTargetAtTime(0.020 + fear*0.10, t, 0.25);
+      drone.frequency.setTargetAtTime(32 + Math.random()*44, t, 1.6);
+      droneLP.frequency.setTargetAtTime(220 + Math.random()*900, t, 1.6);
+      droneGain.gain.setTargetAtTime(0.020 + fear*0.10, t, 0.2);
 
-      // occasionally breathe the siren in/out
-      if (Math.random() < 0.18 + fear*0.35){
-        siren.frequency.setTargetAtTime(160 + Math.random()*140, t, 1.5);
-        sirenGain.gain.setTargetAtTime(0.002 + fear*0.020, t, 0.8);
-        setTimeout(() => {
-          try {
-            sirenGain.gain.setTargetAtTime(0.0001, ac.currentTime, 1.2);
-          } catch {}
-        }, 900 + Math.random()*1600);
+      // siren breathes when oxygen low or fear high
+      if (Math.random() < 0.12 + fear*0.35 + (1-air)*0.35){
+        siren.frequency.setTargetAtTime(160 + Math.random()*160, t, 1.2);
+        sirenGain.gain.setTargetAtTime(0.002 + fear*0.020 + (1-air)*0.018, t, 0.8);
+        setTimeout(()=>{ try{sirenGain.gain.setTargetAtTime(0.0001, ac.currentTime, 1.1);}catch{} }, 900+Math.random()*1600);
       }
 
       // small events
-      if (Math.random() < 0.12 + fear*0.40) click(0.25 + fear*0.8);
-      if (fear > 0.55 && Math.random() < 0.22) thump(0.35 + fear*0.9);
+      if (Math.random() < 0.10 + fear*0.40) click(0.20 + fear*0.8);
+      if ((fear > 0.55 || air < 0.55) && Math.random() < 0.20) thump(0.30 + fear*0.9 + (1-air)*0.6);
 
-      setTimeout(mutate, 800 + Math.random()*1600);
+      setTimeout(mutate, 800 + Math.random()*1500);
     }
 
     audio = {
       ac,
       fear: 0,
-      setFear(f){
-        audio.fear = f;
-      },
-      setObjectivePan(p){
-        pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, p)), ac.currentTime, 0.2);
-      },
-      click,
-      thump
+      air: 1,
+      setFear(f){ audio.fear = f; },
+      setAir(a){ audio.air = a; },
+      setObjectivePan(p){ pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, p)), ac.currentTime, 0.2); },
+      click, thump
     };
 
     setTimeout(mutate, 700);
@@ -481,812 +534,7 @@
     }
   }
 
-  // =======================
-  // MAP / HELPERS
-  // =======================
-  const clamp = (v,a,b)=> v<a?a : v>b?b : v;
-  const inBounds = (x,y)=> x>=0 && y>=0 && x<COLS && y<ROWS;
-  const isFloor = (x,y)=> inBounds(x,y) && map[y][x] === 0;
-
-  function randomFloorFarFrom(px, py, minManhattan){
-    for (let i=0;i<800;i++){
-      const x = (Math.random()*COLS)|0;
-      const y = (Math.random()*ROWS)|0;
-      if (!isFloor(x,y)) continue;
-      if (Math.abs(x-px)+Math.abs(y-py) < minManhattan) continue;
-      return {x,y};
-    }
-    return {x:1,y:1};
-  }
-
-  function checkWall(x,y){
-    const ax=Math.floor(x+0.2), ay=Math.floor(y+0.2);
-    const bx=Math.floor(x+0.8), by=Math.floor(y+0.8);
-    if (!inBounds(ax,ay) || !inBounds(bx,by)) return true;
-    return map[ay][ax]===1 || map[by][ax]===1 || map[ay][bx]===1 || map[by][bx]===1;
-  }
-
-  function triggerMessage(text){
-    messages.push({
-      text,
-      x: 8 + Math.random()*(canvas.width-16),
-      y: 18 + Math.random()*(canvas.height-20),
-      life: 60,
-      color: Math.random()>0.5 ? "#ff2244" : "#ffffff"
-    });
-  }
-
-  function openedChests(){ return chests.filter(c=>c.opened).length; }
-
-  function updateUI(){
-    scoreDisplay.innerText = `EVIDENCE: ${collectedCount}/${TOTAL_EVIDENCE}  |  CHESTS: ${openedChests()}/${CHESTS_PER_LEVEL}`;
-  }
-
-  // =======================
-  // LORE-THEMED PROMPTS
-  // =======================
-  function showPrompt(p){
-    if (prompt.active) return;
-    prompt.active = true;
-    prompt.text = p.text;
-    prompt.a = p.a;
-    prompt.b = p.b;
-    prompt.onChoose = p.choose;
-    prompt.timer = 6.5;
-    triggerMessage("INPUT REQUIRED");
-    globalAnxiety = Math.max(globalAnxiety, 10);
-  }
-
-  function choosePrompt(choice){
-    if (!prompt.active) return;
-    const fn = prompt.onChoose;
-    prompt.active = false;
-    if (fn) fn(choice);
-    audio?.click?.(0.9);
-  }
-
-  function buildLorePrompts(){
-    // adapt prompts to the generated lore
-    const victimName = runLore.line2.split(" was taken")[0].trim();
-
-    return [
-      {
-        text: `A recorder crackles: "${victimName} is still HERE. Do you CALL OUT?"`,
-        a: "1) CALL (she answers…)",
-        b: "2) STAY QUIET (safer…)",
-        choose: (c) => {
-          if (c===1){
-            globalAnxiety = Math.max(globalAnxiety, 14);
-            enemy.aggression += 0.14;
-            triggerMessage("SHE HEARD YOU");
-            audio?.thump?.(1.0);
-          } else {
-            enemy.aggression = Math.max(0.85, enemy.aggression - 0.08);
-            triggerMessage("SILENCE HOLDS");
-          }
-        }
-      },
-      {
-        text: `A door label peels: "BLEEDING STOPPED?"`,
-        a: "1) YES (lie)",
-        b: "2) NO (tell truth)",
-        choose: (c) => {
-          if (c===1){
-            triggerMessage("THE MAZE SMILES");
-            enemy.aggression += 0.10;
-            globalAnxiety = Math.max(globalAnxiety, 12);
-          } else {
-            triggerMessage("THE MAZE LISTENS");
-            player.sanity = Math.min(100, player.sanity + 10);
-          }
-        }
-      },
-      {
-        text: `The CRT hums: "GIVE UP SPEED FOR CLEANER AIR?"`,
-        a: "1) ACCEPT",
-        b: "2) REFUSE",
-        choose: (c) => {
-          if (c===1){
-            player.speed = Math.max(2.6, player.speed - 0.3);
-            globalAnxiety = Math.max(0, globalAnxiety - 4);
-            triggerMessage("BREATH QUIETER");
-          } else {
-            player.speed = Math.min(3.9, player.speed + 0.2);
-            enemy.aggression += 0.09;
-            triggerMessage("BREATH LOUDER");
-          }
-        }
-      }
-    ];
-  }
-
-  let lorePrompts = buildLorePrompts();
-
-  // =======================
-  // MISSION SYSTEM (lore)
-  // =======================
-  function setMission(m){
-    mission.active = true;
-    mission.completed = false;
-    mission.title = m.title;
-    mission.desc  = m.desc;
-    mission.type  = m.type;
-    mission.progress = 0;
-    mission.goal = m.goal ?? 1;
-    mission.extra = m.extra ?? null;
-
-    exitLocked = true;
-    statusDisplay.style.color = "#ccffcc";
-    statusDisplay.innerText = "STATUS: TRACE ACTIVE";
-    triggerMessage("MISSION UNLOCKED");
-  }
-
-  function completeMission(){
-    mission.completed = true;
-    mission.active = false;
-    exitLocked = false;
-    triggerMessage("TRACE COMPLETE");
-    triggerMessage("EXIT UNSEALED");
-    audio?.click?.(1.0);
-    statusDisplay.style.color = "#ccffcc";
-    statusDisplay.innerText = "STATUS: EXIT UNLOCKED";
-    enemy.aggression = Math.max(0.85, enemy.aggression - 0.08);
-    globalAnxiety = Math.max(0, globalAnxiety - 4);
-  }
-
-  function generateRandomMission(){
-    const types = ["HOLD_BREATH", "NO_RUN", "STAIN_TOUCH", "ECHO_COUNT", "FOLLOW_ORDER"];
-    const t = types[(Math.random()*types.length)|0];
-
-    if (t === "HOLD_BREATH"){
-      const seconds = 2.2 + Math.random()*2.0;
-      return {
-        type: "HOLD_BREATH",
-        title: "HOLD YOUR BREATH",
-        desc: `Stand still near a stain for ${seconds.toFixed(1)}s.\n(Do not move.)`,
-        goal: seconds,
-        extra: { seconds }
-      };
-    }
-
-    if (t === "NO_RUN"){
-      const time = 8 + ((Math.random()*10)|0);
-      return {
-        type:"NO_RUN",
-        title:"MOVE QUIETLY",
-        desc:`Survive ${time}s without running.\n(Shift forbidden.)`,
-        goal: time,
-        extra: { time }
-      };
-    }
-
-    if (t === "STAIN_TOUCH"){
-      const count = 2 + ((Math.random()*3)|0);
-      return {
-        type:"STAIN_TOUCH",
-        title:"FOLLOW THE STAINS",
-        desc:`Step into ${count} different stains.\n(Each counts once.)`,
-        goal: count,
-        extra: { touched: new Set() }
-      };
-    }
-
-    if (t === "ECHO_COUNT"){
-      const pulses = 2 + ((Math.random()*3)|0);
-      return {
-        type:"ECHO_COUNT",
-        title:"PING THE CORRIDOR",
-        desc:`Use Signal Pulse (E) exactly ${pulses} times.\n(Too many resets.)`,
-        goal: pulses,
-        extra: { used:0, max:pulses }
-      };
-    }
-
-    // FOLLOW_ORDER: assign order to evidence
-    const order = [1,2,3].sort(()=>Math.random()-0.5);
-    evidence.forEach((o,i)=>o.order = order[i]);
-    return {
-      type:"FOLLOW_ORDER",
-      title:"RECONSTRUCT THE TIMELINE",
-      desc:`Collect evidence in correct sequence.\n(Colors indicate order.)`,
-      goal: TOTAL_EVIDENCE,
-      extra: { needed:1 }
-    };
-  }
-
-  function updateMission(dt, moving, sprinting){
-    if (!mission.active) return;
-
-    if (mission.type === "HOLD_BREATH"){
-      const near = stains.some(s => Math.hypot((s.x+0.5)-player.x, (s.y+0.5)-player.y) < 2.0);
-      if (!moving && near) mission.progress += dt;
-      else mission.progress = Math.max(0, mission.progress - dt*0.8);
-      if (mission.progress >= mission.goal) completeMission();
-      return;
-    }
-
-    if (mission.type === "NO_RUN"){
-      if (sprinting){
-        mission.progress = Math.max(0, mission.progress - dt*2.0);
-        globalAnxiety = Math.max(globalAnxiety, 12);
-        if (Math.random()<0.02) triggerMessage("TOO LOUD");
-      } else {
-        mission.progress += dt;
-      }
-      if (mission.progress >= mission.goal) completeMission();
-      return;
-    }
-
-    if (mission.type === "STAIN_TOUCH"){
-      for (const s of stains){
-        const d = Math.hypot((s.x+0.5)-player.x, (s.y+0.5)-player.y);
-        if (d < 0.9) mission.extra.touched.add(`${s.x},${s.y}`);
-      }
-      mission.progress = mission.extra.touched.size;
-      if (mission.progress >= mission.goal) completeMission();
-      return;
-    }
-
-    if (mission.type === "ECHO_COUNT"){
-      mission.progress = mission.extra.used;
-      if (mission.progress >= mission.goal) completeMission();
-      return;
-    }
-
-    if (mission.type === "FOLLOW_ORDER"){
-      mission.progress = collectedCount;
-      return;
-    }
-  }
-
-  // =======================
-  // FLASH + DISTORTION
-  // =======================
-  function generateProceduralCreepy(){
-    const c = document.createElement("canvas");
-    c.width = 160; c.height = 120;
-    const g = c.getContext("2d");
-
-    g.fillStyle="#000"; g.fillRect(0,0,c.width,c.height);
-    for(let i=0;i<2400;i++){
-      const x=(Math.random()*c.width)|0, y=(Math.random()*c.height)|0;
-      const v=(Math.random()*70)|0;
-      g.fillStyle=`rgb(${v},${v},${v})`;
-      g.fillRect(x,y,1,1);
-    }
-
-    // vague “room”
-    g.fillStyle="rgba(255,60,90,0.08)";
-    g.fillRect(20, 30, 120, 70);
-
-    // “eyes”
-    g.fillStyle="rgba(255,60,90,0.55)";
-    g.fillRect(55, 55, 10, 4);
-    g.fillRect(95, 55, 10, 4);
-
-    // smear
-    g.globalAlpha=0.22;
-    for(let i=0;i<7;i++){
-      const y=(Math.random()*c.height)|0;
-      const dx=(Math.random()*20-10);
-      g.drawImage(c, 0, y, c.width, 2, dx, y, c.width, 2);
-    }
-    g.globalAlpha=1;
-
-    return c;
-  }
-
-  function triggerFlash(){
-    flash.active = true;
-    flash.t = 0;
-    flash.dur = 0.7 + Math.random()*0.7;
-
-    // Prefer your images; fallback to procedural
-    if (assets.creepyFlashes.length > 0){
-      flash.img = pick(assets.creepyFlashes);
-      flash.procedural = null;
-    } else {
-      flash.img = null;
-      flash.procedural = generateProceduralCreepy();
-    }
-
-    flash.alpha = 0;
-  }
-
-  function drawDistortedImage(img, x, y, w, h, intensity){
-    // Creepy slit-scan + jitter + tint
-    const slices = 10 + (intensity*24)|0;
-    const sliceH = h / slices;
-
-    ctx.save();
-    ctx.imageSmoothingEnabled = false;
-
-    // base tint
-    ctx.globalAlpha = 0.55 + intensity*0.25;
-    ctx.drawImage(img, x, y, w, h);
-
-    // slice jitter
-    ctx.globalAlpha = 0.85;
-    for (let i=0;i<slices;i++){
-      const sy = y + i*sliceH;
-      const off = (Math.random()-0.5) * (2 + intensity*18);
-      const wob = (Math.random()-0.5) * (1 + intensity*10);
-      ctx.drawImage(img,
-        0, (img.height/slices)*i, img.width, img.height/slices,
-        x + off, sy + wob, w, sliceH + 0.5
-      );
-    }
-
-    // red channel-ish wash
-    ctx.globalCompositeOperation = "screen";
-    ctx.globalAlpha = 0.10 + intensity*0.25;
-    ctx.fillStyle = "rgba(255,60,90,1)";
-    ctx.fillRect(x, y, w, h);
-
-    ctx.restore();
-  }
-
-  function maybeTriggerFaceOverlay(distToEnemy){
-    if (assets.monsterFaces.length === 0) return;
-
-    // close enough + cooldown
-    if (faceOverlay.pickCooldown > 0) return;
-    if (distToEnemy > 4.2) return;
-
-    // low probability per frame to avoid constant spam
-    const chance = clamp(0.004 + (4.2-distToEnemy)*0.006, 0.004, 0.05);
-    if (Math.random() > chance) return;
-
-    faceOverlay.active = true;
-    faceOverlay.t = 0;
-    faceOverlay.dur = 0.45 + Math.random()*0.35;
-    faceOverlay.img = pick(assets.monsterFaces);
-    faceOverlay.intensity = clamp(1 - distToEnemy/4.2, 0, 1);
-    faceOverlay.alpha = 0;
-    faceOverlay.pickCooldown = 40 + ((Math.random()*60)|0);
-
-    triggerMessage("DO NOT STARE");
-  }
-
-  // =======================
-  // SIGNAL PULSE
-  // =======================
-  function getNearestObjective(){
-    let best=null, bestD=1e9;
-
-    for (const c of chests){
-      if (c.opened) continue;
-      const d = Math.hypot((c.x+0.5)-player.x, (c.y+0.5)-player.y);
-      if (d<bestD){ bestD=d; best={x:c.x,y:c.y}; }
-    }
-    if (best) return best;
-
-    for (const o of evidence){
-      if (o.collected) continue;
-      const d = Math.hypot((o.x+0.5)-player.x, (o.y+0.5)-player.y);
-      if (d<bestD){ bestD=d; best={x:o.x,y:o.y}; }
-    }
-    if (!best && exit) best = {x:exit.x, y:exit.y};
-    return best;
-  }
-
-  function triggerPulse(){
-    if (!gameStarted) return;
-    if (pulse.active) return;
-
-    const target = getNearestObjective();
-    if (!target) return;
-
-    const dx = (target.x+0.5) - player.x;
-    const dy = (target.y+0.5) - player.y;
-    const d = Math.max(0.0001, Math.hypot(dx,dy));
-
-    pulse.active = true;
-    pulse.t = 0;
-    pulse.dirX = dx/d;
-    pulse.dirY = dy/d;
-
-    globalAnxiety = Math.max(globalAnxiety, 10);
-    triggerMessage("ECHO PULSE");
-    audio?.click?.(0.9);
-
-    if (mission.active && mission.type === "ECHO_COUNT"){
-      mission.extra.used++;
-      if (mission.extra.used > mission.extra.max){
-        mission.extra.used = 0;
-        triggerMessage("ECHO OVERFLOW");
-        globalAnxiety = Math.max(globalAnxiety, 16);
-      }
-    }
-  }
-
-  // =======================
-  // ENEMY AI (simple grid chase)
-  // =======================
-  function enemyPickStepToward(tx,ty){
-    const ex = enemy.x|0, ey = enemy.y|0;
-    const opts = [
-      {x:ex+1,y:ey},{x:ex-1,y:ey},{x:ex,y:ey+1},{x:ex,y:ey-1}
-    ].filter(p=>isFloor(p.x,p.y));
-    if (!opts.length) return null;
-
-    let best=opts[0], bestScore=1e9;
-    for (const o of opts){
-      const d = Math.hypot((o.x+0.5)-tx,(o.y+0.5)-ty);
-      const wob = (Math.random()-0.5)*0.25;
-      const score = d + wob;
-      if (score<bestScore){ bestScore=score; best=o; }
-    }
-    return best;
-  }
-
-  function spawnEnemy(){
-    const ptx = player.x|0, pty = player.y|0;
-    const r = randomFloorFarFrom(ptx,pty, 14);
-    enemy.x = r.x+0.5;
-    enemy.y = r.y+0.5;
-    enemy.active = true;
-    enemy.stun = 0;
-    enemy.lastSeen = 0;
-    enemy.stepCooldown = 0;
-    enemy.targetTile = null;
-    statusDisplay.innerText = "STATUS: WATCHED";
-    statusDisplay.style.color = "#ff3344";
-    audio?.click?.(1.0);
-  }
-
-  function updateEnemy(dt){
-    if (!enemy.active && collectedCount >= 1) spawnEnemy();
-    if (!enemy.active) return;
-
-    const dx = player.x - enemy.x;
-    const dy = player.y - enemy.y;
-    const dist = Math.max(0.0001, Math.hypot(dx,dy));
-
-    const fear = clamp(1 - dist/6, 0, 1);
-    audio?.setFear?.(fear);
-
-    maybeTriggerFaceOverlay(dist);
-
-    if (enemy.stun > 0){ enemy.stun -= dt; return; }
-
-    const sprinting = isDown("ShiftLeft");
-    const hearRadius = sprinting ? 8.0 : 4.8;
-
-    if (dist < 3){
-      globalAnxiety = Math.max(globalAnxiety, 9 + (3-dist)*6);
-      if (Math.random()<0.03) triggerMessage("BEHIND YOU");
-    }
-
-    let targetX = enemy.x, targetY = enemy.y;
-    if (dist < hearRadius){
-      enemy.lastSeen = 1.2; // seconds
-      targetX = player.x; targetY = player.y;
-    } else if (enemy.lastSeen > 0){
-      enemy.lastSeen -= dt;
-      targetX = enemy.x + (dx/dist)*1.0;
-      targetY = enemy.y + (dy/dist)*1.0;
-    } else {
-      const s = stains[(Math.random()*stains.length)|0];
-      targetX = s.x+0.5; targetY = s.y+0.5;
-    }
-
-    enemy.stepCooldown -= dt;
-    if (enemy.stepCooldown <= 0 || !enemy.targetTile){
-      enemy.stepCooldown = 0.12 + Math.random()*0.18;
-      const step = enemyPickStepToward(targetX, targetY);
-      if (step) enemy.targetTile = step;
-    }
-
-    const spd = enemy.speed * enemy.aggression;
-    if (enemy.targetTile){
-      const cx = enemy.targetTile.x+0.5;
-      const cy = enemy.targetTile.y+0.5;
-      const mdx = cx - enemy.x;
-      const mdy = cy - enemy.y;
-      const md  = Math.max(0.0001, Math.hypot(mdx,mdy));
-      enemy.x += (mdx/md) * spd * dt;
-      enemy.y += (mdy/md) * spd * dt;
-      if (md < 0.10) enemy.stepCooldown = 0;
-    }
-
-    if (player.panicGrace > 0) player.panicGrace -= dt;
-
-    if (dist < 0.62 && player.panicGrace <= 0){
-      player.panicGrace = 0.85; // seconds
-      enemy.stun = 0.55;
-
-      globalAnxiety = Math.max(globalAnxiety, 22);
-      triggerMessage("DON'T LOOK");
-      triggerFlash();
-
-      // shove
-      player.x -= (dx/dist)*0.35;
-      player.y -= (dy/dist)*0.35;
-
-      player.panicHits += 1;
-      player.sanity = Math.max(0, player.sanity - 18);
-
-      if (player.panicHits >= 2){
-        alert("CAUGHT. RESETTING.");
-        generateLevel();
-      }
-    }
-  }
-
-  // =======================
-  // LEVEL GEN
-  // =======================
-  function generateLevel(){
-    // maze init
-    map = Array(ROWS).fill(0).map(()=>Array(COLS).fill(1));
-    const stack=[];
-    const start={x:1,y:1};
-    map[start.y][start.x]=0;
-    stack.push(start);
-
-    while(stack.length){
-      const c = stack[stack.length-1];
-      const dirs = [
-        {dx:0,dy:-2},{dx:0,dy:2},{dx:-2,dy:0},{dx:2,dy:0}
-      ].sort(()=>Math.random()-0.5);
-
-      let carved=false;
-      for(const d of dirs){
-        const nx=c.x+d.dx, ny=c.y+d.dy;
-        if(nx>0 && nx<COLS-1 && ny>0 && ny<ROWS-1 && map[ny][nx]===1){
-          map[ny][nx]=0;
-          map[c.y+(d.dy/2)][c.x+(d.dx/2)]=0;
-          stack.push({x:nx,y:ny});
-          carved=true;
-          break;
-        }
-      }
-      if(!carved) stack.pop();
-    }
-
-    stains=[];
-    for(let i=0;i<8;i++){
-      stains.push(randomFloorFarFrom(1,1,4));
-    }
-
-    evidence=[];
-    while(evidence.length<TOTAL_EVIDENCE){
-      const r = randomFloorFarFrom(1,1,6);
-      if(evidence.some(o=>o.x===r.x && o.y===r.y)) continue;
-      evidence.push({x:r.x,y:r.y,collected:false,order:0});
-    }
-
-    chests=[];
-    while(chests.length<CHESTS_PER_LEVEL){
-      const r = randomFloorFarFrom(1,1,5);
-      if(chests.some(c=>c.x===r.x && c.y===r.y)) continue;
-      if(evidence.some(o=>o.x===r.x && o.y===r.y)) continue;
-      chests.push({x:r.x,y:r.y,opened:false});
-    }
-
-    // player
-    player.x=1; player.y=1;
-    player.panicHits=0; player.panicGrace=0;
-    player.sanity=100;
-    player.speed = PLAYER_SPEED;
-
-    // exit
-    exit = randomFloorFarFrom(1,1,12);
-    exitLocked = true;
-
-    collectedCount = 0;
-    messages = [];
-    globalAnxiety = 0;
-
-    enemy.active=false;
-    enemy.stun=0;
-    enemy.lastSeen=0;
-    enemy.stepCooldown=0;
-    enemy.targetTile=null;
-    enemy.speed = 2.0 + Math.random()*0.6;
-    enemy.aggression = 0.95 + Math.random()*0.20;
-
-    mission.active=false;
-    mission.completed=false;
-
-    prompt.active=false;
-
-    pulse.active=false;
-    flash.active=false;
-
-    faceOverlay.active=false;
-    faceOverlay.pickCooldown=0;
-
-    statusDisplay.style.color="#ccffcc";
-    statusDisplay.innerText="STATUS: ALONE";
-
-    updateUI();
-  }
-
-  // =======================
-  // PICKUPS
-  // =======================
-  function openChest(ch){
-    ch.opened = true;
-    triggerMessage("CHEST OPENED");
-    audio?.click?.(1.0);
-    if (Math.random() < 0.80) triggerFlash();
-
-    if (!mission.active && exitLocked){
-      setMission(generateRandomMission());
-    } else {
-      if (Math.random() < 0.70) showPrompt(pick(lorePrompts));
-    }
-  }
-
-  function collectEvidence(o){
-    if (mission.active && mission.type === "FOLLOW_ORDER"){
-      const needed = (mission.extra?.needed ?? 1);
-      if (o.order !== needed){
-        triggerMessage("WRONG TIMELINE");
-        globalAnxiety = Math.max(globalAnxiety, 18);
-        audio?.thump?.(1.0);
-        triggerFlash();
-        generateLevel();
-        return;
-      }
-      mission.extra.needed = needed + 1;
-      if (mission.extra.needed > TOTAL_EVIDENCE){
-        completeMission();
-      }
-    }
-
-    o.collected = true;
-    collectedCount++;
-    triggerMessage("EVIDENCE FOUND");
-    triggerMessage(pick(["TAPE HISS", "METAL BREATH", "FOUND FOOTAGE: OK", "FRAME: CORRUPTED", "SHE WAS HERE"]));
-    audio?.click?.(0.9);
-
-    if (Math.random() < 0.65) triggerFlash();
-    if (Math.random() < 0.35) showPrompt(pick(lorePrompts));
-
-    updateUI();
-  }
-
-  // =======================
-  // UPDATE + RENDER
-  // =======================
-  let lastTime = performance.now();
-
-  function update(dt){
-    // prompt timer
-    if (prompt.active){
-      prompt.timer -= dt;
-      if (prompt.timer <= 0){
-        prompt.active = false;
-        triggerMessage("NO RESPONSE");
-        globalAnxiety = Math.max(globalAnxiety, 14);
-        enemy.aggression += 0.06;
-      }
-    }
-
-    // movement (dt-based, diagonal normalized)
-    let ix = 0, iy = 0;
-    if (isDown("KeyW") || isDown("ArrowUp")) iy -= 1;
-    if (isDown("KeyS") || isDown("ArrowDown")) iy += 1;
-    if (isDown("KeyA") || isDown("ArrowLeft")) ix -= 1;
-    if (isDown("KeyD") || isDown("ArrowRight")) ix += 1;
-
-    const sprinting = isDown("ShiftLeft");
-    let spd = player.speed * (sprinting ? PLAYER_RUN_MULT : 1.0);
-
-    if (sprinting){
-      globalAnxiety = Math.min(globalAnxiety + 0.35, 16);
-      player.sanity = Math.max(0, player.sanity - 10*dt);
-    } else {
-      globalAnxiety = Math.max(globalAnxiety - 0.12, 0);
-      player.sanity = Math.min(100, player.sanity + 6*dt);
-    }
-
-    const moving = (ix !== 0 || iy !== 0);
-
-    if (moving){
-      const len = Math.hypot(ix, iy) || 1;
-      const vx = (ix/len) * spd * dt;
-      const vy = (iy/len) * spd * dt;
-
-      // slide collision
-      const nx = player.x + vx;
-      const ny = player.y + vy;
-      if (!checkWall(nx, player.y)) player.x = nx;
-      if (!checkWall(player.x, ny)) player.y = ny;
-    }
-
-    // mission update
-    updateMission(dt, moving, sprinting);
-
-    // enemy update
-    updateEnemy(dt);
-
-    // objective panning
-    const obj = getNearestObjective();
-    if (obj && audio){
-      const dx = (obj.x+0.5) - player.x;
-      audio.setObjectivePan(clamp(dx/6, -1, 1));
-    }
-
-    // stains effect
-    for (const s of stains){
-      const d = Math.hypot((s.x+0.5)-player.x, (s.y+0.5)-player.y);
-      if (d < 1.0){
-        globalAnxiety = Math.max(globalAnxiety, 8);
-        if (Math.random() < 0.010) audio?.click?.(0.25);
-        if (Math.random() < 0.006) triggerMessage("WET FOOTSTEPS");
-        if (Math.random() < 0.004) showPrompt(pick(lorePrompts));
-      }
-    }
-
-    // pickups
-    for (const c of chests){
-      if (c.opened) continue;
-      const d = Math.hypot((c.x+0.5)-player.x, (c.y+0.5)-player.y);
-      if (d < 0.72) openChest(c);
-    }
-
-    for (const o of evidence){
-      if (o.collected) continue;
-      const d = Math.hypot((o.x+0.5)-player.x, (o.y+0.5)-player.y);
-      if (d < 0.72) collectEvidence(o);
-    }
-
-    // exit
-    if (exit){
-      const d = Math.hypot((exit.x+0.5)-player.x, (exit.y+0.5)-player.y);
-      if (d < 0.60){
-        if (exitLocked){
-          triggerMessage("EXIT LOCKED");
-          globalAnxiety = Math.max(globalAnxiety, 10);
-        } else {
-          alert("TRACE COMPLETE. DESCENDING…");
-          generateLevel();
-        }
-      }
-    }
-
-    // pulse
-    if (pulse.active){
-      pulse.t += dt * 12;
-      if (pulse.t > 25) pulse.active = false;
-    }
-
-    // flash fade
-    if (flash.active){
-      flash.t += dt;
-      if (flash.t < flash.dur * 0.2) flash.alpha = flash.t / (flash.dur * 0.2);
-      else flash.alpha = 1 - (flash.t - flash.dur * 0.2) / (flash.dur * 0.8);
-
-      if (flash.t >= flash.dur){
-        flash.active = false;
-        flash.alpha = 0;
-      }
-    }
-
-    // face overlay
-    if (faceOverlay.pickCooldown > 0) faceOverlay.pickCooldown -= 1;
-
-    if (faceOverlay.active){
-      faceOverlay.t += dt;
-      const a = Math.sin(Math.min(1, faceOverlay.t/faceOverlay.dur)*Math.PI);
-      faceOverlay.alpha = 0.25 + a*0.65;
-      if (faceOverlay.t >= faceOverlay.dur){
-        faceOverlay.active = false;
-        faceOverlay.alpha = 0;
-      }
-    }
-
-    // messages decay
-    for (let i=messages.length-1;i>=0;i--){
-      messages[i].life -= 1;
-      if (messages[i].life <= 0) messages.splice(i,1);
-    }
-  }
-
+  // ===== VISUAL EFFECTS =====
   function drawNoiseOverlay(amount){
     if (amount<=0) return;
     ctx.save();
@@ -1302,78 +550,680 @@
     ctx.restore();
   }
 
+  function generateProceduralCreepy(){
+    const c = document.createElement("canvas");
+    c.width = 160; c.height = 120;
+    const g = c.getContext("2d");
+
+    g.fillStyle="#000"; g.fillRect(0,0,c.width,c.height);
+    for(let i=0;i<2400;i++){
+      const x=(Math.random()*c.width)|0, y=(Math.random()*c.height)|0;
+      const v=(Math.random()*70)|0;
+      g.fillStyle=`rgb(${v},${v},${v})`;
+      g.fillRect(x,y,1,1);
+    }
+    g.fillStyle="rgba(255,60,90,0.08)";
+    g.fillRect(20, 30, 120, 70);
+
+    g.fillStyle="rgba(255,60,90,0.55)";
+    g.fillRect(55, 55, 10, 4);
+    g.fillRect(95, 55, 10, 4);
+
+    g.globalAlpha=0.22;
+    for(let i=0;i<7;i++){
+      const y=(Math.random()*c.height)|0;
+      const dx=(Math.random()*20-10);
+      g.drawImage(c, 0, y, c.width, 2, dx, y, c.width, 2);
+    }
+    g.globalAlpha=1;
+
+    return c;
+  }
+
+  function triggerFlash(){
+    flash.active = true;
+    flash.t = 0;
+    flash.dur = 0.7 + Math.random()*0.7;
+    if (assets.creepyFlashes.length > 0){
+      flash.img = pick(assets.creepyFlashes);
+      flash.procedural = null;
+    } else {
+      flash.img = null;
+      flash.procedural = generateProceduralCreepy();
+    }
+    flash.alpha = 0;
+  }
+
+  function drawDistortedImage(img, x, y, w, h, intensity){
+    const slices = 10 + (intensity*24)|0;
+    const sliceH = h / slices;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+
+    ctx.globalAlpha = 0.55 + intensity*0.25;
+    ctx.drawImage(img, x, y, w, h);
+
+    ctx.globalAlpha = 0.88;
+    for (let i=0;i<slices;i++){
+      const sy = y + i*sliceH;
+      const off = (Math.random()-0.5) * (2 + intensity*18);
+      const wob = (Math.random()-0.5) * (1 + intensity*10);
+      ctx.drawImage(img,
+        0, (img.height/slices)*i, img.width, img.height/slices,
+        x + off, sy + wob, w, sliceH + 0.5
+      );
+    }
+
+    ctx.globalCompositeOperation = "screen";
+    ctx.globalAlpha = 0.10 + intensity*0.25;
+    ctx.fillStyle = "rgba(255,60,90,1)";
+    ctx.fillRect(x, y, w, h);
+
+    ctx.restore();
+  }
+
+  function maybeTriggerFaceOverlay(dist){
+    if (assets.monsterFaces.length === 0) return;
+    if (faceOverlay.pickCooldown > 0) return;
+    if (dist > 4.2) return;
+
+    const chance = clamp(0.004 + (4.2-dist)*0.008, 0.004, 0.06);
+    if (Math.random() > chance) return;
+
+    faceOverlay.active = true;
+    faceOverlay.t = 0;
+    faceOverlay.dur = 0.45 + Math.random()*0.35;
+    faceOverlay.img = pick(assets.monsterFaces);
+    faceOverlay.intensity = clamp(1 - dist/4.2, 0, 1);
+    faceOverlay.alpha = 0;
+    faceOverlay.pickCooldown = 50 + ((Math.random()*70)|0);
+
+    pushMessage(`DO NOT STARE, ${hero.name}`);
+  }
+
+  // ===== TEXT =====
+  function pushMessage(text){
+    messages.push({
+      text,
+      x: 8 + Math.random()*(canvas.width-16),
+      y: 18 + Math.random()*(canvas.height-20),
+      life: 70,
+      color: Math.random()>0.5 ? "#ff2244" : "#ffffff"
+    });
+  }
+
+  // ===== MAP =====
+  const inBounds = (x,y)=> x>=0 && y>=0 && x<COLS && y<ROWS;
+  const isFloor = (x,y)=> inBounds(x,y) && map[y][x]===0;
+
+  function randomFloorFarFrom(px, py, minManhattan){
+    for(let i=0;i<900;i++){
+      const x=(Math.random()*COLS)|0, y=(Math.random()*ROWS)|0;
+      if(!isFloor(x,y)) continue;
+      if(Math.abs(x-px)+Math.abs(y-py) < minManhattan) continue;
+      return {x,y};
+    }
+    return {x:1,y:1};
+  }
+
+  // collision sample: tighten, but keep escape nudges
+  function checkWall(x,y){
+    const ax=Math.floor(x+0.18), ay=Math.floor(y+0.18);
+    const bx=Math.floor(x+0.82), by=Math.floor(y+0.82);
+    if (!inBounds(ax,ay) || !inBounds(bx,by)) return true;
+    return map[ay][ax]===1 || map[by][ax]===1 || map[ay][bx]===1 || map[by][bx]===1;
+  }
+
+  // ===== OBJECTIVES =====
+  function openedChests(){ return chests.filter(c=>c.opened).length; }
+  function updateHUD(){
+    scoreDisplay.textContent = `EVIDENCE: ${collectedCount}/${TOTAL_EVIDENCE}  |  CHESTS: ${openedChests()}/${chests.length}`;
+    const diffTxt = diff ? diff.name : "???";
+    statsLine.textContent = `${hero.name} · ${hero.role} · O₂ ${hero.oxygen.toFixed(0)}% · ${diffTxt}`;
+    missionLine.textContent = mission.active ? `${mission.title} (${Math.floor(100*clamp(mission.progress/mission.goal,0,1))}%)` : (exitLocked ? "Find a chest." : "Exit unsealed.");
+  }
+
+  // ===== PROMPT SYSTEM =====
+  function showPrompt(p){
+    if (prompt.active) return;
+    prompt.active = true;
+    prompt.text = p.text.replaceAll("{NAME}", hero.name).replaceAll("{ROLE}", hero.role);
+    prompt.a = p.a.replaceAll("{NAME}", hero.name);
+    prompt.b = p.b.replaceAll("{NAME}", hero.name);
+    prompt.onChoose = p.choose;
+    prompt.timer = 6.5;
+    pushMessage("INPUT REQUIRED");
+    globalAnxiety = Math.max(globalAnxiety, 10);
+  }
+
+  function choosePrompt(choice){
+    if (!prompt.active) return;
+    const fn = prompt.onChoose;
+    prompt.active = false;
+    if (fn) fn(choice);
+    audio?.click?.(0.9);
+  }
+
+  function buildLorePrompts(){
+    const hooks = {
+      THIEF: [
+        { text:`A lock whispers: "{NAME}, return what you stole."`, a:"1) RETURN IT", b:"2) KEEP IT", choose:(c)=>{ if(c===1){ monsters.forEach(m=>m.aggression*=0.93); pushMessage("DEBT PAID"); } else { monsters.forEach(m=>m.aggression*=1.07); pushMessage("DEBT GROWS"); globalAnxiety=Math.max(globalAnxiety,13);} } },
+        { text:`A drawer opens by itself: "HANDS CLEAN?"`, a:"1) YES", b:"2) NO", choose:(c)=>{ if(c===1){ pushMessage("LIAR"); monsters.forEach(m=>m.aggression*=1.06);} else { hero.oxygen=Math.min(hero.maxOxygen, hero.oxygen+8); pushMessage("BREATH RETURNS"); } } }
+      ],
+      KILLER: [
+        { text:`The corridor asks: "{NAME}, do you feel REMORSE?"`, a:"1) YES", b:"2) NO", choose:(c)=>{ if(c===1){ hero.oxygenDrainBase*=0.92; pushMessage("SOFTER STEPS"); } else { monsters.forEach(m=>m.speed*=1.05); pushMessage("HUNGER ANSWERS"); globalAnxiety=Math.max(globalAnxiety,14);} } },
+        { text:`A tape loops: "CONFESS."`, a:"1) CONFESS", b:"2) DENY", choose:(c)=>{ if(c===1){ monsters.forEach(m=>m.aggression*=0.90); pushMessage("THE MAZE LISTENS"); } else { pushMessage("THE MAZE GRINS"); hero.oxygen=Math.max(0, hero.oxygen-10);} } }
+      ],
+      BUTCHER: [
+        { text:`A hook swings: "{NAME}, sharpen?"`, a:"1) SHARPEN", b:"2) REFUSE", choose:(c)=>{ if(c===1){ hero.maxOxygen=Math.max(80, hero.maxOxygen-6); hero.oxygen=Math.min(hero.oxygen, hero.maxOxygen); monsters.forEach(m=>m.aggression*=0.92); pushMessage("STEEL SONG"); } else { monsters.forEach(m=>m.aggression*=1.07); pushMessage("DULL TEETH"); globalAnxiety=Math.max(globalAnxiety,13);} } },
+        { text:`A sink runs: "WASH THE HANDS."`, a:"1) WASH", b:"2) DON'T", choose:(c)=>{ if(c===1){ hero.oxygen=Math.min(hero.maxOxygen, hero.oxygen+6); pushMessage("WATER IS BLACK"); } else { hero.oxygenDrainBase*=1.10; pushMessage("SALT IN LUNGS"); } } }
+      ]
+    };
+    return hooks[hero.role] || hooks.THIEF;
+  }
+
+  let lorePrompts = [];
+
+  // ===== MISSION SYSTEM =====
+  function setMission(m){
+    mission.active = true;
+    mission.completed = false;
+    mission.title = m.title.replaceAll("{NAME}", hero.name);
+    mission.desc  = m.desc.replaceAll("{NAME}", hero.name);
+    mission.type  = m.type;
+    mission.progress = 0;
+    mission.goal = m.goal ?? 1;
+    mission.extra = m.extra ?? null;
+
+    exitLocked = true;
+    statusDisplay.style.color = "#ccffcc";
+    statusDisplay.textContent = "STATUS: TRACE ACTIVE";
+    pushMessage(`NEW TASK FOR ${hero.name}`);
+  }
+
+  function completeMission(){
+    mission.completed = true;
+    mission.active = false;
+    exitLocked = false;
+    pushMessage("TRACE COMPLETE");
+    pushMessage("EXIT UNSEALED");
+    audio?.click?.(1.0);
+    statusDisplay.style.color = "#ccffcc";
+    statusDisplay.textContent = "STATUS: EXIT UNLOCKED";
+    monsters.forEach(m => m.aggression = Math.max(0.85, m.aggression * 0.94));
+    globalAnxiety = Math.max(0, globalAnxiety - 4);
+  }
+
+  function generateRandomMission(){
+    const t = pick(["HOLD_BREATH","NO_RUN","STAIN_TOUCH","ECHO_COUNT","FOLLOW_ORDER"]);
+    const taskMult = diff.taskMult;
+
+    if (t==="HOLD_BREATH"){
+      const seconds = (2.2 + Math.random()*2.2) * taskMult;
+      return { type:"HOLD_BREATH", title:"HOLD YOUR BREATH", desc:`Stand still near a stain for ${seconds.toFixed(1)}s.\nDo not move.`, goal:seconds, extra:{} };
+    }
+    if (t==="NO_RUN"){
+      const time = (8 + ((Math.random()*10)|0)) * taskMult;
+      return { type:"NO_RUN", title:"MOVE QUIETLY", desc:`Survive ${time.toFixed(0)}s without running.\nShift forbidden.`, goal:time, extra:{} };
+    }
+    if (t==="STAIN_TOUCH"){
+      const count = Math.max(2, Math.round((2 + ((Math.random()*3)|0)) * taskMult));
+      return { type:"STAIN_TOUCH", title:"FOLLOW THE STAINS", desc:`Step into ${count} different stains.\nEach counts once.`, goal:count, extra:{ touched:new Set() } };
+    }
+    if (t==="ECHO_COUNT"){
+      const pulses = Math.max(2, Math.round((2 + ((Math.random()*3)|0)) * taskMult));
+      return { type:"ECHO_COUNT", title:"PING THE CORRIDOR", desc:`Use Signal Pulse (E) exactly ${pulses} times.\nToo many resets.`, goal:pulses, extra:{ used:0, max:pulses } };
+    }
+    const order=[1,2,3].sort(()=>Math.random()-0.5);
+    evidence.forEach((o,i)=>o.order=order[i]);
+    return { type:"FOLLOW_ORDER", title:"RECONSTRUCT TIMELINE", desc:`Collect evidence in sequence.\nColors indicate order.`, goal:TOTAL_EVIDENCE, extra:{ needed:1 } };
+  }
+
+  function updateMission(dt, moving, sprinting){
+    if (!mission.active) return;
+
+    if (mission.type==="HOLD_BREATH"){
+      const near = stains.some(s=>Math.hypot((s.x+0.5)-player.x,(s.y+0.5)-player.y) < 2.0);
+      if (!moving && near) mission.progress += dt;
+      else mission.progress = Math.max(0, mission.progress - dt*0.9);
+      if (mission.progress >= mission.goal) completeMission();
+      return;
+    }
+
+    if (mission.type==="NO_RUN"){
+      if (sprinting){
+        mission.progress = Math.max(0, mission.progress - dt*2.2);
+        globalAnxiety = Math.max(globalAnxiety, 12);
+        if (Math.random()<0.02) pushMessage("TOO LOUD");
+      } else mission.progress += dt;
+      if (mission.progress >= mission.goal) completeMission();
+      return;
+    }
+
+    if (mission.type==="STAIN_TOUCH"){
+      for(const s of stains){
+        if (Math.hypot((s.x+0.5)-player.x,(s.y+0.5)-player.y) < 0.9) mission.extra.touched.add(`${s.x},${s.y}`);
+      }
+      mission.progress = mission.extra.touched.size;
+      if (mission.progress >= mission.goal) completeMission();
+      return;
+    }
+
+    if (mission.type==="ECHO_COUNT"){
+      mission.progress = mission.extra.used;
+      if (mission.progress >= mission.goal) completeMission();
+      return;
+    }
+
+    if (mission.type==="FOLLOW_ORDER"){
+      mission.progress = collectedCount;
+      return;
+    }
+  }
+
+  // ===== PULSE =====
+  function getNearestObjective(){
+    let best=null, bestD=1e9;
+    for(const c of chests){
+      if(c.opened) continue;
+      const d=Math.hypot((c.x+0.5)-player.x,(c.y+0.5)-player.y);
+      if(d<bestD){bestD=d; best={x:c.x,y:c.y};}
+    }
+    if(best) return best;
+    for(const o of evidence){
+      if(o.collected) continue;
+      const d=Math.hypot((o.x+0.5)-player.x,(o.y+0.5)-player.y);
+      if(d<bestD){bestD=d; best={x:o.x,y:o.y};}
+    }
+    if(!best && exit) best={x:exit.x,y:exit.y};
+    return best;
+  }
+
+  function triggerPulse(){
+    if (!gameStarted) return;
+    if (pulse.active) return;
+    const target = getNearestObjective();
+    if (!target) return;
+
+    const dx=(target.x+0.5)-player.x, dy=(target.y+0.5)-player.y;
+    const d=Math.max(0.0001, Math.hypot(dx,dy));
+    pulse.active=true; pulse.t=0; pulse.dirX=dx/d; pulse.dirY=dy/d;
+    globalAnxiety=Math.max(globalAnxiety, 10);
+    pushMessage("ECHO PULSE");
+    audio?.click?.(0.9);
+
+    if (mission.active && mission.type==="ECHO_COUNT"){
+      mission.extra.used++;
+      if (mission.extra.used > mission.extra.max){
+        mission.extra.used = 0;
+        pushMessage("ECHO OVERFLOW");
+        globalAnxiety=Math.max(globalAnxiety, 16);
+      }
+    }
+  }
+
+  // ===== MONSTERS =====
+  function enemyPickStepToward(m, tx, ty){
+    const ex=m.x|0, ey=m.y|0;
+    const opts=[{x:ex+1,y:ey},{x:ex-1,y:ey},{x:ex,y:ey+1},{x:ex,y:ey-1}].filter(p=>isFloor(p.x,p.y));
+    if(!opts.length) return null;
+
+    let best=opts[0], bestScore=1e9;
+    for(const o of opts){
+      const d=Math.hypot((o.x+0.5)-tx,(o.y+0.5)-ty);
+      const wob=(Math.random()-0.5)*0.25;
+      const score=d + wob;
+      if(score<bestScore){bestScore=score; best=o;}
+    }
+    return best;
+  }
+
+  function spawnMonsters(){
+    monsters = [];
+    const count = diff.monsters;
+    for (let i=0;i<count;i++){
+      const r = randomFloorFarFrom(player.x|0, player.y|0, 12 + i*2);
+      monsters.push({
+        x:r.x+0.5, y:r.y+0.5,
+        speed: (1.9 + Math.random()*0.7) * (0.95 + i*0.06),
+        aggression: diff.enemyAggro * (0.95 + Math.random()*0.18),
+        stun:0,
+        lastSeen:0,
+        stepCooldown:0,
+        targetTile:null,
+        seed: Math.random()*9999
+      });
+    }
+    statusDisplay.textContent = "STATUS: WATCHED";
+    statusDisplay.style.color = "#ff3344";
+  }
+
+  function updateMonsters(dt){
+    if (monsters.length===0 && collectedCount >= 1){
+      spawnMonsters();
+      audio?.click?.(1.0);
+    }
+    if (monsters.length===0) return;
+
+    let closest = 999;
+    for (const m of monsters){
+      const dx=player.x-m.x, dy=player.y-m.y;
+      const dist=Math.max(0.0001, Math.hypot(dx,dy));
+      closest = Math.min(closest, dist);
+
+      // fear audio uses closest monster
+      if (m.stun>0){ m.stun-=dt; continue; }
+
+      const sprinting = isDown("ShiftLeft");
+      const hearRadius = sprinting ? 8.0 : 4.8;
+
+      let targetX=m.x, targetY=m.y;
+      if (dist < hearRadius){
+        m.lastSeen = 1.3;
+        targetX = player.x; targetY = player.y;
+      } else if (m.lastSeen>0){
+        m.lastSeen -= dt;
+        targetX = m.x + (dx/dist)*1.0;
+        targetY = m.y + (dy/dist)*1.0;
+      } else {
+        const s = stains[(Math.random()*stains.length)|0];
+        targetX = s.x+0.5; targetY = s.y+0.5;
+      }
+
+      m.stepCooldown -= dt;
+      if (m.stepCooldown<=0 || !m.targetTile){
+        m.stepCooldown = 0.12 + Math.random()*0.18;
+        const step = enemyPickStepToward(m, targetX, targetY);
+        if (step) m.targetTile=step;
+      }
+
+      const spd = m.speed * m.aggression;
+      if (m.targetTile){
+        const cx=m.targetTile.x+0.5, cy=m.targetTile.y+0.5;
+        const mdx=cx-m.x, mdy=cy-m.y;
+        const md=Math.max(0.0001, Math.hypot(mdx,mdy));
+        m.x += (mdx/md) * spd * dt;
+        m.y += (mdy/md) * spd * dt;
+        if (md < 0.10) m.stepCooldown = 0;
+      }
+
+      // close attack (2 strikes total)
+      if (player.panicGrace>0) player.panicGrace -= dt;
+      if (dist < 0.62 && player.panicGrace<=0){
+        player.panicGrace = 0.85;
+        m.stun = 0.55;
+
+        globalAnxiety = Math.max(globalAnxiety, 22);
+        pushMessage(`DON'T LOOK, ${hero.name}`);
+        triggerFlash();
+
+        // shove back
+        player.x -= (dx/dist)*0.35;
+        player.y -= (dy/dist)*0.35;
+
+        player.panicHits += 1;
+        hero.oxygen = Math.max(0, hero.oxygen - 12);
+
+        if (player.panicHits >= 2){
+          alert("CAUGHT. RESETTING.");
+          generateLevel();
+          return;
+        }
+      }
+    }
+
+    // audio fear + face overlay
+    const fear = clamp(1 - closest/6, 0, 1);
+    audio?.setFear?.(fear);
+    maybeTriggerFaceOverlay(closest);
+  }
+
+  // ===== LEVEL GEN =====
+  function generateLevel(){
+    // randomize difficulty each run
+    diff = pick(DIFF_PRESETS);
+    diffLine.textContent = `RANDOM DIFFICULTY: ${diff.name} · monsters: ${diff.monsters} · oxygen drain: x${diff.oxygenDrain.toFixed(2)} · tasks: x${diff.taskMult.toFixed(2)}`;
+
+    // set hero based on role
+    hero.name = (nameInput.value || "UNKNOWN").trim().slice(0,18) || "UNKNOWN";
+    hero.role = chosenRole;
+    hero.maxOxygen = hero.role==="BUTCHER" ? 92 : hero.role==="KILLER" ? 96 : 100;
+    hero.oxygen = hero.maxOxygen;
+    hero.oxygenDrainBase = hero.role==="THIEF" ? 0.85 : hero.role==="KILLER" ? 0.95 : 1.00;
+    hero.stealth = hero.role==="THIEF" ? 0.90 : hero.role==="KILLER" ? 1.05 : 1.10; // affects hearing radius indirectly
+    hero.tint = hero.role==="THIEF" ? "#ccffcc" : hero.role==="KILLER" ? "#ff6677" : "#ffcc66";
+
+    lorePrompts = buildLorePrompts();
+
+    // maze
+    map = Array(ROWS).fill(0).map(()=>Array(COLS).fill(1));
+    const stack=[];
+    const start={x:1,y:1};
+    map[start.y][start.x]=0;
+    stack.push(start);
+
+    while(stack.length){
+      const c = stack[stack.length-1];
+      const dirs=[{dx:0,dy:-2},{dx:0,dy:2},{dx:-2,dy:0},{dx:2,dy:0}].sort(()=>Math.random()-0.5);
+      let carved=false;
+      for(const d of dirs){
+        const nx=c.x+d.dx, ny=c.y+d.dy;
+        if(nx>0&&nx<COLS-1&&ny>0&&ny<ROWS-1&&map[ny][nx]===1){
+          map[ny][nx]=0;
+          map[c.y+(d.dy/2)][c.x+(d.dx/2)]=0;
+          stack.push({x:nx,y:ny});
+          carved=true; break;
+        }
+      }
+      if(!carved) stack.pop();
+    }
+
+    stains=[];
+    for(let i=0;i<8;i++) stains.push(randomFloorFarFrom(1,1,4));
+
+    evidence=[];
+    while(evidence.length<TOTAL_EVIDENCE){
+      const r = randomFloorFarFrom(1,1,6);
+      if(evidence.some(o=>o.x===r.x && o.y===r.y)) continue;
+      evidence.push({x:r.x,y:r.y,collected:false,order:0});
+    }
+
+    // chests scale slightly with difficulty
+    const chestCount = CHESTS_BASE + (diff.name==="HELL" ? 1 : 0);
+    chests=[];
+    while(chests.length<chestCount){
+      const r = randomFloorFarFrom(1,1,5);
+      if(chests.some(c=>c.x===r.x && c.y===r.y)) continue;
+      if(evidence.some(o=>o.x===r.x && o.y===r.y)) continue;
+      chests.push({x:r.x,y:r.y,opened:false});
+    }
+
+    exit = randomFloorFarFrom(1,1,12);
+    exitLocked = true;
+
+    collectedCount=0;
+    messages=[];
+    globalAnxiety=0;
+
+    // player
+    player.x=1; player.y=1;
+    player.vx=0; player.vy=0;
+    player.panicHits=0; player.panicGrace=0;
+    player.sanity=100;
+
+    // monsters reset
+    monsters=[];
+    // mission reset
+    mission.active=false; mission.completed=false;
+    prompt.active=false;
+    pulse.active=false;
+    flash.active=false;
+    faceOverlay.active=false; faceOverlay.pickCooldown=0;
+
+    statusDisplay.style.color="#ccffcc";
+    statusDisplay.textContent="STATUS: ALONE";
+
+    pushMessage(`HELLO, ${hero.name}.`);
+    pushMessage(`ROLE: ${hero.role}.`);
+    pushMessage(`DIFFICULTY: ${diff.name}.`);
+
+    updateHUD();
+  }
+
+  // ===== PICKUPS =====
+  function openChest(ch){
+    ch.opened=true;
+    pushMessage(`CHEST OPENED BY ${hero.name}`);
+    audio?.click?.(1.0);
+    if (Math.random()<0.85) triggerFlash();
+
+    if (!mission.active && exitLocked){
+      setMission(generateRandomMission());
+    } else {
+      if (Math.random()<0.75) showPrompt(pick(lorePrompts));
+    }
+    updateHUD();
+  }
+
+  function collectEvidence(o){
+    if (mission.active && mission.type==="FOLLOW_ORDER"){
+      const needed=(mission.extra?.needed ?? 1);
+      if (o.order !== needed){
+        pushMessage("WRONG TIMELINE");
+        globalAnxiety=Math.max(globalAnxiety,18);
+        audio?.thump?.(1.0);
+        triggerFlash();
+        generateLevel();
+        return;
+      }
+      mission.extra.needed = needed + 1;
+      if (mission.extra.needed > TOTAL_EVIDENCE) completeMission();
+    }
+
+    o.collected=true;
+    collectedCount++;
+    pushMessage(`EVIDENCE FOUND: ${hero.name}`);
+    audio?.click?.(0.9);
+
+    // oxygen micro reward on thief (playstyle)
+    if (hero.role==="THIEF") hero.oxygen = Math.min(hero.maxOxygen, hero.oxygen + 3);
+
+    if (Math.random()<0.65) triggerFlash();
+    if (Math.random()<0.35) showPrompt(pick(lorePrompts));
+
+    updateHUD();
+  }
+
+  // ===== DRAW PLAYER (animated creepy) =====
+  function drawCreepyProtagonist(px, py, t){
+    // px/py are in pixels at tile coords
+    const wob = Math.sin(t*7.2) * 0.9;
+    const breathe = 1 + Math.sin(t*2.4) * 0.05;
+    const jitterX = (Math.random()-0.5)*0.6;
+    const jitterY = (Math.random()-0.5)*0.6;
+
+    // silhouette
+    ctx.save();
+    ctx.translate(px + jitterX, py + jitterY);
+    ctx.scale(1, breathe);
+
+    // body
+    ctx.fillStyle = "rgba(10,10,12,0.95)";
+    ctx.fillRect(-3, -6, 6, 10);
+
+    // “head”
+    ctx.fillStyle = "rgba(20,20,24,0.95)";
+    ctx.fillRect(-2, -10, 4, 4);
+
+    // role glow
+    ctx.globalCompositeOperation = "screen";
+    ctx.globalAlpha = 0.20;
+    ctx.fillStyle = hero.tint;
+    ctx.fillRect(-4, -11, 8, 16);
+
+    // eyes flicker
+    ctx.globalAlpha = 0.55 + 0.35*Math.sin(t*12.0 + wob);
+    ctx.fillStyle = hero.role==="KILLER" ? "rgba(255,60,90,1)" :
+                    hero.role==="BUTCHER" ? "rgba(255,180,90,1)" :
+                    "rgba(120,255,160,1)";
+    if (Math.random()<0.85){
+      ctx.fillRect(-1, -9, 1, 1);
+      ctx.fillRect(1, -9, 1, 1);
+    }
+
+    // trailing smear line (abstract)
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = "rgba(255,60,90,1)";
+    ctx.fillRect(-2 + wob, 4, 4, 1);
+
+    ctx.restore();
+  }
+
+  // ===== RENDER =====
   function render(){
-    ctx.fillStyle = "#050505";
+    ctx.fillStyle="#050505";
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
     const viewRadius = clamp(BASE_FOV - (globalAnxiety/5) + (pulse.active?2.5:0), MIN_FOV, MAX_FOV);
 
-    // draw tiles
+    // map
     for(let y=0;y<ROWS;y++){
       for(let x=0;x<COLS;x++){
-        const dist = Math.hypot((x+0.5)-player.x, (y+0.5)-player.y);
-
-        let vis = 0;
-        if (dist < viewRadius) {
-          vis = 1 - (dist/viewRadius);
-          vis = Math.pow(vis, 0.65);
+        const dist = Math.hypot((x+0.5)-player.x,(y+0.5)-player.y);
+        let vis=0;
+        if (dist<viewRadius){
+          vis=1-(dist/viewRadius);
+          vis=Math.pow(vis, 0.65);
         }
-        if (pulse.active && Math.abs(dist - pulse.t) < 1.5) {
-          vis += 0.5 * (1 - (Math.abs(dist - pulse.t)/1.5));
+        if (pulse.active && Math.abs(dist-pulse.t)<1.5){
+          vis += 0.5*(1-(Math.abs(dist-pulse.t)/1.5));
         }
-        if (vis <= 0.01) continue;
-        vis = clamp(vis, 0, 1);
+        if (vis<=0.01) continue;
+        vis = clamp(vis,0,1);
 
-        const sx = x*TILE_SIZE, sy = y*TILE_SIZE;
+        const sx=x*TILE_SIZE, sy=y*TILE_SIZE;
         ctx.save();
-        ctx.globalAlpha = vis;
+        ctx.globalAlpha=vis;
 
-        if (map[y][x] === 1) {
-          ctx.fillStyle = "#333";
+        if (map[y][x]===1){
+          ctx.fillStyle="#333";
           ctx.fillRect(sx,sy,TILE_SIZE,TILE_SIZE);
-          ctx.strokeStyle = "#1a1a1a";
+          ctx.strokeStyle="#1a1a1a";
           ctx.strokeRect(sx,sy,TILE_SIZE,TILE_SIZE);
         } else {
-          ctx.fillStyle = "#0a0a0a";
+          ctx.fillStyle="#0a0a0a";
           ctx.fillRect(sx,sy,TILE_SIZE,TILE_SIZE);
 
-          const st = stains.find(s=>s.x===x && s.y===y);
-          if (st){
-            // "blood-rust" shimmer
-            ctx.fillStyle = `rgba(${110+(Math.random()*60)}, 0, ${30+(Math.random()*50)}, 0.35)`;
-            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+          if (stains.some(s=>s.x===x && s.y===y)){
+            ctx.fillStyle=`rgba(${110+(Math.random()*60)},0,${30+(Math.random()*50)},0.35)`;
+            ctx.fillRect(sx,sy,TILE_SIZE,TILE_SIZE);
           }
         }
         ctx.restore();
       }
     }
 
-    // helper to draw objects
-    const drawObj = (ox, oy, color, shape) => {
-      const dist = Math.hypot((ox+0.5)-player.x, (oy+0.5)-player.y);
-      if (dist > viewRadius && !(pulse.active && Math.abs(dist-pulse.t)<1.5)) return;
-
-      const sx = ox*TILE_SIZE, sy = oy*TILE_SIZE;
-      ctx.fillStyle = color;
-
-      if (shape==="box"){
-        ctx.fillRect(sx+4, sy+4, 8, 8);
-      } else if (shape==="circle"){
-        ctx.beginPath(); ctx.arc(sx+8, sy+8, 4, 0, Math.PI*2); ctx.fill();
-      } else if (shape==="diamond"){
-        ctx.beginPath();
-        ctx.moveTo(sx+8, sy+2); ctx.lineTo(sx+14, sy+8);
-        ctx.lineTo(sx+8, sy+14); ctx.lineTo(sx+2, sy+8);
-        ctx.fill();
+    // objects helper
+    const drawObj=(ox,oy,color,shape)=>{
+      const dist=Math.hypot((ox+0.5)-player.x,(oy+0.5)-player.y);
+      if(dist>viewRadius && !(pulse.active && Math.abs(dist-pulse.t)<1.5)) return;
+      const sx=ox*TILE_SIZE, sy=oy*TILE_SIZE;
+      ctx.fillStyle=color;
+      if(shape==="box") ctx.fillRect(sx+4,sy+4,8,8);
+      if(shape==="circle"){ ctx.beginPath(); ctx.arc(sx+8,sy+8,4,0,Math.PI*2); ctx.fill(); }
+      if(shape==="diamond"){
+        ctx.beginPath(); ctx.moveTo(sx+8,sy+2); ctx.lineTo(sx+14,sy+8);
+        ctx.lineTo(sx+8,sy+14); ctx.lineTo(sx+2,sy+8); ctx.fill();
       }
     };
 
     // chests
-    chests.forEach(c => { if(!c.opened) drawObj(c.x,c.y,"#4488aa","box"); });
+    chests.forEach(c=>{ if(!c.opened) drawObj(c.x,c.y,"#4488aa","box"); });
 
     // evidence
-    evidence.forEach(o => {
-      if (o.collected) return;
+    evidence.forEach(o=>{
+      if(o.collected) return;
       const col = (mission.active && mission.type==="FOLLOW_ORDER")
         ? (["#ff2244","#ccff88","#88aaff"][o.order-1] || "#ddcc44")
         : "#ddcc44";
@@ -1381,186 +1231,354 @@
     });
 
     // exit
-    if (exit){
-      drawObj(exit.x, exit.y, exitLocked ? "#550000" : "#ffffff", "diamond");
-    }
+    if(exit) drawObj(exit.x, exit.y, exitLocked ? "#550000" : "#ffffff", "diamond");
 
-    // enemy (minimal sprite-ish)
-    if (enemy.active){
-      const dist = Math.hypot(enemy.x-player.x, enemy.y-player.y);
-      if (dist < viewRadius + 1.5){
-        const sx = enemy.x*TILE_SIZE - 6;
-        const sy = enemy.y*TILE_SIZE - 6;
-        const jx = (Math.random()-0.5)*2;
-        const jy = (Math.random()-0.5)*2;
+    // monsters (creepy image following player)
+    for (const m of monsters){
+      const dist=Math.hypot(m.x-player.x,m.y-player.y);
+      if(dist<viewRadius+1.5){
+        const sx=m.x*TILE_SIZE-8, sy=m.y*TILE_SIZE-8;
+        const jx=(Math.random()-0.5)*2, jy=(Math.random()-0.5)*2;
 
-        ctx.save();
-        ctx.globalAlpha = 0.65 + clamp(1 - dist/6, 0, 1)*0.25;
-        ctx.fillStyle = "rgba(255,60,90,0.25)";
-        ctx.fillRect(sx+jx, sy+jy, 12, 12);
-        ctx.fillStyle = "rgba(0,0,0,0.75)";
-        ctx.fillRect(sx+3+jx, sy+5+jy, 2, 1);
-        ctx.fillRect(sx+7+jx, sy+5+jy, 2, 1);
-        ctx.restore();
+        if (assets.monsterBody){
+          // distorted draw of your monster body image
+          ctx.save();
+          ctx.globalAlpha = 0.55 + clamp(1-dist/6,0,1)*0.35;
+          drawDistortedImage(assets.monsterBody, sx+jx, sy+jy, 16, 16, clamp(1-dist/6,0,1));
+          ctx.restore();
+        } else {
+          // procedural mini “creepy image”
+          ctx.save();
+          ctx.globalAlpha = 0.65 + clamp(1-dist/6,0,1)*0.25;
+          ctx.fillStyle="rgba(255,60,90,0.25)";
+          ctx.fillRect(sx+jx, sy+jy, 16, 16);
+          ctx.fillStyle="rgba(0,0,0,0.75)";
+          ctx.fillRect(sx+5+jx, sy+6+jy, 2, 1);
+          ctx.fillRect(sx+10+jx, sy+6+jy, 2, 1);
+          ctx.restore();
+        }
       }
     }
 
-    // player
-    ctx.fillStyle = "#eee";
-    ctx.fillRect(player.x*TILE_SIZE - 2, player.y*TILE_SIZE - 2, 4, 4);
+    // player (animated, creepy)
+    const t = performance.now()/1000;
+    drawCreepyProtagonist(player.x*TILE_SIZE, player.y*TILE_SIZE, t);
 
     // flash overlay
-    if (flash.active){
+    if(flash.active){
       ctx.save();
-      ctx.globalAlpha = flash.alpha * 0.85;
+      ctx.globalAlpha = flash.alpha*0.85;
       const img = flash.img || flash.procedural;
-      if (img) {
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      if(img){
+        ctx.imageSmoothingEnabled=false;
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
       }
       ctx.restore();
     }
 
-    // face overlay (distorted)
-    if (faceOverlay.active && faceOverlay.img){
-      const w = canvas.width;
-      const h = canvas.height;
-      const intensity = faceOverlay.intensity;
-
+    // face overlay
+    if(faceOverlay.active && faceOverlay.img){
       ctx.save();
       ctx.globalAlpha = faceOverlay.alpha;
-      drawDistortedImage(faceOverlay.img, 0, 0, w, h, intensity);
+      drawDistortedImage(faceOverlay.img, 0,0, canvas.width, canvas.height, faceOverlay.intensity);
       ctx.restore();
     }
 
     // pulse indicator
-    if (pulse.active){
-      const px = player.x*TILE_SIZE;
-      const py = player.y*TILE_SIZE;
-      ctx.strokeStyle = "rgba(255,60,90,0.35)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(px,py);
-      ctx.lineTo(px + pulse.dirX*28, py + pulse.dirY*28);
-      ctx.stroke();
+    if(pulse.active){
+      const px=player.x*TILE_SIZE, py=player.y*TILE_SIZE;
+      ctx.strokeStyle="rgba(255,60,90,0.35)";
+      ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px+pulse.dirX*28, py+pulse.dirY*28); ctx.stroke();
     }
 
     // noise + messages
     drawNoiseOverlay(globalAnxiety);
 
-    ctx.font = "14px VT323";
-    messages.forEach(m => {
-      ctx.fillStyle = m.color;
-      ctx.globalAlpha = Math.min(1, m.life/20);
+    ctx.font="14px VT323";
+    messages.forEach(m=>{
+      ctx.fillStyle=m.color;
+      ctx.globalAlpha=Math.min(1, m.life/22);
       ctx.fillText(m.text, m.x, m.y);
     });
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha=1;
 
-    // mission/prompt UI
-    if (prompt.active){
-      ctx.fillStyle = "rgba(0,0,0,0.85)";
-      ctx.fillRect(20, 160, 280, 70);
-      ctx.strokeStyle = "#ccffcc";
-      ctx.strokeRect(20, 160, 280, 70);
-
-      ctx.fillStyle = "#fff";
-      ctx.textAlign = "center";
+    // prompt box (center-bottom)
+    if(prompt.active){
+      ctx.fillStyle="rgba(0,0,0,0.85)";
+      ctx.fillRect(18, 160, 284, 72);
+      ctx.strokeStyle="#ccffcc";
+      ctx.strokeRect(18, 160, 284, 72);
+      ctx.fillStyle="#fff";
+      ctx.textAlign="center";
       ctx.fillText(prompt.text, 160, 180);
-
-      ctx.fillStyle = "#aaa";
-      ctx.fillText(prompt.a, 160, 200);
-      ctx.fillText(prompt.b, 160, 215);
-
-      ctx.fillStyle = "#ff2244";
-      ctx.fillRect(22, 226, (prompt.timer/6.5)*276, 2);
-      ctx.textAlign = "left";
-    }
-    else if (mission.active){
-      ctx.textAlign = "left";
-      ctx.fillStyle = "rgba(0,0,0,0.6)";
-      ctx.fillRect(5, 5, 165, 52);
-      ctx.fillStyle = "#ccffcc";
-      ctx.fillText(mission.title, 10, 20);
-
-      const pct = clamp(mission.progress / mission.goal, 0, 1);
-      ctx.fillStyle = "#444";
-      ctx.fillRect(10, 28, 120, 4);
-      ctx.fillStyle = "#ccffcc";
-      ctx.fillRect(10, 28, 120*pct, 4);
-
-      const lines = mission.desc.split('\n');
-      ctx.fillStyle = "#aaa";
-      if (lines[1]) ctx.fillText(lines[1], 10, 44);
-      ctx.fillStyle = "#ccffcc";
+      ctx.fillStyle="#aaa";
+      ctx.fillText(prompt.a, 160, 202);
+      ctx.fillText(prompt.b, 160, 218);
+      ctx.fillStyle="#ff2244";
+      ctx.fillRect(20, 228, (prompt.timer/6.5)*280, 2);
+      ctx.textAlign="left";
     }
   }
 
-  // =======================
-  // GAME LOOP (single RAF)
-  // =======================
+  // ===== UPDATE =====
+  let lastTime = performance.now();
+  let hudDimTimer = 0;
+
+  function update(dt){
+    // oxygen drain: harder diff + running + low sanity vibe
+    const sprinting = isDown("ShiftLeft");
+    const movingInput = (isDown("KeyW")||isDown("ArrowUp")||isDown("KeyS")||isDown("ArrowDown")||isDown("KeyA")||isDown("ArrowLeft")||isDown("KeyD")||isDown("ArrowRight"));
+    const runPenalty = sprinting ? 1.45 : 1.0;
+    const drain = hero.oxygenDrainBase * diff.oxygenDrain * runPenalty;
+    hero.oxygen = Math.max(0, hero.oxygen - drain * dt * 6.0);
+
+    audio?.setAir?.(hero.oxygen / hero.maxOxygen);
+
+    // if oxygen is 0, you “choke” = increased anxiety and slower accel
+    const choke = hero.oxygen <= 0.1;
+    if (choke){
+      globalAnxiety = Math.max(globalAnxiety, 16);
+      pushMessage(Math.random()<0.02 ? `${hero.name} CAN'T BREATHE` : "");
+    }
+
+    // prompt timer
+    if (prompt.active){
+      prompt.timer -= dt;
+      if (prompt.timer <= 0){
+        prompt.active=false;
+        pushMessage("NO RESPONSE");
+        globalAnxiety=Math.max(globalAnxiety,14);
+        monsters.forEach(m=>m.aggression*=1.03);
+      }
+    }
+
+    // smooth acceleration movement (fix stuck-feel)
+    let ix=0, iy=0;
+    if (isDown("KeyW")||isDown("ArrowUp")) iy -= 1;
+    if (isDown("KeyS")||isDown("ArrowDown")) iy += 1;
+    if (isDown("KeyA")||isDown("ArrowLeft")) ix -= 1;
+    if (isDown("KeyD")||isDown("ArrowRight")) ix += 1;
+
+    // dim hud when moving
+    if (movingInput) hudDimTimer = 0.25;
+    else hudDimTimer = Math.max(0, hudDimTimer - dt);
+    hudLeft.classList.toggle("dim", hudDimTimer > 0);
+
+    // normalize input
+    let tx=0, ty=0;
+    if (ix!==0 || iy!==0){
+      const len=Math.hypot(ix,iy) || 1;
+      tx=ix/len; ty=iy/len;
+    }
+
+    // target max speed
+    const runMult = sprinting ? RUN_MULT : 1.0;
+    const maxSpd = clamp(MAX_SPEED * runMult, 0, MAX_SPEED*1.7) * (choke ? 0.70 : 1.0);
+
+    // accel towards target
+    player.vx += tx * ACCEL * dt;
+    player.vy += ty * ACCEL * dt;
+
+    // friction when no input on an axis
+    if (Math.abs(tx) < INPUT_DEADZONE){
+      const s = Math.sign(player.vx);
+      player.vx -= s * FRICTION * dt;
+      if (Math.sign(player.vx) !== s) player.vx = 0;
+    }
+    if (Math.abs(ty) < INPUT_DEADZONE){
+      const s = Math.sign(player.vy);
+      player.vy -= s * FRICTION * dt;
+      if (Math.sign(player.vy) !== s) player.vy = 0;
+    }
+
+    // clamp speed
+    const sp = Math.hypot(player.vx, player.vy);
+    if (sp > maxSpd){
+      const k = maxSpd / sp;
+      player.vx *= k; player.vy *= k;
+    }
+
+    // move with axis separation + anti-wedge nudge
+    const oldX = player.x, oldY = player.y;
+
+    // X move
+    let nx = player.x + player.vx * dt;
+    if (!checkWall(nx, player.y)) player.x = nx;
+    else {
+      player.vx = 0;
+      // nudge attempt
+      if (!checkWall(player.x, player.y + 0.12)) player.y += 0.08;
+      else if (!checkWall(player.x, player.y - 0.12)) player.y -= 0.08;
+    }
+
+    // Y move
+    let ny = player.y + player.vy * dt;
+    if (!checkWall(player.x, ny)) player.y = ny;
+    else {
+      player.vy = 0;
+      if (!checkWall(player.x + 0.12, player.y)) player.x += 0.08;
+      else if (!checkWall(player.x - 0.12, player.y)) player.x -= 0.08;
+    }
+
+    // if somehow got embedded (rare), snap back
+    if (checkWall(player.x, player.y)){
+      player.x = oldX; player.y = oldY;
+      player.vx = 0; player.vy = 0;
+    }
+
+    const moving = (Math.abs(player.x-oldX) + Math.abs(player.y-oldY)) > 0.00001;
+
+    // anxiety dynamics
+    if (sprinting) globalAnxiety = Math.min(globalAnxiety + 0.35, 18);
+    else globalAnxiety = Math.max(globalAnxiety - 0.12, 0);
+
+    // mission
+    updateMission(dt, moving, sprinting);
+
+    // monsters
+    updateMonsters(dt);
+
+    // objective panning
+    const obj = getNearestObjective();
+    if (obj && audio){
+      const dx=(obj.x+0.5)-player.x;
+      audio.setObjectivePan(clamp(dx/6, -1, 1));
+    }
+
+    // stains effect
+    for(const s of stains){
+      const d=Math.hypot((s.x+0.5)-player.x,(s.y+0.5)-player.y);
+      if(d<1.0){
+        globalAnxiety=Math.max(globalAnxiety,8);
+        if (Math.random()<0.006) audio?.click?.(0.25);
+        if (Math.random()<0.005) pushMessage(`${hero.name}…`);
+        if (Math.random()<0.004) showPrompt(pick(lorePrompts));
+      }
+    }
+
+    // pickups
+    for(const c of chests){
+      if(c.opened) continue;
+      const d=Math.hypot((c.x+0.5)-player.x,(c.y+0.5)-player.y);
+      if(d<0.72) openChest(c);
+    }
+    for(const o of evidence){
+      if(o.collected) continue;
+      const d=Math.hypot((o.x+0.5)-player.x,(o.y+0.5)-player.y);
+      if(d<0.72) collectEvidence(o);
+    }
+
+    // exit logic
+    if (exit){
+      const d=Math.hypot((exit.x+0.5)-player.x,(exit.y+0.5)-player.y);
+      if(d<0.60){
+        if(exitLocked){
+          pushMessage("EXIT LOCKED");
+          globalAnxiety=Math.max(globalAnxiety,10);
+        } else {
+          // win -> next depth (new run)
+          pushMessage("DESCENDING…");
+          generateLevel();
+        }
+      }
+    }
+
+    // pulse
+    if(pulse.active){
+      pulse.t += dt*12;
+      if(pulse.t>25) pulse.active=false;
+    }
+
+    // flash
+    if(flash.active){
+      flash.t += dt;
+      if (flash.t < flash.dur*0.2) flash.alpha = flash.t/(flash.dur*0.2);
+      else flash.alpha = 1 - (flash.t - flash.dur*0.2)/(flash.dur*0.8);
+      if (flash.t>=flash.dur){ flash.active=false; flash.alpha=0; }
+    }
+
+    // face overlay
+    if (faceOverlay.pickCooldown>0) faceOverlay.pickCooldown -= 1;
+    if (faceOverlay.active){
+      faceOverlay.t += dt;
+      const a = Math.sin(Math.min(1, faceOverlay.t/faceOverlay.dur)*Math.PI);
+      faceOverlay.alpha = 0.25 + a*0.65;
+      if (faceOverlay.t>=faceOverlay.dur){ faceOverlay.active=false; faceOverlay.alpha=0; }
+    }
+
+    // messages decay
+    for(let i=messages.length-1;i>=0;i--){
+      messages[i].life -= 1;
+      if(messages[i].life<=0) messages.splice(i,1);
+    }
+
+    updateHUD();
+
+    // lose condition (oxygen depleted too long): soft reset
+    if (hero.oxygen <= 0 && Math.random() < 0.0025){
+      alert(`${hero.name} BLACKED OUT.`);
+      generateLevel();
+    }
+  }
+
+  // ===== LOOP =====
   function frame(){
-    const now = performance.now();
-    const dt = Math.min(0.05, (now - lastTime)/1000);
-    lastTime = now;
+    const now=performance.now();
+    const dt=Math.min(0.05, (now-lastTime)/1000);
+    lastTime=now;
 
     if (gameStarted){
-      // reduce fear bugs: if dt spikes, it still moves correctly
       update(dt);
       render();
     } else {
-      // idle preview
-      ctx.fillStyle="#000";
-      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle="#000"; ctx.fillRect(0,0,canvas.width,canvas.height);
       drawNoiseOverlay(8);
     }
 
     requestAnimationFrame(frame);
   }
 
-  // =======================
-  // START FLOW (fixed)
-  // =======================
-  function requestStart(){
+  // ===== START FLOW =====
+  async function requestStart(){
     startRequested = true;
 
-    // visual feedback
-    loreLine1.textContent = runLore.line1;
-    loreLine2.textContent = runLore.line2;
-    loreLine3.textContent = runLore.line3;
+    // if assets still loading, give immediate feedback
+    statusDisplay.textContent = "STATUS: INITIALIZING";
+    statusDisplay.style.color = "#ccffcc";
 
-    // If ready -> start immediately; else overlay shows "loading" and will start once ready.
     if (assetsReady) startGame();
+    else {
+      // unlock audio on first user gesture anyway (so it starts instantly once ready)
+      await ensureAudioRunning();
+    }
   }
 
   async function startGame(){
     if (gameStarted) return;
-    gameStarted = true;
 
-    startOverlay.style.display = "none";
-    statusDisplay.textContent = "STATUS: CONNECTED";
-    statusDisplay.style.color = "#ccffcc";
+    // personalization fallback
+    if (!nameInput.value.trim()) nameInput.value = "UNKNOWN";
 
+    startOverlay.style.display="none";
     await ensureAudioRunning();
 
-    // rebuild prompts each start (fresh + lore)
-    lorePrompts = buildLorePrompts();
-
     generateLevel();
+    gameStarted=true;
+    pushMessage(`RUN STARTED: ${hero.name}`);
   }
 
-  // Boot UI lore lines
-  loreLine1.textContent = runLore.line1;
-  loreLine2.textContent = runLore.line2;
-  loreLine3.textContent = runLore.line3;
+  // ===== INIT =====
+  // random difficulty preview (will re-roll at level start too)
+  diff = pick(DIFF_PRESETS);
+  diffLine.textContent = `RANDOM DIFFICULTY: ${diff.name} (rerolls on start)`;
 
-  // Start loading assets immediately
   loadAssets();
-
-  // Start animation loop once (never spawn multiple loops)
   frame();
 
 })();
 </script>
 </body>
 </html>
+
 
