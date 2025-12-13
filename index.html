@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Fog Maze: Static Exit</title>
+  <style>
+    :root{
+      --bg:#070808;
+      --frame:#0f1311;
+      --text:#b7c0ba;
+      --accent:#b10c1a;
+    }
+    html,body{height:100%; margin:0; background:var(--bg); color:var(--text); font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+    .wrap{height:100%; display:grid; place-items:center;}
+    .crt{
+      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(0,0,0,.02));
+      padding:14px;
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:14px;
+      box-shadow:0 18px 60px rgba(0,0,0,.7);
+    }
+    canvas{
+      width:min(92vw, 960px);
+      aspect-ratio: 4/3;
+      background: #000;
+      display:block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      border-radius:10px;
+      outline:1px solid rgba(255,255,255,.08);
+    }
+    .hud{display:flex; justify-content:space-between; gap:12px; margin-top:10px; font-size:12px; opacity:.9}
+    .hud b{color:#d7e1db}
+    .hint{opacity:.75}
+    .badge{color:var(--accent)}
+    .btn{
+      background:transparent;
+      color:var(--text);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:10px;
+      padding:6px 10px;
+      cursor:pointer;
+    }
+    .btn:hover{border-color:rgba(255,255,255,.25)}
+    .btn:active{transform:translateY(1px)}
+    .small{opacity:.75}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="crt">
+      <canvas id="c" width="320" height="240" aria-label="Fog Maze"></canvas>
+      <div class="hud">
+        <div>
+          <div><b>FOG MAZE</b> <span class="badge">// STATIC EXIT</span></div>
+          <div class="hint">WASD / Arrows to move · <span class="small">Click canvas to enable audio</span></div>
+        </div>
+        <div style="text-align:right">
+          <button id="restart" class="btn" title="New maze">NEW</button>
+          <div class="small" id="status">…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ====== Canvas (low-res, scaled up by CSS) ======
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const W = canvas.width|0, H = canvas.height|0;
+
+  // ====== Palette (dull greens/browns/blacks + saturated red) ======
+  const PAL = {
+    void:   '#040505',
+    fog:    '#0b1511',
+    floor:  '#182018',
+    floor2: '#141b16',
+    wall:   '#2a2c23',
+    wall2:  '#1f221c',
+    trim:   '#0d0f0e',
+    red:    '#b10c1a',
+    ui:     '#c9d2cc'
+  };
+
+  // ====== Input ======
+  const keys = new Set();
+  addEventListener('keydown', e => { keys.add(e.key.toLowerCase()); if(["arrowup","arrowdown","arrowleft","arrowright"].includes(e.key.toLowerCase())) e.preventDefault(); }, {passive:false});
+  addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+
+  // ====== RNG (seeded) ======
+  function xmur3(str){
+    let h = 1779033703 ^ str.length;
+    for (let i=0; i<str.length; i++) {
+      h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+      h = (h << 13) | (h >>> 19);
+    }
+    return function(){
+      h = Math.imul(h ^ (h >>> 16), 2246822507);
+      h = Math.imul(h ^ (h >>> 13), 3266489909);
+      return (h ^= (h >>> 16)) >>> 0;
+    };
+  }
+  function sfc32(a,b,c,d){
+    return function(){
+      a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0;
+      let t = (a + b) | 0;
+      a = b ^ (b >>> 9);
+      b = (c + (c << 3)) | 0;
+      c = (c << 21) | (c >>> 11);
+      d = (d + 1) | 0;
+      t = (t + d) | 0;
+      c = (c + t) | 0;
+      return (t >>> 0) / 4294967296;
+    };
+  }
+
+  // ====== Maze generation (perfect maze) ======
+  // Cells are in a grid; walls stored per cell.
+  const MAZE = { w: 23, h: 17, cells: null }; // tuned for 320x240 + chunkiness
+
+  function makeMaze(rng){
+    const w = MAZE.w, h = MAZE.h;
+    const cells = new Array(w*h);
+    for(let i=0;i<w*h;i++){
+      cells[i] = { v:false, n:1, e:1, s:1, w:1 }; // 1 = wall present
+    }
+    const idx = (x,y)=>y*w+x;
+    const stack = [];
+    let cx = (rng()*w)|0, cy = (rng()*h)|0;
+    cells[idx(cx,cy)].v = true;
+    stack.push([cx,cy]);
+
+    const dirs = [
+      [0,-1,'n','s'],
+      [1,0,'e','w'],
+      [0,1,'s','n'],
+      [-1,0,'w','e']
+    ];
+
+    while(stack.length){
+      const [x,y] = stack[stack.length-1];
+      // collect unvisited neighbors
+      const opts = [];
+      for(const [dx,dy,here,there] of dirs){
+        const nx=x+dx, ny=y+dy;
+        if(nx<0||ny<0||nx>=w||ny>=h) continue;
+        const c = cells[idx(nx,ny)];
+        if(!c.v) opts.push([nx,ny,here,there]);
+      }
+      if(!opts.length){
+        stack.pop();
+        continue;
+      }
+      const pick = opts[(rng()*opts.length)|0];
+      const [nx,ny,here,there] = pick;
+      // carve
+      cells[idx(x,y)][here]=0;
+      cells[idx(nx,ny)][there]=0;
+      cells[idx(nx,ny)].v = true;
+      stack.push([nx,ny]);
+    }
+
+    // Choose start and exit far apart.
+    const start = { x:(rng()*w)|0, y:(rng()*h)|0 };
+    // find farthest by random sampling (cheap & good enough)
+    let exit = { x:start.x, y:start.y };
+    let best = -1;
+    for(let i=0;i<60;i++){
+      const ex=(rng()*w)|0, ey=(rng()*h)|0;
+      const d = (ex-start.x)*(ex-start.x) + (ey-start.y)*(ey-start.y);
+      if(d>best){ best=d; exit={x:ex,y:ey}; }
+    }
+
+    // Ensure exit isn't same as start
+    if(exit.x===start.x && exit.y===start.y){ exit.x=(exit.x+1)%w; }
+
+    // Small chance to add a few loops (slightly less predictable)
+    const loopCount = 2 + ((rng()*4)|0);
+    for(let i=0;i<loopCount;i++){
+      const x=(rng()*w)|0, y=(rng()*h)|0;
+      const d = dirs[(rng()*dirs.length)|0];
+      const nx=x+d[0], ny=y+d[1];
+      if(nx<0||ny<0||nx>=w||ny>=h) continue;
+      const c = cells[idx(x,y)];
+      c[d[2]] = 0;
+      cells[idx(nx,ny)][d[3]] = 0;
+    }
+
+    // Clear visit flags
+    for(const c of cells) c.v=false;
+
+    return { w, h, cells, start, exit };
+  }
+
+  function canMove(maze, x,y, dir){
+    const {w,cells} = maze;
+    const i = (y*w+x)|0;
+    const c = cells[i];
+    if(dir==='n') return c.n===0;
+    if(dir==='e') return c.e===0;
+    if(dir==='s') return c.s===0;
+    if(dir==='w') return c.w===0;
+    return false;
+  }
+
+  // ====== Game State ======
+  let seed, rng, maze;
+  let player, stalker, time=0;
+  let winFlash=0;
+
+  const TILE = 14;         // screen tile size in pixels (low-res)
+  const VIEW_R = 4.3;      // visible radius in tiles
+
+  function reset(newSeed){
+    seed = newSeed ?? (Date.now().toString(16) + Math.random().toString(16).slice(2));
+    const gen = xmur3(seed);
+    rng = sfc32(gen(), gen(), gen(), gen());
+    maze = makeMaze(rng);
+
+    player = {
+      cx: maze.start.x,
+      cy: maze.start.y,
+      x: maze.start.x + 0.5,
+      y: maze.start.y + 0.5,
+      vx: 0,
+      vy: 0,
+      speed: 2.9, // cells per second
+      bob: 0,
+    };
+
+    stalker = {
+      x: ((rng()*maze.w)|0)+0.5,
+      y: ((rng()*maze.h)|0)+0.5,
+      tx: 0, ty: 0,
+      cooldown: 0,
+      panic: 0,
+    };
+
+    time = 0;
+    winFlash = 0;
+    uiStatus(`seed ${seed.slice(0,8)} · find the exit`);
+  }
+
+  // ====== Audio (procedural ambience) ======
+  let audio = null;
+  function initAudio(){
+    if(audio) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ac = new AC();
+
+    // Master
+    const master = ac.createGain();
+    master.gain.value = 0.55;
+    master.connect(ac.destination);
+
+    // Static noise
+    const noiseBuf = ac.createBuffer(1, ac.sampleRate * 1.0, ac.sampleRate);
+    {
+      const data = noiseBuf.getChannelData(0);
+      for(let i=0;i<data.length;i++){
+        // pink-ish-ish: integrate white noise lightly
+        const w = (Math.random()*2-1);
+        data[i] = w * 0.35;
+      }
+    }
+    const noise = ac.createBufferSource();
+    noise.buffer = noiseBuf;
+    noise.loop = true;
+
+    const noiseFilter = ac.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.value = 1200;
+    noiseFilter.Q.value = 0.8;
+
+    const noiseGain = ac.createGain();
+    noiseGain.gain.value = 0.02;
+
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(master);
+    noise.start();
+
+    // Wind (low filtered noise)
+    const wind = ac.createBufferSource();
+    wind.buffer = noiseBuf;
+    wind.loop = true;
+
+    const windFilter = ac.createBiquadFilter();
+    windFilter.type = 'lowpass';
+    windFilter.frequency.value = 220;
+    windFilter.Q.value = 0.6;
+
+    const windGain = ac.createGain();
+    windGain.gain.value = 0.045;
+
+    const windLFO = ac.createOscillator();
+    windLFO.type = 'sine';
+    windLFO.frequency.value = 0.08;
+    const windLFOGain = ac.createGain();
+    windLFOGain.gain.value = 120;
+    windLFO.connect(windLFOGain);
+    windLFOGain.connect(windFilter.frequency);
+
+    wind.connect(windFilter);
+    windFilter.connect(windGain);
+    windGain.connect(master);
+    wind.start();
+    windLFO.start();
+
+    // Distant siren (detuned triangle with slow vibrato)
+    const siren = ac.createOscillator();
+    siren.type = 'triangle';
+    siren.frequency.value = 220;
+
+    const sirenGain = ac.createGain();
+    sirenGain.gain.value = 0.0; // mostly off, fades in/out unpredictably
+
+    const sirenFilter = ac.createBiquadFilter();
+    sirenFilter.type = 'lowpass';
+    sirenFilter.frequency.value = 680;
+    sirenFilter.Q.value = 0.7;
+
+    const vib = ac.createOscillator();
+    vib.type = 'sine';
+    vib.frequency.value = 0.18;
+    const vibGain = ac.createGain();
+    vibGain.gain.value = 18;
+    vib.connect(vibGain);
+    vibGain.connect(siren.frequency);
+
+    siren.connect(sirenFilter);
+    sirenFilter.connect(sirenGain);
+    sirenGain.connect(master);
+    siren.start();
+    vib.start();
+
+    // Glitch clicker (short bursts)
+    const clickGain = ac.createGain();
+    clickGain.gain.value = 0.0;
+    clickGain.connect(master);
+
+    // helper for short click
+    function blip(intensity){
+      const t = ac.currentTime;
+      const osc = ac.createOscillator();
+      osc.type = 'square';
+      osc.frequency.value = 180 + Math.random()*1200;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.08*intensity, t+0.002);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.05);
+      osc.connect(g);
+      g.connect(clickGain);
+      osc.start(t);
+      osc.stop(t+0.06);
+    }
+
+    // Non-repeating modulation loop
+    function modTick(){
+      const t = ac.currentTime;
+      // Slowly wander noise band
+      noiseFilter.frequency.setTargetAtTime(900 + Math.random()*1300, t, 1.8);
+      // Occasionally breathe the siren
+      if(Math.random() < 0.15){
+        const peak = 0.006 + Math.random()*0.02;
+        sirenGain.gain.cancelScheduledValues(t);
+        sirenGain.gain.setValueAtTime(sirenGain.gain.value, t);
+        sirenGain.gain.linearRampToValueAtTime(peak, t+2.0+Math.random()*2.0);
+        sirenGain.gain.linearRampToValueAtTime(0.0, t+7.0+Math.random()*4.0);
+      }
+      setTimeout(modTick, 1400 + Math.random()*1800);
+    }
+    setTimeout(modTick, 800);
+
+    audio = {
+      ac,
+      master,
+      noiseGain,
+      noiseFilter,
+      windGain,
+      sirenGain,
+      siren,
+      vibGain,
+      blip,
+      setFear(f){
+        // f in [0..1] based on stalker proximity
+        const t = ac.currentTime;
+        const nf = 1200 + f*1500;
+        noiseFilter.frequency.setTargetAtTime(nf, t, 0.08);
+        noiseGain.gain.setTargetAtTime(0.02 + f*0.14, t, 0.06);
+        windGain.gain.setTargetAtTime(0.04 + f*0.08, t, 0.12);
+        vibGain.gain.setTargetAtTime(18 + f*55, t, 0.2);
+        siren.detune.setTargetAtTime((-40 + f*120) * (Math.random()<0.5?-1:1), t, 0.3);
+      }
+    };
+
+    uiStatus('audio online · keep moving');
+  }
+
+  canvas.addEventListener('pointerdown', async () => {
+    initAudio();
+    if(audio?.ac?.state === 'suspended') await audio.ac.resume();
+  });
+
+  // ====== Rendering helpers ======
+  function clamp(v,a,b){ return v<a?a : v>b?b : v; }
+  function lerp(a,b,t){ return a+(b-a)*t; }
+
+  // Low-res noise overlay (generated each frame, cheap)
+  const noiseImg = ctx.createImageData(W,H);
+  const noiseData = noiseImg.data;
+  function fillNoise(intensity){
+    // intensity 0..1
+    const amt = 10 + intensity*70;
+    for(let i=0;i<noiseData.length;i+=4){
+      const n = (Math.random()*amt)|0;
+      noiseData[i]=n; noiseData[i+1]=n; noiseData[i+2]=n; noiseData[i+3]=255;
+    }
+  }
+
+  // ====== Game logic ======
+  function step(dt){
+    time += dt;
+
+    // Movement intent
+    let ix=0, iy=0;
+    const up = keys.has('w') || keys.has('arrowup');
+    const dn = keys.has('s') || keys.has('arrowdown');
+    const lf = keys.has('a') || keys.has('arrowleft');
+    const rt = keys.has('d') || keys.has('arrowright');
+    if(up) iy -= 1;
+    if(dn) iy += 1;
+    if(lf) ix -= 1;
+    if(rt) ix += 1;
+
+    // keep diagonal from being faster
+    const mag = Math.hypot(ix,iy) || 1;
+    ix /= mag; iy /= mag;
+
+    player.vx = ix * player.speed;
+    player.vy = iy * player.speed;
+
+    // Attempt movement with wall collisions in cell grid
+    const px = player.x, py = player.y;
+    const nx = px + player.vx*dt;
+    const ny = py + player.vy*dt;
+
+    // collide by checking edges between cells (simple & stable)
+    let fx = nx, fy = ny;
+    const cx = Math.floor(px), cy = Math.floor(py);
+
+    // X axis
+    if(nx !== px){
+      const dir = nx>px ? 'e' : 'w';
+      const nextCellX = Math.floor(nx);
+      const curCellX = Math.floor(px);
+      const cellY = Math.floor(py);
+      if(nextCellX !== curCellX){
+        // crossing a cell boundary
+        const ok = canMove(maze, curCellX, cellY, dir);
+        if(!ok){
+          fx = dir==='e' ? (curCellX + 0.98) : (curCellX + 0.02);
+        }
+      }
+    }
+
+    // Y axis
+    if(ny !== py){
+      const dir = ny>py ? 's' : 'n';
+      const nextCellY = Math.floor(ny);
+      const curCellY = Math.floor(py);
+      const cellX = Math.floor(fx);
+      if(nextCellY !== curCellY){
+        const ok = canMove(maze, cellX, curCellY, dir);
+        if(!ok){
+          fy = dir==='s' ? (curCellY + 0.98) : (curCellY + 0.02);
+        }
+      }
+    }
+
+    player.x = clamp(fx, 0.02, maze.w-0.02);
+    player.y = clamp(fy, 0.02, maze.h-0.02);
+    player.cx = Math.floor(player.x);
+    player.cy = Math.floor(player.y);
+    player.bob += (Math.abs(player.vx)+Math.abs(player.vy))*dt;
+
+    // Exit check
+    if(player.cx === maze.exit.x && player.cy === maze.exit.y){
+      winFlash = Math.min(1, winFlash + dt*0.7);
+      if(winFlash > 0.95){
+        uiStatus('exit found · the fog resets');
+        reset();
+      }
+    } else {
+      winFlash = Math.max(0, winFlash - dt*0.8);
+    }
+
+    // Stalker behavior: wanders, but subtly biases toward player
+    stalker.cooldown -= dt;
+    if(stalker.cooldown <= 0){
+      stalker.cooldown = 0.35 + rng()*0.65;
+      const sx = Math.floor(stalker.x), sy = Math.floor(stalker.y);
+      // pick a legal direction; sometimes prefer toward player
+      const dirs = [];
+      if(canMove(maze,sx,sy,'n')) dirs.push([0,-1,'n']);
+      if(canMove(maze,sx,sy,'e')) dirs.push([1,0,'e']);
+      if(canMove(maze,sx,sy,'s')) dirs.push([0,1,'s']);
+      if(canMove(maze,sx,sy,'w')) dirs.push([-1,0,'w']);
+      if(dirs.length){
+        let best = dirs[(rng()*dirs.length)|0];
+        if(rng() < 0.62){
+          let bestScore = -1e9;
+          for(const d of dirs){
+            const nx = sx + d[0], ny = sy + d[1];
+            const score = -((nx-player.cx)*(nx-player.cx) + (ny-player.cy)*(ny-player.cy)) + (rng()-0.5)*2;
+            if(score>bestScore){ bestScore=score; best=d; }
+          }
+        }
+        stalker.tx = sx + best[0] + 0.5;
+        stalker.ty = sy + best[1] + 0.5;
+      }
+    }
+    // move stalker toward target
+    const dx = stalker.tx - stalker.x;
+    const dy = stalker.ty - stalker.y;
+    const d = Math.hypot(dx,dy);
+    if(d>0.001){
+      const sp = 2.2; // slightly slower than player
+      stalker.x += (dx/d)*sp*dt;
+      stalker.y += (dy/d)*sp*dt;
+    }
+
+    // Fear based on proximity
+    const dist = Math.hypot((stalker.x-player.x), (stalker.y-player.y));
+    const fear = clamp(1 - (dist/6.0), 0, 1); // ~6 cells range
+    stalker.panic = lerp(stalker.panic, fear, 1 - Math.pow(0.001, dt));
+
+    // Audio feedback
+    if(audio) audio.setFear(stalker.panic);
+
+    // Occasional blips when close
+    if(audio && stalker.panic > 0.55 && rng() < (0.8*stalker.panic*dt)){
+      audio.blip(stalker.panic);
+    }
+
+    // UI hint if audio not enabled
+    if(!audio && (time%4.0) < dt){
+      uiStatus('click canvas to enable audio');
+    }
+
+    // Screen glitch trigger
+    glitch.level = lerp(glitch.level, stalker.panic, 1 - Math.pow(0.0005, dt));
+    if(stalker.panic > 0.72 && rng() < 0.65*dt){
+      glitch.kick = 1.0;
+    } else {
+      glitch.kick = Math.max(0, glitch.kick - dt*2.0);
+    }
+  }
+
+  // ====== Glitch FX ======
+  const glitch = { level: 0, kick: 0, jitter: 0 };
+
+  function render(){
+    // camera centered on player
+    const camX = player.x*TILE;
+    const camY = player.y*TILE;
+    const ox0 = (W/2) - camX;
+    const oy0 = (H/2) - camY;
+
+    // jitter when panicked
+    const j = (glitch.level*glitch.level) * (0.9 + glitch.kick*1.7);
+    const jx = (rng()*2-1)*j*3;
+    const jy = (rng()*2-1)*j*2;
+
+    // background
+    ctx.fillStyle = PAL.void;
+    ctx.fillRect(0,0,W,H);
+
+    // floor fill
+    ctx.fillStyle = PAL.floor;
+    ctx.fillRect(0,0,W,H);
+
+    // draw a tiled floor pattern (cheap)
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = PAL.floor2;
+    for(let y=0;y<H;y+=6){
+      const wob = ((y*13 + (time*30)|0) % 17);
+      for(let x=(wob%6); x<W; x+=12){
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // Determine visible cell bounds
+    const px = player.x, py = player.y;
+    const minX = Math.max(0, Math.floor(px - VIEW_R) - 1);
+    const maxX = Math.min(maze.w-1, Math.floor(px + VIEW_R) + 1);
+    const minY = Math.max(0, Math.floor(py - VIEW_R) - 1);
+    const maxY = Math.min(maze.h-1, Math.floor(py + VIEW_R) + 1);
+
+    // walls
+    for(let y=minY;y<=maxY;y++){
+      for(let x=minX;x<=maxX;x++){
+        const i = y*maze.w+x;
+        const c = maze.cells[i];
+        const sx = ox0 + x*TILE + jx;
+        const sy = oy0 + y*TILE + jy;
+
+        // distance fog factor per cell center
+        const dc = Math.hypot((x+0.5)-px,(y+0.5)-py);
+        const vis = clamp(1 - (dc/VIEW_R), 0, 1);
+        if(vis<=0.02) continue;
+
+        const shade = (x*928371 + y*19283) & 1;
+        ctx.globalAlpha = 0.85 * (0.35 + vis*0.65);
+        ctx.fillStyle = shade ? PAL.wall : PAL.wall2;
+
+        // draw walls as thick borders
+        const thick = 3;
+        if(c.n){ ctx.fillRect(sx, sy, TILE, thick); }
+        if(c.w){ ctx.fillRect(sx, sy, thick, TILE); }
+        if(c.e){ ctx.fillRect(sx+TILE-thick, sy, thick, TILE); }
+        if(c.s){ ctx.fillRect(sx, sy+TILE-thick, TILE, thick); }
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // exit door (procedurally placed) - only reveals when near
+    {
+      const ex = maze.exit.x + 0.5;
+      const ey = maze.exit.y + 0.5;
+      const d = Math.hypot(ex-px, ey-py);
+      const reveal = clamp(1 - (d/(VIEW_R+0.6)), 0, 1);
+      if(reveal>0.1){
+        const sx = ox0 + (maze.exit.x*TILE) + jx;
+        const sy = oy0 + (maze.exit.y*TILE) + jy;
+        ctx.globalAlpha = 0.25 + reveal*0.75;
+        ctx.fillStyle = PAL.red;
+        // door mark: a vertical slit with a tiny highlight
+        ctx.fillRect(sx + TILE/2 - 1, sy + 3, 2, TILE-6);
+        ctx.globalAlpha = 0.15 + reveal*0.25;
+        ctx.fillStyle = '#f0c0c8';
+        ctx.fillRect(sx + TILE/2 + 1, sy + 5, 1, TILE-10);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // player (simple shape)
+    {
+      const sx = W/2 + jx;
+      const sy = H/2 + jy + Math.sin(player.bob*3.2)*0.6;
+      ctx.fillStyle = PAL.trim;
+      ctx.fillRect((sx-3)|0, (sy-3)|0, 7, 7);
+      ctx.fillStyle = PAL.ui;
+      ctx.fillRect((sx-2)|0, (sy-2)|0, 5, 5);
+      ctx.fillStyle = PAL.red;
+      ctx.fillRect((sx+1)|0, (sy-1)|0, 1, 2);
+    }
+
+    // fog overlay (dense, draw distance)
+    {
+      // base fog blanket
+      ctx.globalAlpha = 0.88;
+      ctx.fillStyle = PAL.fog;
+      ctx.fillRect(0,0,W,H);
+
+      // carve visibility circle using destination-out
+      ctx.globalCompositeOperation = 'destination-out';
+      const r = VIEW_R*TILE;
+      const g = ctx.createRadialGradient(W/2, H/2, r*0.2, W/2, H/2, r);
+      g.addColorStop(0.0, 'rgba(0,0,0,0.92)');
+      g.addColorStop(0.55, 'rgba(0,0,0,0.55)');
+      g.addColorStop(1.0, 'rgba(0,0,0,0.0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(W/2, H/2, r, 0, Math.PI*2);
+      ctx.fill();
+
+      // restore
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
+
+    // subtle vignette
+    {
+      const v = ctx.createRadialGradient(W/2,H/2,10, W/2,H/2, Math.max(W,H)*0.72);
+      v.addColorStop(0,'rgba(0,0,0,0)');
+      v.addColorStop(1,'rgba(0,0,0,0.55)');
+      ctx.fillStyle = v;
+      ctx.fillRect(0,0,W,H);
+    }
+
+    // glitch/static overlay when stalker is close
+    {
+      const g = clamp(glitch.level*0.9 + glitch.kick*0.6, 0, 1);
+      if(g > 0.02){
+        fillNoise(g);
+        ctx.globalAlpha = 0.06 + g*0.18;
+        ctx.putImageData(noiseImg, 0, 0);
+
+        // scanline tear
+        if(g > 0.2 && rng() < 0.35 + glitch.kick*0.5){
+          const y = (rng()*H)|0;
+          const h = 2 + ((rng()*10)|0);
+          const dx = ((rng()*2-1) * (8 + g*22))|0;
+          ctx.globalAlpha = 0.15 + g*0.25;
+          ctx.drawImage(canvas, 0, y, W, h, dx, y, W, h);
+        }
+
+        // chroma-ish offset (fake)
+        if(g > 0.35){
+          ctx.globalAlpha = 0.08 + g*0.12;
+          ctx.globalCompositeOperation = 'screen';
+          ctx.drawImage(canvas, 0, 0, W, H, (rng()*2-1)*g*2, (rng()*2-1)*g*1, W, H);
+          ctx.globalCompositeOperation = 'source-over';
+        }
+
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // win flash (a sickly red pulse)
+    if(winFlash>0){
+      ctx.globalAlpha = winFlash*0.55;
+      ctx.fillStyle = PAL.red;
+      ctx.fillRect(0,0,W,H);
+      ctx.globalAlpha = 1;
+    }
+
+    // tiny corner HUD
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    ctx.fillRect(6,6, 140, 16);
+    ctx.fillStyle = PAL.ui;
+    ctx.font = '10px ui-monospace, monospace';
+    const fearPct = Math.round(glitch.level*100);
+    const txt = `x:${player.cx},y:${player.cy}  signal:${fearPct}%`;
+    ctx.fillText(txt, 10, 18);
+  }
+
+  // ====== Main loop ======
+  let last = performance.now();
+  let acc = 0;
+  const FIXED = 1/60;
+
+  function frame(now){
+    const dt = Math.min(0.05, (now-last)/1000);
+    last = now;
+    acc += dt;
+    while(acc >= FIXED){
+      step(FIXED);
+      acc -= FIXED;
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  // ====== UI ======
+  const statusEl = document.getElementById('status');
+  function uiStatus(s){ statusEl.textContent = s; }
+  document.getElementById('restart').addEventListener('click', () => reset());
+
+  // Prevent key scrolling in some browsers
+  addEventListener('keydown', (e)=>{
+    const k=e.key.toLowerCase();
+    if([" ","arrowup","arrowdown","arrowleft","arrowright"].includes(k)) e.preventDefault();
+  }, {passive:false});
+
+  // Boot
+  reset();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
