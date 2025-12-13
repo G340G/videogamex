@@ -7,218 +7,189 @@
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 
   <style>
-    body {
-      background-color: #050505;
-      color: #a8b5b2;
-      font-family: 'VT323', monospace;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-      overflow: hidden;
-      user-select: none;
+    body{
+      background:#050505;color:#a8b5b2;font-family:'VT323',monospace;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      height:100vh;margin:0;overflow:hidden;user-select:none;
     }
-
-    .crt-monitor {
-      position: relative;
-      border: 1px solid #333;
-      box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
-      width: 640px;
-      height: 480px;
-      background: #000;
-    }
-
-    canvas {
-      width: 100%;
-      height: 100%;
-      background-color: #000;
-      display: block;
-      image-rendering: pixelated;
-    }
-
-    .scanlines {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: linear-gradient(
-        to bottom,
-        rgba(255,255,255,0),
-        rgba(255,255,255,0) 50%,
-        rgba(0,0,0,0.22) 50%,
-        rgba(0,0,0,0.22)
-      );
-      background-size: 100% 4px;
-      pointer-events: none;
-      z-index: 10;
-    }
-
-    .crt-monitor::after {
-      content: " ";
-      display: block;
-      position: absolute;
-      top: 0; left: 0; bottom: 0; right: 0;
-      background: rgba(18, 16, 16, 0.10);
-      opacity: 0;
-      z-index: 10;
-      pointer-events: none;
-      animation: flicker 0.14s infinite;
-    }
-
-    @keyframes flicker {
-      0% { opacity: 0.02; }
-      50% { opacity: 0.06; }
-      100% { opacity: 0.02; }
-    }
-
-    #game-ui {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      display: flex;
-      justify-content: space-between;
-      z-index: 20;
-      color: #ccffcc;
-      text-shadow: 0 0 5px #ccffcc;
-      font-size: 1.5rem;
-      pointer-events: none;
-    }
-
-    .controls-hint {
-      margin-top: 20px;
-      text-align: center;
-      opacity: 0.55;
-      font-size: 1.2rem;
-    }
-
-    .start-overlay {
-      position: absolute;
-      inset: 0;
-      z-index: 30;
-      display: grid;
-      place-items: center;
-      background: radial-gradient(circle at center, rgba(0,0,0,0.35), rgba(0,0,0,0.92));
-      color: #ccffcc;
-      text-shadow: 0 0 8px rgba(204,255,204,0.35);
-      cursor: pointer;
-    }
-
-    .start-overlay .start-title {
-      font-size: 4rem;
-      letter-spacing: 2px;
-      margin-bottom: 10px;
-      text-align: center;
-    }
-
-    .start-overlay .start-sub {
-      font-size: 1.8rem;
-      opacity: 0.9;
-      text-align: center;
-    }
-
-    .start-overlay .small {
-      font-size: 1.2rem;
-      opacity: 0.65;
-    }
+    .crt-monitor{position:relative;border:1px solid #333;box-shadow:0 0 20px rgba(0,0,0,.8);width:640px;height:480px;background:#000}
+    canvas{width:100%;height:100%;background:#000;display:block;image-rendering:pixelated}
+    .scanlines{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(255,255,255,0),rgba(255,255,255,0) 50%,rgba(0,0,0,.22) 50%,rgba(0,0,0,.22));background-size:100% 4px;pointer-events:none;z-index:10}
+    .crt-monitor::after{content:" ";position:absolute;inset:0;background:rgba(18,16,16,.10);opacity:0;z-index:10;pointer-events:none;animation:flicker .14s infinite}
+    @keyframes flicker{0%{opacity:.02}50%{opacity:.06}100%{opacity:.02}}
+    #game-ui{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;z-index:20;color:#ccffcc;text-shadow:0 0 5px #ccffcc;font-size:1.5rem;pointer-events:none}
+    .controls-hint{margin-top:20px;text-align:center;opacity:.55;font-size:1.2rem}
+    .start-overlay{position:absolute;inset:0;z-index:30;display:grid;place-items:center;background:radial-gradient(circle at center,rgba(0,0,0,.35),rgba(0,0,0,.92));color:#ccffcc;text-shadow:0 0 8px rgba(204,255,204,.35);cursor:pointer}
+    .start-title{font-size:4rem;letter-spacing:2px;margin-bottom:10px;text-align:center}
+    .start-sub{font-size:1.8rem;opacity:.9;text-align:center}
+    .small{font-size:1.2rem;opacity:.65}
   </style>
 </head>
 <body>
   <div class="crt-monitor" id="crt">
     <div class="scanlines"></div>
-
     <div id="game-ui">
       <span id="score-display">OFFERINGS: 0/3</span>
       <span id="status-display">STATUS: ALONE</span>
     </div>
-
     <canvas id="gameCanvas" width="320" height="240"></canvas>
-
     <div id="startOverlay" class="start-overlay" tabindex="0" role="button" aria-label="Start game">
       <div>
         <div class="start-title">ENTROPY.DAT</div>
         <div class="start-sub">CLICK TO INITIALIZE</div>
-        <div class="start-sub small">WASD / Arrows to move · Shift to run (louder)</div>
-        <div class="start-sub small">E = SIGNAL PULSE (risk)</div>
+        <div class="start-sub small">WASD / Arrows · Shift run · E pulse</div>
+        <div class="start-sub small">1/2 respond to messages</div>
       </div>
     </div>
   </div>
-
   <div class="controls-hint">
-    WASD / Arrows to Move · Shift to Run (makes you easier to track).<br/>
-    E = Signal Pulse (brief guidance, increases anxiety).
+    WASD / Arrows to Move · Shift to Run (louder) · E = Signal Pulse.<br/>
+    Chests unlock missions. Clear mission to open the exit.
   </div>
 
 <script>
 (() => {
-  // --- CONFIGURATION ---
+  // ===== CONFIG =====
   const TILE_SIZE = 16;
   const COLS = 20;
   const ROWS = 15;
 
-  const BASE_FOV = 6;              // base fog radius
-  const MIN_FOV  = 4.6;            // when fear is high
-  const MAX_FOV  = 6.8;            // when calm
   const TOTAL_OFFERINGS = 3;
+  const CHESTS_PER_LEVEL = 3;
 
+  const BASE_FOV = 6;
+  const MIN_FOV  = 4.2;
+  const MAX_FOV  = 7.0;
+
+  // ===== DOM / CANVAS =====
   const canvas = document.getElementById('gameCanvas');
-  const ctx = canvas.getContext('2d', { alpha: false });
+  const ctx = canvas.getContext('2d', { alpha:false });
 
   const statusDisplay = document.getElementById('status-display');
-  const scoreDisplay = document.getElementById('score-display');
-  const startOverlay = document.getElementById('startOverlay');
+  const scoreDisplay  = document.getElementById('score-display');
+  const startOverlay  = document.getElementById('startOverlay');
 
-  // --- GAME STATE ---
+  // ===== STATE =====
   let map = [];
   let keys = {};
-  let player = { x: 1, y: 1, speed: 0.08, panicHits: 0, panicGrace: 0 };
+
+  let player = { x:1, y:1, speed:0.08, panicHits:0, panicGrace:0, sanity: 100 };
+
   let offerings = [];
   let collectedCount = 0;
-  let exit = null;
+  let exit = null; // {x,y}
+  let exitLocked = true;
 
-  // Enemy is in tile-space floats; movement is guided by grid steps.
-  let enemy = {
-    x: -1, y: -1,
-    active: false,
-    speed: 0.020,
-    stun: 0,
-    lastSeen: 0,
-    stepCooldown: 0,
-    targetTile: null
+  let chests = []; // {x,y,opened:false}
+
+  let stains = []; // corruption zones
+
+  let messages = []; // floating glitch text
+  let globalAnxiety = 0;
+
+  // lore prompt with choice
+  let prompt = {
+    active:false,
+    text:"",
+    a:"",
+    b:"",
+    onChoose:null,
+    timer:0
   };
 
-  let messages = [];
-  let globalAnxiety = 0;
-  let mission = { type: "TUNE", progress: 0, target: 2.0 };
-  let gameStarted = false;
+  // missions (unlocked via chests)
+  let mission = {
+    active:false,
+    title:"",
+    desc:"",
+    type:"",
+    progress:0,
+    goal:1,
+    extra:null,
+    completed:false
+  };
 
-  // New: abstract “stains” in the maze (corrupted tiles)
-  let stains = []; // {x,y}
-
-  // New: signal pulse fx
+  // signal pulse
   let pulse = { active:false, t:0, dirX:0, dirY:0 };
 
-  // --- Phrases / fragments ---
+  // full-screen creepy image flash
+  let flash = { active:false, t:0, dur:0.9, img:null, alpha:0 };
+
+  // Enemy as creepy image sprite
+  let enemy = {
+    x:-1, y:-1,
+    active:false,
+    speed:0.020,
+    stun:0,
+    lastSeen:0,
+    stepCooldown:0,
+    targetTile:null,
+    aggression: 1.0
+  };
+
+  let gameStarted = false;
+
+  // ===== TEXT BANK =====
   const crypticPhrases = [
-    "IT KNOWS", "BEHIND YOU", "NULL REFERENCE",
-    "WHERE AM I", "DONT STOP", "STATIC...", "1997",
-    "DE-SYNC", "LOST SIGNAL", "FRAME DROP", "NO CLIP",
-    "PAINTED AIR", "NEGATIVE SPACE", "FRACTURE", "MUTE COLOR"
+    "IT KNOWS","BEHIND YOU","NULL REFERENCE","WHERE AM I","DONT STOP","STATIC...","1997",
+    "DE-SYNC","LOST SIGNAL","FRAME DROP","NO CLIP","PAINTED AIR","NEGATIVE SPACE","FRACTURE","MUTE COLOR",
+    "DOOR IS NOT A DOOR","EYES IN THE FOG","YOU ARE DATA","THE MAZE REMEMBERS"
   ];
 
-  // --- INPUT ---
+  const lorePrompts = [
+    {
+      text: "A voice leaks from the wall: \"DO YOU WANT TO BE SEEN?\"",
+      a: "1) YES (more clarity)",
+      b: "2) NO (more safety)",
+      choose: (c) => {
+        if (c===1){ player.sanity = Math.min(100, player.sanity + 12); globalAnxiety = Math.max(globalAnxiety, 10); enemy.aggression += 0.12; triggerMessage("YOU ARE VISIBLE"); }
+        else { enemy.aggression = Math.max(0.8, enemy.aggression - 0.10); triggerMessage("YOU ARE MISSING"); }
+      }
+    },
+    {
+      text: "The CRT whispers: \"SACRIFICE SPEED FOR SILENCE?\"",
+      a: "1) ACCEPT (slower run, calmer)",
+      b: "2) REFUSE (faster run, louder)",
+      choose: (c) => {
+        if (c===1){ player.speed = Math.max(0.07, player.speed - 0.01); globalAnxiety = Math.max(0, globalAnxiety - 3); triggerMessage("SILENCE TRADE"); }
+        else { player.speed = Math.min(0.095, player.speed + 0.008); enemy.aggression += 0.10; triggerMessage("LOUD TRADE"); }
+      }
+    },
+    {
+      text: "A stain pulses: \"NAME THE COLOR.\"",
+      a: "1) RED",
+      b: "2) NONE",
+      choose: (c) => {
+        if (c===1){ globalAnxiety = Math.max(globalAnxiety, 14); triggerMessage("WRONG"); enemy.aggression += 0.08; }
+        else { triggerMessage("CORRECT"); player.sanity = Math.min(100, player.sanity + 8); }
+      }
+    }
+  ];
+
+  // ===== INPUT =====
   window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
+
     if (!gameStarted && (e.code === "Enter" || e.code === "Space")) startGame();
+
     if (gameStarted && e.code === "KeyE") triggerPulse();
-  }, { passive: true });
 
-  window.addEventListener('keyup', (e) => keys[e.code] = false, { passive: true });
+    // respond to prompts
+    if (prompt.active) {
+      if (e.code === "Digit1" || e.code === "KeyY") choosePrompt(1);
+      if (e.code === "Digit2" || e.code === "KeyN") choosePrompt(2);
+    }
+  }, { passive:true });
 
-  // --- AUDIO (Ever-changing, eerie, non-repeating + objective panning) ---
+  window.addEventListener('keyup', (e) => keys[e.code] = false, { passive:true });
+
+  startOverlay.addEventListener("pointerdown", (e)=>{ e.preventDefault(); if(!gameStarted) startGame(); });
+  canvas.addEventListener("pointerdown", (e)=>{ e.preventDefault(); if(!gameStarted) startGame(); });
+
+  // ===== AUDIO (same engine + extra behaviors) =====
   let audio = null;
 
-  function initAudio() {
+  function initAudio(){
     if (audio) return;
     const AC = window.AudioContext || window.webkitAudioContext;
     const ac = new AC();
@@ -226,10 +197,8 @@
     const master = ac.createGain();
     master.gain.value = 0.70;
 
-    // stereo panner to hint objective direction (subtle)
     const pan = ac.createStereoPanner();
     pan.pan.value = 0;
-
     master.connect(pan);
     pan.connect(ac.destination);
 
@@ -237,201 +206,113 @@
     {
       const d = noiseBuf.getChannelData(0);
       let last = 0;
-      for (let i = 0; i < d.length; i++) {
-        last = 0.97 * last + 0.03 * (Math.random() * 2 - 1);
+      for (let i=0;i<d.length;i++){
+        last = 0.97*last + 0.03*(Math.random()*2-1);
         d[i] = last;
       }
     }
 
     // wind
-    const wind = ac.createBufferSource();
-    wind.buffer = noiseBuf;
-    wind.loop = true;
-    const windLP = ac.createBiquadFilter();
-    windLP.type = "lowpass";
-    windLP.frequency.value = 220;
-    const windGain = ac.createGain();
-    windGain.gain.value = 0.05;
-    wind.connect(windLP);
-    windLP.connect(windGain);
-    windGain.connect(master);
-    wind.start();
+    const wind = ac.createBufferSource(); wind.buffer = noiseBuf; wind.loop = true;
+    const windLP = ac.createBiquadFilter(); windLP.type="lowpass"; windLP.frequency.value=220;
+    const windGain = ac.createGain(); windGain.gain.value=0.05;
+    wind.connect(windLP); windLP.connect(windGain); windGain.connect(master); wind.start();
 
     // static
-    const staticSrc = ac.createBufferSource();
-    staticSrc.buffer = noiseBuf;
-    staticSrc.loop = true;
-    const staticBP = ac.createBiquadFilter();
-    staticBP.type = "bandpass";
-    staticBP.frequency.value = 1300;
-    staticBP.Q.value = 0.8;
-    const staticGain = ac.createGain();
-    staticGain.gain.value = 0.02;
-    staticSrc.connect(staticBP);
-    staticBP.connect(staticGain);
-    staticGain.connect(master);
-    staticSrc.start();
+    const staticSrc = ac.createBufferSource(); staticSrc.buffer=noiseBuf; staticSrc.loop=true;
+    const staticBP = ac.createBiquadFilter(); staticBP.type="bandpass"; staticBP.frequency.value=1300; staticBP.Q.value=0.8;
+    const staticGain = ac.createGain(); staticGain.gain.value=0.02;
+    staticSrc.connect(staticBP); staticBP.connect(staticGain); staticGain.connect(master); staticSrc.start();
 
     // drone
-    const drone = ac.createOscillator();
-    drone.type = "sine";
-    drone.frequency.value = 55;
+    const drone = ac.createOscillator(); drone.type="sine"; drone.frequency.value=55;
+    const mod = ac.createOscillator(); mod.type="sine"; mod.frequency.value=0.12;
+    const modGain = ac.createGain(); modGain.gain.value = 18;
+    mod.connect(modGain); modGain.connect(drone.frequency);
+    const droneLP = ac.createBiquadFilter(); droneLP.type="lowpass"; droneLP.frequency.value=520;
+    const droneGain = ac.createGain(); droneGain.gain.value=0.03;
+    drone.connect(droneLP); droneLP.connect(droneGain); droneGain.connect(master);
+    drone.start(); mod.start();
 
-    const mod = ac.createOscillator();
-    mod.type = "sine";
-    mod.frequency.value = 0.12;
-
-    const modGain = ac.createGain();
-    modGain.gain.value = 18;
-    mod.connect(modGain);
-    modGain.connect(drone.frequency);
-
-    const droneLP = ac.createBiquadFilter();
-    droneLP.type = "lowpass";
-    droneLP.frequency.value = 520;
-
-    const droneGain = ac.createGain();
-    droneGain.gain.value = 0.03;
-
-    drone.connect(droneLP);
-    droneLP.connect(droneGain);
-    droneGain.connect(master);
-
-    drone.start();
-    mod.start();
-
-    // percussive glitch
-    function blip(intensity = 0.4) {
+    function blip(intensity=0.4){
       const t = ac.currentTime;
       const o = ac.createOscillator();
-      o.type = Math.random() < 0.5 ? "square" : "triangle";
-      o.frequency.value = 120 + Math.random() * 1600;
+      o.type = Math.random()<0.5 ? "square":"triangle";
+      o.frequency.value = 120 + Math.random()*1600;
 
       const bp = ac.createBiquadFilter();
-      bp.type = "bandpass";
-      bp.frequency.value = 400 + Math.random() * 2800;
-      bp.Q.value = 8;
+      bp.type="bandpass"; bp.frequency.value = 400 + Math.random()*2800; bp.Q.value=8;
 
       const g = ac.createGain();
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.09 * intensity, t + 0.002);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(0.09*intensity, t+0.002);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.08);
 
-      o.connect(bp);
-      bp.connect(g);
-      g.connect(master);
-
-      o.start(t);
-      o.stop(t + 0.09);
+      o.connect(bp); bp.connect(g); g.connect(master);
+      o.start(t); o.stop(t+0.09);
     }
 
-    // “stain” whispers: quieter noise bursts that feel like rooms breathing
-    function stainWhisper() {
+    function mutate(){
       const t = ac.currentTime;
-      const o = ac.createOscillator();
-      o.type = "sine";
-      o.frequency.value = 180 + Math.random()*60;
+      staticBP.frequency.setTargetAtTime(700 + Math.random()*3000, t, 1.8);
+      staticGain.gain.setTargetAtTime(0.012 + Math.random()*0.03, t, 1.2);
+      windLP.frequency.setTargetAtTime(120 + Math.random()*320, t, 2.5);
+      drone.frequency.setTargetAtTime(35 + Math.random()*55, t, 2.0);
+      droneLP.frequency.setTargetAtTime(250 + Math.random()*900, t, 2.0);
+      droneGain.gain.setTargetAtTime(0.018 + Math.random()*0.06, t, 2.0);
 
-      const g = ac.createGain();
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.03, t + 0.03);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
-
-      const lp = ac.createBiquadFilter();
-      lp.type = "lowpass";
-      lp.frequency.value = 360 + Math.random()*220;
-
-      o.connect(lp);
-      lp.connect(g);
-      g.connect(master);
-      o.start(t);
-      o.stop(t + 0.38);
-    }
-
-    function eventTick() {
-      const fear = audio?.fear ?? 0;
-      // more fear => more micro-events
-      if (Math.random() < 0.18 + fear * 0.25) blip(0.2 + Math.random() * (0.4 + fear));
-      setTimeout(eventTick, 220 + Math.random() * (900 - fear * 400));
-    }
-
-    function mutate() {
-      const t = ac.currentTime;
-      staticBP.frequency.setTargetAtTime(700 + Math.random() * 3000, t, 1.8);
-      staticGain.gain.setTargetAtTime(0.012 + Math.random() * 0.03, t, 1.2);
-      windLP.frequency.setTargetAtTime(120 + Math.random() * 320, t, 2.5);
-      drone.frequency.setTargetAtTime(35 + Math.random() * 55, t, 2.0);
-      droneLP.frequency.setTargetAtTime(250 + Math.random() * 900, t, 2.0);
-      droneGain.gain.setTargetAtTime(0.018 + Math.random() * 0.06, t, 2.0);
-
-      if (Math.random() < 0.12) {
-        drone.detune.setTargetAtTime((Math.random() < 0.5 ? -1 : 1) * (80 + Math.random() * 180), t, 0.6);
-        setTimeout(() => drone.detune.setTargetAtTime(0, ac.currentTime, 0.9), 900 + Math.random() * 1400);
+      if (Math.random()<0.12){
+        drone.detune.setTargetAtTime((Math.random()<0.5?-1:1)*(80+Math.random()*180), t, 0.6);
+        setTimeout(()=>drone.detune.setTargetAtTime(0, ac.currentTime, 0.9), 900+Math.random()*1400);
       }
+      setTimeout(mutate, 900 + Math.random()*1600);
+    }
 
-      // occasional stain whisper regardless of fear
-      if (Math.random() < 0.22) stainWhisper();
-
-      setTimeout(mutate, 900 + Math.random() * 1600);
+    function eventTick(){
+      const fear = audio?.fear ?? 0;
+      if (Math.random() < 0.16 + fear*0.30) blip(0.2 + Math.random()*(0.5 + fear));
+      setTimeout(eventTick, 240 + Math.random()*(900 - fear*420));
     }
 
     audio = {
-      ac,
-      fear: 0,
-      blip,
-      setFear(f) {
+      ac, fear:0, blip,
+      setFear(f){
         audio.fear = f;
         const t = ac.currentTime;
-        staticGain.gain.setTargetAtTime(0.015 + f * 0.10, t, 0.08);
-        staticBP.Q.setTargetAtTime(0.8 + f * 9, t, 0.15);
-        windGain.gain.setTargetAtTime(0.04 + f * 0.08, t, 0.12);
-        droneGain.gain.setTargetAtTime(0.02 + f * 0.09, t, 0.2);
-        if (f > 0.68 && Math.random() < 0.08) blip(0.7 * f);
+        staticGain.gain.setTargetAtTime(0.015 + f*0.10, t, 0.08);
+        staticBP.Q.setTargetAtTime(0.8 + f*9, t, 0.15);
+        windGain.gain.setTargetAtTime(0.04 + f*0.08, t, 0.12);
+        droneGain.gain.setTargetAtTime(0.02 + f*0.09, t, 0.2);
+        if (f>0.70 && Math.random()<0.07) blip(0.7*f);
       },
-      setObjectivePan(p) {
-        // p in [-1..1]
+      setObjectivePan(p){
         pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, p)), ac.currentTime, 0.15);
       }
     };
 
     setTimeout(mutate, 500);
-    setTimeout(eventTick, 800);
+    setTimeout(eventTick, 700);
   }
 
-  async function ensureAudioRunning() {
+  async function ensureAudioRunning(){
     initAudio();
-    if (audio?.ac?.state === "suspended") {
+    if (audio?.ac?.state === "suspended"){
       try { await audio.ac.resume(); } catch {}
     }
   }
 
-  // --- START HANDLERS ---
-  function bindStartHandlers() {
-    const startFromGesture = async (e) => {
-      e?.preventDefault?.();
-      e?.stopPropagation?.();
-      if (!gameStarted) startGame();
-    };
-    startOverlay.addEventListener("pointerdown", startFromGesture);
-    startOverlay.addEventListener("click", startFromGesture);
-    canvas.addEventListener("pointerdown", startFromGesture);
-    window.addEventListener("keydown", () => ensureAudioRunning(), { once: true });
-  }
-  bindStartHandlers();
-
-  // --- Helpers ---
+  // ===== MAP / HELPERS =====
   const clamp = (v,a,b)=> v<a?a : v>b?b : v;
   const inBounds = (x,y)=> x>=0 && y>=0 && x<COLS && y<ROWS;
   const isFloor = (x,y)=> inBounds(x,y) && map[y][x] === 0;
 
-  function randomFloorFarFrom(px, py, minManhattan) {
-    // tries a bunch of random points, then falls back to scan
-    for (let i=0;i<500;i++){
+  function randomFloorFarFrom(px, py, minManhattan){
+    for (let i=0;i<600;i++){
       const x = (Math.random()*COLS)|0;
       const y = (Math.random()*ROWS)|0;
       if (!isFloor(x,y)) continue;
       if (Math.abs(x-px)+Math.abs(y-py) < minManhattan) continue;
-      return {x, y};
+      return {x,y};
     }
     for (let y=0;y<ROWS;y++){
       for (let x=0;x<COLS;x++){
@@ -441,168 +322,376 @@
     return {x:1,y:1};
   }
 
-  // --- MAP GENERATION ---
-  function generateLevel() {
-    map = Array(ROWS).fill(0).map(() => Array(COLS).fill(1));
-
-    const stack = [];
-    const start = { x: 1, y: 1 };
-    map[start.y][start.x] = 0;
-    stack.push(start);
-
-    while (stack.length > 0) {
-      const current = stack[stack.length - 1];
-      const directions = [
-        { dx: 0, dy: -2 }, { dx: 0, dy: 2 },
-        { dx: -2, dy: 0 }, { dx: 2, dy: 0 }
-      ].sort(() => Math.random() - 0.5);
-
-      let carved = false;
-      for (let dir of directions) {
-        const nx = current.x + dir.dx;
-        const ny = current.y + dir.dy;
-        if (nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1 && map[ny][nx] === 1) {
-          map[ny][nx] = 0;
-          map[current.y + (dir.dy / 2)][current.x + (dir.dx / 2)] = 0;
-          stack.push({ x: nx, y: ny });
-          carved = true;
-          break;
-        }
-      }
-      if (!carved) stack.pop();
-    }
-
-    // Place “stains” (abstract corrupted zones)
-    stains = [];
-    for (let i=0;i<8;i++){
-      const s = randomFloorFarFrom(1,1, 4);
-      stains.push(s);
-    }
-
-    // Place offerings
-    offerings = [];
-    while (offerings.length < TOTAL_OFFERINGS) {
-      const r = randomFloorFarFrom(1,1, 6);
-      if (offerings.some(o => o.x===r.x && o.y===r.y)) continue;
-      offerings.push({ x: r.x, y: r.y, collected: false, order: 0 });
-    }
-
-    // Reset player
-    player.x = 1; player.y = 1;
-    player.panicHits = 0;
-    player.panicGrace = 0;
-
-    collectedCount = 0;
-    exit = null;
-
-    // Reset enemy
-    enemy.active = false;
-    enemy.stun = 0;
-    enemy.lastSeen = 0;
-    enemy.stepCooldown = 0;
-    enemy.targetTile = null;
-    enemy.speed = 0.020 + Math.random()*0.006; // slight per-run variation
-
-    globalAnxiety = 0;
-    messages = [];
-
-    // Missions
-    const types = ["TUNE", "NO_RUN", "ORDER"];
-    mission.type = types[(Math.random()*types.length)|0];
-    mission.progress = 0;
-    mission.target = 1.9 + Math.random()*0.8;
-
-    if (mission.type === "ORDER") {
-      const order = [1, 2, 3].sort(() => Math.random() - 0.5);
-      offerings.forEach((o, i) => o.order = order[i]);
-    }
-
-    statusDisplay.style.color = "#ccffcc";
-    statusDisplay.innerText =
-      mission.type === "TUNE" ? "STATUS: FIND SIGNAL" :
-      mission.type === "NO_RUN" ? "STATUS: DO NOT RUN" :
-      "STATUS: FOLLOW ORDER";
-
-    updateUI();
-  }
-
-  // --- COLLISION (player) ---
-  function checkWall(x, y) {
-    // guard bounds so we never read undefined indices
-    const ax = Math.floor(x + 0.2), ay = Math.floor(y + 0.2);
-    const bx = Math.floor(x + 0.8), by = Math.floor(y + 0.8);
+  function checkWall(x,y){
+    const ax=Math.floor(x+0.2), ay=Math.floor(y+0.2);
+    const bx=Math.floor(x+0.8), by=Math.floor(y+0.8);
     if (!inBounds(ax,ay) || !inBounds(bx,by)) return true;
-    return map[ay][ax] === 1 || map[by][ax] === 1 || map[ay][bx] === 1 || map[by][bx] === 1;
+    return map[ay][ax]===1 || map[by][ax]===1 || map[ay][bx]===1 || map[by][bx]===1;
   }
 
-  // --- MESSAGES ---
-  function triggerMessage(text = null) {
-    if (Math.random() > 0.35 && !text) return;
+  function triggerMessage(text=null){
+    if (Math.random() > 0.38 && !text) return;
     const phrase = text || crypticPhrases[(Math.random()*crypticPhrases.length)|0];
     messages.push({
       text: phrase,
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      life: 55,
-      color: Math.random() > 0.5 ? '#ff2244' : '#ffffff'
+      x: Math.random()*canvas.width,
+      y: Math.random()*canvas.height,
+      life: 60,
+      color: Math.random()>0.5 ? "#ff2244" : "#ffffff"
     });
   }
 
-  function updateUI() {
-    scoreDisplay.innerText = `OFFERINGS: ${collectedCount}/${TOTAL_OFFERINGS}`;
+  function updateUI(){
+    scoreDisplay.innerText = `OFFERINGS: ${collectedCount}/${TOTAL_OFFERINGS}  |  CHESTS: ${openedChests()}/${CHESTS_PER_LEVEL}`;
   }
 
-  // --- EXIT ---
-  function spawnExit() {
-    const r = randomFloorFarFrom((player.x|0),(player.y|0), 10);
-    exit = { x: r.x, y: r.y };
-    triggerMessage("THE WAY IS OPEN");
-    audio?.blip?.(0.8);
+  function openedChests(){
+    return chests.filter(c=>c.opened).length;
   }
 
-  // --- SIGNAL PULSE (E) ---
-  function triggerPulse() {
-    // brief direction hint toward nearest target, but it spikes anxiety
+  // ===== MISSION SYSTEM =====
+  function setMission(m){
+    mission.active = true;
+    mission.completed = false;
+    mission.title = m.title;
+    mission.desc  = m.desc;
+    mission.type  = m.type;
+    mission.progress = 0;
+    mission.goal = m.goal ?? 1;
+    mission.extra = m.extra ?? null;
+
+    exitLocked = true;
+    statusDisplay.style.color = "#ccffcc";
+    statusDisplay.innerText = "STATUS: MISSION ACTIVE";
+    triggerMessage("NEW TASK LOADED");
+  }
+
+  function completeMission(){
+    mission.completed = true;
+    mission.active = false;
+    exitLocked = false;
+    triggerMessage("TASK COMPLETE");
+    triggerMessage("EXIT UNSEALED");
+    audio?.blip?.(1.0);
+    statusDisplay.style.color = "#ccffcc";
+    statusDisplay.innerText = "STATUS: EXIT UNLOCKED";
+    // reward: reduce aggression a bit
+    enemy.aggression = Math.max(0.85, enemy.aggression - 0.08);
+    globalAnxiety = Math.max(0, globalAnxiety - 4);
+  }
+
+  function generateRandomMission(){
+    // always different flavor
+    const types = ["STILLNESS", "NO_RUN", "STAIN_TOUCH", "ECHO_COUNT", "FOLLOW_ORDER"];
+    const t = types[(Math.random()*types.length)|0];
+
+    if (t === "STILLNESS"){
+      const seconds = 2.0 + Math.random()*2.0;
+      return {
+        type: "STILLNESS",
+        title: "STILLNESS RITUAL",
+        desc: `Stand completely still near a stain for ${seconds.toFixed(1)}s.\n(Do not move.)`,
+        goal: seconds,
+        extra: { seconds }
+      };
+    }
+
+    if (t === "NO_RUN"){
+      const time = 8 + ((Math.random()*10)|0);
+      return {
+        type:"NO_RUN",
+        title:"SILENT WALK",
+        desc:`Survive ${time}s without sprinting.\n(Shift forbidden.)`,
+        goal: time,
+        extra: { time }
+      };
+    }
+
+    if (t === "STAIN_TOUCH"){
+      const count = 2 + ((Math.random()*3)|0);
+      return {
+        type:"STAIN_TOUCH",
+        title:"TOUCH THE CORRUPTION",
+        desc:`Step into ${count} different stains.\n(Each stain counts once.)`,
+        goal: count,
+        extra: { touched: new Set() }
+      };
+    }
+
+    if (t === "ECHO_COUNT"){
+      const pulses = 2 + ((Math.random()*3)|0);
+      return {
+        type:"ECHO_COUNT",
+        title:"ECHO TEST",
+        desc:`Use Signal Pulse (E) exactly ${pulses} times.\n(Too many resets the mission.)`,
+        goal: pulses,
+        extra: { used:0, max:pulses }
+      };
+    }
+
+    // FOLLOW_ORDER: assign order to offerings
+    const order = [1,2,3].sort(()=>Math.random()-0.5);
+    offerings.forEach((o,i)=>o.order = order[i]);
+    return {
+      type:"FOLLOW_ORDER",
+      title:"SEQUENCE OF OFFERINGS",
+      desc:`Collect offerings in the correct sequence.\n(Colors indicate order.)`,
+      goal: TOTAL_OFFERINGS,
+      extra: { needed:1 }
+    };
+  }
+
+  function updateMission(dt, moving, sprinting){
+    if (!mission.active) return;
+
+    // Mission text box is drawn in render; here we update logic.
+    if (mission.type === "STILLNESS"){
+      // near any stain + not moving
+      const near = stains.some(s => Math.hypot((s.x+0.5)-player.x, (s.y+0.5)-player.y) < 2.0);
+      if (!moving && near) mission.progress += dt;
+      else mission.progress = Math.max(0, mission.progress - dt*0.8);
+
+      if (mission.progress >= mission.goal) completeMission();
+      return;
+    }
+
+    if (mission.type === "NO_RUN"){
+      if (sprinting){
+        mission.progress = Math.max(0, mission.progress - dt*2.0);
+        globalAnxiety = Math.max(globalAnxiety, 12);
+        if (Math.random()<0.02) triggerMessage("TOO LOUD");
+      } else {
+        mission.progress += dt;
+      }
+      if (mission.progress >= mission.goal) completeMission();
+      return;
+    }
+
+    if (mission.type === "STAIN_TOUCH"){
+      for (const s of stains){
+        const d = Math.hypot((s.x+0.5)-player.x, (s.y+0.5)-player.y);
+        if (d < 0.9) mission.extra.touched.add(`${s.x},${s.y}`);
+      }
+      mission.progress = mission.extra.touched.size;
+      if (mission.progress >= mission.goal) completeMission();
+      return;
+    }
+
+    if (mission.type === "ECHO_COUNT"){
+      mission.progress = mission.extra.used;
+      if (mission.progress >= mission.goal) completeMission();
+      return;
+    }
+
+    if (mission.type === "FOLLOW_ORDER"){
+      // handled during pickups; keep display in sync
+      mission.progress = collectedCount;
+      if (collectedCount >= TOTAL_OFFERINGS && !exitLocked) {
+        // already unlocked by completion; ignore
+      }
+      return;
+    }
+  }
+
+  // ===== LORE PROMPT SYSTEM =====
+  function showPrompt(p){
+    if (prompt.active) return;
+    prompt.active = true;
+    prompt.text = p.text;
+    prompt.a = p.a;
+    prompt.b = p.b;
+    prompt.onChoose = p.choose;
+    prompt.timer = 6.5; // seconds to respond
+    triggerMessage("INPUT REQUIRED");
+    globalAnxiety = Math.max(globalAnxiety, 10);
+  }
+
+  function choosePrompt(choice){
+    if (!prompt.active) return;
+    const fn = prompt.onChoose;
+    prompt.active = false;
+    if (fn) fn(choice);
+    audio?.blip?.(0.9);
+  }
+
+  // ===== CREEPY IMAGE FLASH (procedural) =====
+  function generateCreepyImage(){
+    // offscreen canvas
+    const c = document.createElement('canvas');
+    c.width = 160; c.height = 120;
+    const g = c.getContext('2d');
+
+    // background noise
+    g.fillStyle = "#000"; g.fillRect(0,0,c.width,c.height);
+    for (let i=0;i<2400;i++){
+      const x = (Math.random()*c.width)|0;
+      const y = (Math.random()*c.height)|0;
+      const v = (Math.random()*60)|0;
+      g.fillStyle = `rgb(${v},${v},${v})`;
+      g.fillRect(x,y,1,1);
+    }
+
+    // abstract “face”
+    const cx = c.width/2 + (Math.random()*18-9);
+    const cy = c.height/2 + (Math.random()*12-6);
+
+    // eyes
+    const eyeY = cy - 10 + Math.random()*8;
+    const eyeDX = 28 + Math.random()*10;
+    g.fillStyle = "rgba(255,60,90,0.65)";
+    g.fillRect(cx - eyeDX, eyeY, 8, 4);
+    g.fillRect(cx + eyeDX - 8, eyeY, 8, 4);
+
+    // pupils
+    g.fillStyle = "rgba(0,0,0,0.9)";
+    g.fillRect(cx - eyeDX + 3, eyeY+1, 2, 2);
+    g.fillRect(cx + eyeDX - 5, eyeY+1, 2, 2);
+
+    // mouth
+    g.fillStyle = "rgba(255,255,255,0.10)";
+    g.fillRect(cx - 22, cy + 14, 44, 3);
+
+    // vertical “tears”
+    g.fillStyle = "rgba(255,60,90,0.22)";
+    for (let i=0;i<6;i++){
+      const x = cx + (Math.random()*90-45);
+      const y = (Math.random()*c.height)|0;
+      g.fillRect(x, y, 1, 10 + (Math.random()*40|0));
+    }
+
+    // smear
+    g.globalAlpha = 0.18;
+    for (let i=0;i<6;i++){
+      const y = (Math.random()*c.height)|0;
+      const dx = (Math.random()*20-10);
+      g.drawImage(c, 0, y, c.width, 2, dx, y, c.width, 2);
+    }
+    g.globalAlpha = 1;
+
+    return c;
+  }
+
+  function triggerFlash(){
+    flash.active = true;
+    flash.t = 0;
+    flash.dur = 0.7 + Math.random()*0.7;
+    flash.img = generateCreepyImage();
+    flash.alpha = 0;
+  }
+
+  // ===== MONSTER SPRITE (procedural “creepy image”) =====
+  function makeMonsterSprite(){
+    const c = document.createElement('canvas');
+    c.width = 16; c.height = 16;
+    const g = c.getContext('2d');
+
+    // base
+    g.fillStyle = "rgba(0,0,0,0)";
+    g.clearRect(0,0,16,16);
+
+    // head
+    g.fillStyle = "rgba(40,40,55,0.9)";
+    g.fillRect(3,3,10,10);
+
+    // eyes (red)
+    g.fillStyle = "rgba(255,60,90,0.8)";
+    g.fillRect(5,7,2,1);
+    g.fillRect(9,7,2,1);
+
+    // mouth (void)
+    g.fillStyle = "rgba(0,0,0,0.85)";
+    g.fillRect(6,10,4,2);
+
+    // noise specks
+    for (let i=0;i<20;i++){
+      const x = (Math.random()*16)|0;
+      const y = (Math.random()*16)|0;
+      g.fillStyle = Math.random()<0.5 ? "rgba(255,60,90,0.12)" : "rgba(255,255,255,0.08)";
+      g.fillRect(x,y,1,1);
+    }
+    return c;
+  }
+  const monsterSprite = makeMonsterSprite();
+
+  // ===== SIGNAL PULSE =====
+  function getNearestObjective(){
+    // nearest unopened chest takes priority, else offering, else exit
+    let best=null, bestD=1e9;
+
+    for (const c of chests){
+      if (c.opened) continue;
+      const d = Math.hypot((c.x+0.5)-player.x, (c.y+0.5)-player.y);
+      if (d<bestD){ bestD=d; best={x:c.x,y:c.y}; }
+    }
+    if (best) return best;
+
+    for (const o of offerings){
+      if (o.collected) continue;
+      const d = Math.hypot((o.x+0.5)-player.x, (o.y+0.5)-player.y);
+      if (d<bestD){ bestD=d; best={x:o.x,y:o.y}; }
+    }
+    if (!best && exit) best = {x:exit.x, y:exit.y};
+    return best;
+  }
+
+  function triggerPulse(){
     if (!gameStarted) return;
     if (pulse.active) return;
 
     const target = getNearestObjective();
     if (!target) return;
 
-    const dx = (target.x + 0.5) - player.x;
-    const dy = (target.y + 0.5) - player.y;
+    const dx = (target.x+0.5) - player.x;
+    const dy = (target.y+0.5) - player.y;
     const d = Math.max(0.0001, Math.hypot(dx,dy));
+
     pulse.active = true;
-    pulse.t = 0.0;
+    pulse.t = 0;
     pulse.dirX = dx/d;
     pulse.dirY = dy/d;
 
     globalAnxiety = Math.max(globalAnxiety, 10);
     triggerMessage("ECHO PULSE");
     audio?.blip?.(1.0);
+
+    // mission hook
+    if (mission.active && mission.type === "ECHO_COUNT"){
+      mission.extra.used++;
+      if (mission.extra.used > mission.extra.max){
+        // too many -> reset mission progress
+        mission.extra.used = 0;
+        triggerMessage("ECHO OVERFLOW");
+        globalAnxiety = Math.max(globalAnxiety, 16);
+      }
+    }
   }
 
-  function getNearestObjective() {
-    // nearest uncollected offering, else exit
-    let best = null;
-    let bestD = 1e9;
-    for (const o of offerings) {
-      if (o.collected) continue;
-      const d = Math.hypot((o.x+0.5)-player.x, (o.y+0.5)-player.y);
-      if (d < bestD) { bestD = d; best = {x:o.x, y:o.y}; }
+  // ===== ENEMY AI (grid guided) =====
+  function enemyPickStepToward(tx,ty){
+    const ex = enemy.x|0, ey = enemy.y|0;
+    const opts = [
+      {x:ex+1,y:ey},{x:ex-1,y:ey},{x:ex,y:ey+1},{x:ex,y:ey-1}
+    ].filter(p=>isFloor(p.x,p.y));
+    if (!opts.length) return null;
+
+    let best=opts[0], bestScore=1e9;
+    for (const o of opts){
+      const d = Math.hypot((o.x+0.5)-tx,(o.y+0.5)-ty);
+      const wob = (Math.random()-0.5)*0.35;
+      const score = d + wob;
+      if (score<bestScore){ bestScore=score; best=o; }
     }
-    if (!best && exit) best = {x: exit.x, y: exit.y};
     return best;
   }
 
-  // --- ENEMY ---
-  function spawnEnemy() {
-    // spawn on a *floor tile far away* (fixes your bug)
+  function spawnEnemy(){
     const ptx = player.x|0, pty = player.y|0;
-    const r = randomFloorFarFrom(ptx, pty, 14);
-    enemy.x = r.x + 0.5;
-    enemy.y = r.y + 0.5;
+    const r = randomFloorFarFrom(ptx,pty, 14);
+    enemy.x = r.x+0.5;
+    enemy.y = r.y+0.5;
     enemy.active = true;
+    enemy.stun = 0;
+    enemy.lastSeen = 0;
     enemy.stepCooldown = 0;
     enemy.targetTile = null;
     statusDisplay.innerText = "STATUS: WATCHED";
@@ -610,428 +699,622 @@
     audio?.blip?.(0.9);
   }
 
-  function enemyPickStepToward(tx, ty) {
-    // choose a neighboring floor tile that reduces distance
-    const ex = enemy.x|0, ey = enemy.y|0;
-    const opts = [
-      {x:ex+1,y:ey}, {x:ex-1,y:ey}, {x:ex,y:ey+1}, {x:ex,y:ey-1}
-    ].filter(p => isFloor(p.x,p.y));
-    if (!opts.length) return null;
-
-    // slight randomness (glitchy)
-    let best = opts[0], bestScore = 1e9;
-    for (const o of opts) {
-      const d = Math.hypot((o.x+0.5)-tx, (o.y+0.5)-ty);
-      const wob = (Math.random()-0.5)*0.35;
-      const score = d + wob;
-      if (score < bestScore) { bestScore = score; best = o; }
-    }
-    return best;
-  }
-
-  function updateEnemy() {
-    if (collectedCount >= 1 && !enemy.active) spawnEnemy();
+  function updateEnemy(){
+    if (!enemy.active && collectedCount >= 1) spawnEnemy();
     if (!enemy.active) return;
 
     const dx = player.x - enemy.x;
     const dy = player.y - enemy.y;
     const dist = Math.max(0.0001, Math.hypot(dx,dy));
 
-    // audio fear drives FOV breathing + glitch density
     const fear = clamp(1 - dist/6, 0, 1);
     audio?.setFear?.(fear);
 
-    // sprinting makes you trackable + allows occasional phase-burst (creepy but controllable)
+    if (enemy.stun > 0){ enemy.stun--; return; }
+
     const sprinting = !!keys["ShiftLeft"];
-    const hearRadius = sprinting ? 7.5 : 4.5;
+    const hearRadius = sprinting ? 7.8 : 4.6;
 
-    if (enemy.stun > 0) {
-      enemy.stun -= 1;
-      return;
+    if (dist < 3){
+      globalAnxiety = Math.max(globalAnxiety, 9 + (3-dist)*6);
+      if (Math.random()<0.05) triggerMessage();
     }
 
-    if (dist < 3) {
-      globalAnxiety = Math.max(globalAnxiety, 9 + (3 - dist) * 6);
-      if (Math.random() < 0.05) triggerMessage();
-    }
-
-    // memory of player position
+    // tracking
     let targetX = enemy.x, targetY = enemy.y;
-    if (dist < hearRadius) {
-      enemy.lastSeen = 70;
+    if (dist < hearRadius){
+      enemy.lastSeen = 80;
       targetX = player.x; targetY = player.y;
-    } else if (enemy.lastSeen > 0) {
+    } else if (enemy.lastSeen > 0){
       enemy.lastSeen--;
-      // continue roughly same direction
-      targetX = enemy.x + (dx / dist) * 1.0;
-      targetY = enemy.y + (dy / dist) * 1.0;
+      targetX = enemy.x + (dx/dist)*1.0;
+      targetY = enemy.y + (dy/dist)*1.0;
     } else {
-      // drift toward a random stain sometimes (abstract behavior)
+      // drift toward stains (creepy behavior)
       const s = stains[(Math.random()*stains.length)|0];
-      targetX = s.x + 0.5;
-      targetY = s.y + 0.5;
+      targetX = s.x+0.5; targetY = s.y+0.5;
     }
 
-    // grid step selection on cooldown
-    enemy.stepCooldown -= 1;
-    if (enemy.stepCooldown <= 0 || !enemy.targetTile) {
-      enemy.stepCooldown = 10 + ((Math.random()*10)|0);
+    enemy.stepCooldown--;
+    if (enemy.stepCooldown <= 0 || !enemy.targetTile){
+      enemy.stepCooldown = 9 + ((Math.random()*10)|0);
       const step = enemyPickStepToward(targetX, targetY);
       if (step) enemy.targetTile = step;
     }
 
-    // move toward target tile center
-    if (enemy.targetTile) {
-      const cx = enemy.targetTile.x + 0.5;
-      const cy = enemy.targetTile.y + 0.5;
+    const spd = enemy.speed * enemy.aggression;
+    if (enemy.targetTile){
+      const cx = enemy.targetTile.x+0.5;
+      const cy = enemy.targetTile.y+0.5;
       const mdx = cx - enemy.x;
       const mdy = cy - enemy.y;
-      const md = Math.max(0.0001, Math.hypot(mdx,mdy));
-      enemy.x += (mdx/md) * enemy.speed;
-      enemy.y += (mdy/md) * enemy.speed;
-
-      // reached tile center -> pick new target sooner
-      if (md < 0.12) {
-        enemy.stepCooldown = 0;
-      }
+      const md  = Math.max(0.0001, Math.hypot(mdx,mdy));
+      enemy.x += (mdx/md)*spd;
+      enemy.y += (mdy/md)*spd;
+      if (md < 0.12) enemy.stepCooldown = 0;
     }
 
-    // phase-burst when sprinting (rare)
-    if (sprinting && fear > 0.4 && Math.random() < 0.006) {
-      enemy.x += (dx/dist) * 0.45;
-      enemy.y += (dy/dist) * 0.45;
-      triggerMessage("FRAME SKIP");
+    // rare “image-lurch” when sprinting
+    if (sprinting && fear > 0.45 && Math.random() < 0.006){
+      enemy.x += (dx/dist)*0.50;
+      enemy.y += (dy/dist)*0.50;
+      triggerMessage("IMAGE TEAR");
       globalAnxiety = Math.max(globalAnxiety, 18);
       audio?.blip?.(1.0);
+      triggerFlash();
     }
 
-    // panic hits
-    if (player.panicGrace > 0) player.panicGrace -= 1;
+    // panic hits (2 strikes)
+    if (player.panicGrace > 0) player.panicGrace--;
 
-    if (dist < 0.55 && player.panicGrace <= 0) {
+    if (dist < 0.60 && player.panicGrace <= 0){
       player.panicGrace = 55;
-      enemy.stun = 45;
-
+      enemy.stun = 40;
       globalAnxiety = Math.max(globalAnxiety, 22);
+
       triggerMessage("DON'T LOOK");
       audio?.blip?.(1.0);
+      triggerFlash();
 
-      // shove player away
-      player.x -= (dx / dist) * 0.35;
-      player.y -= (dy / dist) * 0.35;
+      // shove back
+      player.x -= (dx/dist)*0.35;
+      player.y -= (dy/dist)*0.35;
 
-      player.panicHits += 1;
-      if (player.panicHits >= 2) {
+      player.panicHits++;
+      player.sanity = Math.max(0, player.sanity - 18);
+
+      if (player.panicHits >= 2){
         alert("CAUGHT. RESETTING.");
         generateLevel();
-        return;
-      } else {
-        statusDisplay.innerText = "STATUS: PANICKING";
-        setTimeout(() => {
-          statusDisplay.innerText = "STATUS: WATCHED";
-          statusDisplay.style.color = "#ff3344";
-        }, 900);
       }
     }
 
-    if (player.panicHits > 0 && dist > 4.5) {
+    if (player.panicHits > 0 && dist > 4.5){
       player.panicHits = Math.max(0, player.panicHits - 0.0025);
     }
   }
 
-  // --- LIGHTWEIGHT NOISE OVERLAY ---
-  function drawNoiseOverlay(amount) {
-    if (amount <= 0) return;
+  // ===== LEVEL GEN =====
+  function generateLevel(){
+    // maze init
+    map = Array(ROWS).fill(0).map(()=>Array(COLS).fill(1));
+    const stack=[];
+    const start={x:1,y:1};
+    map[start.y][start.x]=0;
+    stack.push(start);
+
+    while(stack.length){
+      const c = stack[stack.length-1];
+      const dirs = [
+        {dx:0,dy:-2},{dx:0,dy:2},{dx:-2,dy:0},{dx:2,dy:0}
+      ].sort(()=>Math.random()-0.5);
+
+      let carved=false;
+      for(const d of dirs){
+        const nx=c.x+d.dx, ny=c.y+d.dy;
+        if(nx>0 && nx<COLS-1 && ny>0 && ny<ROWS-1 && map[ny][nx]===1){
+          map[ny][nx]=0;
+          map[c.y+(d.dy/2)][c.x+(d.dx/2)]=0;
+          stack.push({x:nx,y:ny});
+          carved=true;
+          break;
+        }
+      }
+      if(!carved) stack.pop();
+    }
+
+    // stains
+    stains=[];
+    for(let i=0;i<8;i++){
+      stains.push(randomFloorFarFrom(1,1,4));
+    }
+
+    // offerings
+    offerings=[];
+    while(offerings.length<TOTAL_OFFERINGS){
+      const r = randomFloorFarFrom(1,1,6);
+      if(offerings.some(o=>o.x===r.x && o.y===r.y)) continue;
+      offerings.push({x:r.x,y:r.y,collected:false,order:0});
+    }
+
+    // chests
+    chests=[];
+    while(chests.length<CHESTS_PER_LEVEL){
+      const r = randomFloorFarFrom(1,1,5);
+      if(chests.some(c=>c.x===r.x && c.y===r.y)) continue;
+      if(offerings.some(o=>o.x===r.x && o.y===r.y)) continue;
+      chests.push({x:r.x,y:r.y,opened:false});
+    }
+
+    // player
+    player.x=1; player.y=1;
+    player.panicHits=0; player.panicGrace=0;
+    player.sanity = 100;
+
+    // exit
+    exit = randomFloorFarFrom(1,1,12);
+    exitLocked = true;
+
+    // reset counts
+    collectedCount = 0;
+    messages = [];
+    globalAnxiety = 0;
+
+    // enemy reset
+    enemy.active=false;
+    enemy.stun=0;
+    enemy.lastSeen=0;
+    enemy.stepCooldown=0;
+    enemy.targetTile=null;
+    enemy.speed = 0.018 + Math.random()*0.008;
+    enemy.aggression = 0.95 + Math.random()*0.18;
+
+    // mission reset
+    mission.active = false;
+    mission.completed = false;
+
+    // prompt reset
+    prompt.active = false;
+
+    // pulse/flash
+    pulse.active=false;
+    flash.active=false;
+
+    statusDisplay.style.color="#ccffcc";
+    statusDisplay.innerText="STATUS: ALONE";
+
+    updateUI();
+  }
+
+  // ===== PICKUPS =====
+  function openChest(ch){
+    ch.opened = true;
+    triggerMessage("CHEST OPENED");
+    audio?.blip?.(1.0);
+    if (Math.random() < 0.75) triggerFlash();
+
+    // unlock a mission if none active
+    if (!mission.active && exitLocked){
+      setMission(generateRandomMission());
+    } else {
+      // if a mission is already active, chest can trigger lore prompt instead
+      if (Math.random() < 0.65) showPrompt(lorePrompts[(Math.random()*lorePrompts.length)|0]);
+    }
+  }
+
+  function collectOffering(o){
+    // if FOLLOW_ORDER mission is active, enforce order
+    if (mission.active && mission.type === "FOLLOW_ORDER"){
+      const needed = (mission.extra?.needed ?? 1);
+      if (o.order !== needed){
+        triggerMessage("WRONG SEQUENCE");
+        globalAnxiety = Math.max(globalAnxiety, 18);
+        audio?.blip?.(1.0);
+        triggerFlash();
+        generateLevel();
+        return;
+      }
+      mission.extra.needed = needed + 1;
+      if (mission.extra.needed > TOTAL_OFFERINGS){
+        // complete mission here
+        completeMission();
+      }
+    }
+
+    o.collected = true;
+    collectedCount++;
+    triggerMessage("OFFERING ACCEPTED");
+    triggerMessage(["MEMORY FRAME: 00"+((Math.random()*9)|0), "FOUND FOOTAGE: OK", "INDEX CORRUPTED"][((Math.random()*3)|0)]);
+    audio?.blip?.(0.9);
+
+    if (Math.random() < 0.55) triggerFlash();
+    if (Math.random() < 0.30) showPrompt(lorePrompts[(Math.random()*lorePrompts.length)|0]);
+
+    updateUI();
+  }
+
+  // ===== NOISE OVERLAY =====
+  function drawNoiseOverlay(amount){
+    if (amount<=0) return;
     ctx.save();
-    ctx.globalAlpha = Math.min(0.24, amount / 50);
-    for (let i = 0; i < 150; i++) {
-      const x = Math.random() * canvas.width;
-      const y = Math.random() * canvas.height;
-      const w = 1 + Math.random() * 2;
-      const h = 1 + Math.random() * 2;
-      ctx.fillStyle = Math.random() < 0.5 ? "#0d0d0d" : "#1a1a1a";
-      ctx.fillRect(x, y, w, h);
+    ctx.globalAlpha = Math.min(0.26, amount/50);
+    for(let i=0;i<150;i++){
+      const x=Math.random()*canvas.width;
+      const y=Math.random()*canvas.height;
+      const w=1+Math.random()*2;
+      const h=1+Math.random()*2;
+      ctx.fillStyle = Math.random()<0.5 ? "#0d0d0d" : "#1a1a1a";
+      ctx.fillRect(x,y,w,h);
     }
     ctx.restore();
   }
 
-  // --- UPDATE LOOP ---
-  function update() {
-    let vx = 0, vy = 0;
-    let currentSpeed = player.speed;
-    const sprinting = !!keys["ShiftLeft"];
+  // ===== UPDATE =====
+  let lastTime = performance.now();
 
-    if (sprinting) {
-      currentSpeed *= 1.5;
-      globalAnxiety = Math.min(globalAnxiety + 0.35, 14);
+  function update(){
+    const now = performance.now();
+    const dt = Math.min(0.05, (now-lastTime)/1000);
+    lastTime = now;
+
+    // prompt timer
+    if (prompt.active){
+      prompt.timer -= dt;
+      if (prompt.timer <= 0){
+        // no response -> punish gently
+        prompt.active = false;
+        triggerMessage("NO RESPONSE");
+        globalAnxiety = Math.max(globalAnxiety, 14);
+        enemy.aggression += 0.06;
+      }
+    }
+
+    // movement
+    let vx=0, vy=0;
+    let spd = player.speed;
+    const sprinting = !!keys["ShiftLeft"];
+    if (sprinting){
+      spd *= 1.5;
+      globalAnxiety = Math.min(globalAnxiety + 0.35, 16);
+      player.sanity = Math.max(0, player.sanity - 8*dt);
     } else {
       globalAnxiety = Math.max(globalAnxiety - 0.12, 0);
+      player.sanity = Math.min(100, player.sanity + 5*dt);
     }
 
-    if (keys['KeyW'] || keys['ArrowUp']) vy = -currentSpeed;
-    if (keys['KeyS'] || keys['ArrowDown']) vy = currentSpeed;
-    if (keys['KeyA'] || keys['ArrowLeft']) vx = -currentSpeed;
-    if (keys['KeyD'] || keys['ArrowRight']) vx = currentSpeed;
+    if (keys["KeyW"]||keys["ArrowUp"]) vy=-spd;
+    if (keys["KeyS"]||keys["ArrowDown"]) vy=spd;
+    if (keys["KeyA"]||keys["ArrowLeft"]) vx=-spd;
+    if (keys["KeyD"]||keys["ArrowRight"]) vx=spd;
 
-    const nextX = player.x + vx;
-    const nextY = player.y + vy;
+    const nx = player.x + vx;
+    const ny = player.y + vy;
+    if (!checkWall(nx, player.y)) player.x = nx;
+    if (!checkWall(player.x, ny)) player.y = ny;
 
-    if (!checkWall(nextX, player.y)) player.x = nextX;
-    if (!checkWall(player.x, nextY)) player.y = nextY;
+    const moving = Math.abs(vx)+Math.abs(vy) > 0.00001;
 
-    const moving = Math.abs(vx) + Math.abs(vy) > 0.00001;
+    // update mission
+    updateMission(dt, moving, sprinting);
 
-    // Mission: TUNE (stand still near offering = “signal lock”)
-    if (mission.type === "TUNE") {
-      const nearSignal = offerings.some(o => !o.collected && Math.hypot(player.x - (o.x+0.5), player.y - (o.y+0.5)) < 2.1);
-      if (!moving && nearSignal) {
-        mission.progress += 1 / 60;
-        if (mission.progress > mission.target) {
-          triggerMessage("SIGNAL LOCKED");
-          mission.type = "DONE";
-          enemy.stun = 120;
-          audio?.blip?.(1.0);
-          statusDisplay.innerText = "STATUS: SIGNAL LOCKED";
-          statusDisplay.style.color = "#ccffcc";
-        } else if (Math.random() < 0.02) {
-          triggerMessage("HOLD STILL");
-        }
-      } else {
-        mission.progress = Math.max(0, mission.progress - 0.05);
-      }
-    }
-
-    // Update enemy
+    // enemy
     updateEnemy();
 
-    // Objective panning (toward nearest offering/exit)
+    // objective panning
     const obj = getNearestObjective();
-    if (obj && audio) {
-      const dx = (obj.x + 0.5) - player.x;
-      audio.setObjectivePan(clamp(dx / 6, -1, 1));
+    if (obj && audio){
+      const dx = (obj.x+0.5) - player.x;
+      audio.setObjectivePan(clamp(dx/6, -1, 1));
     }
 
-    // Stain interaction (abstract zones)
-    for (const s of stains) {
+    // stains effects + chance of lore prompt
+    for (const s of stains){
       const d = Math.hypot((s.x+0.5)-player.x, (s.y+0.5)-player.y);
-      if (d < 1.1) {
+      if (d < 1.0){
         globalAnxiety = Math.max(globalAnxiety, 8);
-        if (Math.random() < 0.02) triggerMessage("COLOR BLEED");
-        if (Math.random() < 0.02) audio?.blip?.(0.35);
+        if (Math.random() < 0.015) triggerMessage("COLOR BLEED");
+        if (Math.random() < 0.010) audio?.blip?.(0.35);
+        if (Math.random() < 0.004) showPrompt(lorePrompts[(Math.random()*lorePrompts.length)|0]);
       }
     }
 
-    // pickups
-    offerings.forEach(o => {
-      if (o.collected) return;
-      const d = Math.hypot(player.x - (o.x+0.5), player.y - (o.y+0.5));
-      if (d < 0.55) {
-        if (mission.type === "NO_RUN" && sprinting) {
-          triggerMessage("TOO LOUD");
-          globalAnxiety = Math.max(globalAnxiety, 14);
-          audio?.blip?.(0.5);
-          return;
-        }
-
-        if (mission.type === "ORDER") {
-          const needed = collectedCount + 1;
-          if (o.order !== needed) {
-            triggerMessage("WRONG SEQUENCE");
-            globalAnxiety = Math.max(globalAnxiety, 18);
-            audio?.blip?.(1.0);
-            generateLevel();
-            return;
-          }
-        }
-
-        o.collected = true;
-        collectedCount++;
-        triggerMessage("OFFERING ACCEPTED");
-        triggerMessage(["MEMORY FRAME: 00"+((Math.random()*9)|0), "FOUND FOOTAGE: OK", "INDEX CORRUPTED"][((Math.random()*3)|0)]);
-        audio?.blip?.(0.9);
-        updateUI();
-
-        if (collectedCount === TOTAL_OFFERINGS) spawnExit();
-      }
-    });
-
-    if (exit) {
-      const d = Math.hypot(player.x - (exit.x+0.5), player.y - (exit.y+0.5));
-      if (d < 0.55) {
-        alert("DESCENDING DEEPER...");
-        generateLevel();
+    // chest pickup
+    for (const c of chests){
+      if (c.opened) continue;
+      const d = Math.hypot((c.x+0.5)-player.x, (c.y+0.5)-player.y);
+      if (d < 0.55){
+        openChest(c);
       }
     }
 
-    // pulse decay
-    if (pulse.active) {
-      pulse.t += 1/60;
+    // offering pickup
+    for (const o of offerings){
+      if (o.collected) continue;
+      const d = Math.hypot((o.x+0.5)-player.x, (o.y+0.5)-player.y);
+      if (d < 0.55){
+        collectOffering(o);
+      }
+    }
+
+    // exit interaction
+    if (exit){
+      const d = Math.hypot((exit.x+0.5)-player.x, (exit.y+0.5)-player.y);
+      if (d < 0.60){
+        if (exitLocked){
+          triggerMessage("EXIT LOCKED");
+          globalAnxiety = Math.max(globalAnxiety, 10);
+          if (Math.random()<0.02) audio?.blip?.(0.6);
+        } else {
+          alert("DESCENDING DEEPER...");
+          generateLevel();
+        }
+      }
+    }
+
+    // pulse
+    if (pulse.active){
+      pulse.t += dt;
       if (pulse.t > 0.55) pulse.active = false;
     }
 
-    // decay messages
-    messages = messages.filter(m => m.life > 0);
-    messages.forEach(m => m.life--);
+    // flash
+    if (flash.active){
+      flash.t += dt;
+      const a = Math.sin(Math.min(1, flash.t/flash.dur)*Math.PI);
+      flash.alpha = 0.78 * a;
+      if (flash.t >= flash.dur) flash.active = false;
+    }
 
-    globalAnxiety = Math.min(globalAnxiety, 26);
+    // floating messages
+    messages = messages.filter(m=>m.life>0);
+    for (const m of messages) m.life--;
+
+    globalAnxiety = Math.min(globalAnxiety, 28);
   }
 
-  // --- RENDERING ---
-  function draw() {
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // ===== DRAW =====
+  function draw(){
+    ctx.fillStyle="#000";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    // breathing FOV (fear-based)
+    // breathing FOV depends on fear + sanity
     const fear = clamp(audio?.fear ?? 0, 0, 1);
-    const breath = 0.35 * Math.sin(performance.now()/700);
-    const fov = clamp(BASE_FOV + breath + (0.5 - fear) * 1.6, MIN_FOV, MAX_FOV);
+    const sanityFactor = clamp(player.sanity/100, 0, 1);
+    const breath = 0.35*Math.sin(performance.now()/700);
+    const fov = clamp(BASE_FOV + breath + (0.55 - fear)*1.6 + (sanityFactor-0.5)*0.6, MIN_FOV, MAX_FOV);
 
+    // camera
     ctx.save();
+    const shake = Math.min(10, globalAnxiety);
+    const shakeX = (Math.random()-0.5)*shake;
+    const shakeY = (Math.random()-0.5)*shake;
+    const camX = -player.x*TILE_SIZE + canvas.width/2;
+    const camY = -player.y*TILE_SIZE + canvas.height/2;
+    ctx.translate(camX+shakeX, camY+shakeY);
 
-    const shake = Math.min(9, globalAnxiety);
-    const shakeX = (Math.random() - 0.5) * shake;
-    const shakeY = (Math.random() - 0.5) * shake;
+    // draw map
+    for(let y=0;y<ROWS;y++){
+      for(let x=0;x<COLS;x++){
+        const dist = Math.hypot((x+0.5)-player.x, (y+0.5)-player.y);
+        if (dist>fov) continue;
+        const v = clamp(1 - dist/fov, 0, 1);
 
-    const camX = -player.x * TILE_SIZE + canvas.width / 2;
-    const camY = -player.y * TILE_SIZE + canvas.height / 2;
-    ctx.translate(camX + shakeX, camY + shakeY);
-
-    // draw map with fog falloff
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
-        const distToPlayer = Math.hypot((x+0.5) - player.x, (y+0.5) - player.y);
-        if (distToPlayer > fov) continue;
-
-        const v = clamp(1 - distToPlayer / fov, 0, 1);
-
-        // stains tint floors like abstract paint
-        const stained = stains.some(s => s.x===x && s.y===y);
-
-        if (map[y][x] === 1) {
+        const stained = stains.some(s=>s.x===x && s.y===y);
+        if (map[y][x]===1){
           ctx.fillStyle = `rgba(50,52,62,${v})`;
         } else {
-          if (stained) ctx.fillStyle = `rgba(26,16,28,${v})`;
-          else ctx.fillStyle = `rgba(18,18,24,${v})`;
+          ctx.fillStyle = stained ? `rgba(26,16,28,${v})` : `rgba(18,18,24,${v})`;
         }
-        ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        ctx.fillRect(x*TILE_SIZE,y*TILE_SIZE,TILE_SIZE,TILE_SIZE);
 
-        // extra “micro texture” on stained tiles
-        if (stained && v > 0.2 && Math.random() < 0.12) {
+        // stain micro specks
+        if (stained && v>0.25 && Math.random()<0.12){
           ctx.fillStyle = `rgba(255,60,90,${0.07*v})`;
           ctx.fillRect(x*TILE_SIZE + ((Math.random()*TILE_SIZE)|0), y*TILE_SIZE + ((Math.random()*TILE_SIZE)|0), 1, 1);
         }
       }
     }
 
+    // draw chests
+    for (const c of chests){
+      if (c.opened) continue;
+      const dist = Math.hypot((c.x+0.5)-player.x, (c.y+0.5)-player.y);
+      if (dist>fov) continue;
+      ctx.fillStyle = "rgba(160,160,180,0.9)";
+      ctx.fillRect(c.x*TILE_SIZE+4, c.y*TILE_SIZE+6, 8, 6);
+      ctx.fillStyle = "rgba(255,60,90,0.55)";
+      ctx.fillRect(c.x*TILE_SIZE+4, c.y*TILE_SIZE+9, 8, 1);
+    }
+
     // offerings
-    offerings.forEach(o => {
-      if (o.collected) return;
-      const distToPlayer = Math.hypot((o.x+0.5) - player.x, (o.y+0.5) - player.y);
-      if (distToPlayer > fov) return;
+    for (const o of offerings){
+      if (o.collected) continue;
+      const dist = Math.hypot((o.x+0.5)-player.x, (o.y+0.5)-player.y);
+      if (dist>fov) continue;
 
-      const pulse = 0.55 + Math.sin(Date.now() / 220) * 0.25;
-      let col = `rgba(200,200,120,${pulse})`;
+      const p = 0.55 + Math.sin(Date.now()/220)*0.25;
+      let col = `rgba(200,200,120,${p})`;
 
-      if (mission.type === "ORDER") {
-        col = o.order === 1 ? `rgba(210,160,90,${pulse})`
-            : o.order === 2 ? `rgba(170,210,120,${pulse})`
-            : `rgba(210,120,150,${pulse})`;
+      if (mission.active && mission.type === "FOLLOW_ORDER"){
+        col = o.order===1 ? `rgba(210,160,90,${p})`
+            : o.order===2 ? `rgba(170,210,120,${p})`
+            : `rgba(210,120,150,${p})`;
       }
-
       ctx.fillStyle = col;
-      ctx.fillRect(o.x * TILE_SIZE + 4, o.y * TILE_SIZE + 4, 8, 8);
-    });
+      ctx.fillRect(o.x*TILE_SIZE+4, o.y*TILE_SIZE+4, 8, 8);
+    }
 
-    // exit
-    if (exit) {
-      const distToPlayer = Math.hypot((exit.x+0.5) - player.x, (exit.y+0.5) - player.y);
-      if (distToPlayer <= fov + 0.5) {
-        ctx.fillStyle = "rgba(255,255,255,0.95)";
-        ctx.fillRect(exit.x * TILE_SIZE, exit.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-        ctx.fillStyle = "rgba(255,60,90,0.7)";
-        ctx.fillRect(exit.x * TILE_SIZE + 7, exit.y * TILE_SIZE + 3, 2, TILE_SIZE - 6);
+    // exit (locked/unlocked)
+    if (exit){
+      const dist = Math.hypot((exit.x+0.5)-player.x, (exit.y+0.5)-player.y);
+      if (dist <= fov+0.6){
+        ctx.fillStyle = exitLocked ? "rgba(130,130,130,0.85)" : "rgba(255,255,255,0.95)";
+        ctx.fillRect(exit.x*TILE_SIZE, exit.y*TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        ctx.fillStyle = exitLocked ? "rgba(255,60,90,0.35)" : "rgba(255,60,90,0.75)";
+        ctx.fillRect(exit.x*TILE_SIZE+7, exit.y*TILE_SIZE+3, 2, TILE_SIZE-6);
       }
     }
 
-    // enemy (still mostly implied)
-    if (enemy.active) {
-      const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-      if (dist < fov - 0.4 && Math.random() < 0.50) {
-        ctx.fillStyle = "rgba(255, 0, 60, 0.20)";
-        ctx.fillRect((enemy.x-0.5) * TILE_SIZE, (enemy.y-0.5) * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    // enemy as creepy image following player
+    if (enemy.active){
+      const dist = Math.hypot(player.x-enemy.x, player.y-enemy.y);
+      if (dist < fov+0.2){
+        // warp intensity with proximity
+        const a = clamp(1 - dist/6, 0, 1);
+        const wobX = (Math.random()-0.5) * a * 2.0;
+        const wobY = (Math.random()-0.5) * a * 2.0;
+
+        ctx.globalAlpha = 0.75 + a*0.20;
+        ctx.drawImage(monsterSprite, (enemy.x-0.5)*TILE_SIZE + wobX, (enemy.y-0.5)*TILE_SIZE + wobY);
+        ctx.globalAlpha = 1;
+
+        // subtle red aura specks
+        if (a > 0.35 && Math.random() < 0.18){
+          ctx.fillStyle = `rgba(255,60,90,${0.10*a})`;
+          ctx.fillRect((enemy.x-0.5)*TILE_SIZE + ((Math.random()*16)|0), (enemy.y-0.5)*TILE_SIZE + ((Math.random()*16)|0), 1, 1);
+        }
       }
     }
 
     // player
-    ctx.fillStyle = "#88AAFF";
-    const px = player.x * TILE_SIZE;
-    const py = player.y * TILE_SIZE;
+    ctx.fillStyle="#88AAFF";
+    const px = player.x*TILE_SIZE;
+    const py = player.y*TILE_SIZE;
     ctx.beginPath();
-    ctx.arc(px, py, 5, 0, Math.PI * 2);
+    ctx.arc(px,py,5,0,Math.PI*2);
     ctx.fill();
 
-    // signal pulse indicator (brief vector)
-    if (pulse.active) {
+    // signal pulse vector
+    if (pulse.active){
       const a = clamp(1 - pulse.t/0.55, 0, 1);
       ctx.strokeStyle = `rgba(255,60,90,${0.35*a})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(px, py);
-      ctx.lineTo(px + pulse.dirX * 28, py + pulse.dirY * 28);
+      ctx.moveTo(px,py);
+      ctx.lineTo(px + pulse.dirX*28, py + pulse.dirY*28);
       ctx.stroke();
       ctx.fillStyle = `rgba(255,255,255,${0.12*a})`;
       ctx.beginPath();
-      ctx.arc(px + pulse.dirX * 28, py + pulse.dirY * 28, 6, 0, Math.PI*2);
+      ctx.arc(px + pulse.dirX*28, py + pulse.dirY*28, 6, 0, Math.PI*2);
       ctx.fill();
     }
 
     ctx.restore();
 
-    // messages
+    // floating glitch messages
     ctx.font = "20px 'VT323', monospace";
-    messages.forEach(m => {
+    for (const m of messages){
       ctx.fillStyle = m.color;
       ctx.fillText(m.text, m.x, m.y);
-    });
+    }
 
-    drawNoiseOverlay(globalAnxiety);
+    // mission box
+    if (mission.active){
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = "rgba(0,0,0,0.70)";
+      ctx.fillRect(6, 150, 308, 84);
+      ctx.globalAlpha = 1;
 
-    // tiny HUD hint
+      ctx.fillStyle = "#ccffcc";
+      ctx.font = "16px 'VT323', monospace";
+      ctx.fillText(`MISSION: ${mission.title}`, 12, 166);
+
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = "14px 'VT323', monospace";
+      const lines = mission.desc.split("\n");
+      ctx.fillText(lines[0] || "", 12, 182);
+      ctx.fillText(lines[1] || "", 12, 196);
+
+      // progress
+      let progText = "";
+      if (mission.type === "STILLNESS" || mission.type === "NO_RUN"){
+        progText = `${mission.progress.toFixed(1)} / ${mission.goal.toFixed(1)}s`;
+      } else {
+        progText = `${mission.progress} / ${mission.goal}`;
+      }
+      ctx.fillStyle = "#ff2244";
+      ctx.fillText(`PROGRESS: ${progText}`, 12, 214);
+
+      ctx.restore();
+    }
+
+    // prompt overlay with choices
+    if (prompt.active){
+      ctx.save();
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = "rgba(0,0,0,0.80)";
+      ctx.fillRect(10, 20, 300, 110);
+      ctx.globalAlpha = 1;
+
+      ctx.fillStyle = "#ff2244";
+      ctx.font = "16px 'VT323', monospace";
+      ctx.fillText("TRANSMISSION:", 16, 36);
+
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.fillText(prompt.text, 16, 54);
+
+      ctx.fillStyle = "#ccffcc";
+      ctx.fillText(prompt.a, 16, 80);
+      ctx.fillText(prompt.b, 16, 98);
+
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.fillText(`RESPOND: 1 / 2   (${prompt.timer.toFixed(1)}s)`, 16, 118);
+
+      ctx.restore();
+    }
+
+    // sanity bar + small debug
     ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.fillRect(6, 222, 180, 12);
+    ctx.fillRect(6, 222, 308, 12);
     ctx.fillStyle = "#ccffcc";
     ctx.font = "12px 'VT323', monospace";
-    ctx.fillText(`signal:${Math.round((audio?.fear||0)*100)}%  fov:${fov.toFixed(1)}`, 10, 232);
+    const fear = clamp(audio?.fear ?? 0, 0, 1);
+    ctx.fillText(`sanity:${Math.round(player.sanity)}  fear:${Math.round(fear*100)}%  exit:${exitLocked?"LOCKED":"OPEN"}`, 10, 232);
+
+    // noise overlay
+    drawNoiseOverlay(globalAnxiety);
+
+    // creepy image flash
+    if (flash.active && flash.img){
+      ctx.save();
+      ctx.globalAlpha = flash.alpha;
+      // scale flash to screen
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(flash.img, 0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
   }
 
-  // --- LOOP ---
-  function gameLoop() {
-    if (gameStarted) {
+  // ===== GAME LOOP =====
+  function gameLoop(){
+    if (gameStarted){
       update();
       draw();
     } else {
-      ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle="#000";
+      ctx.fillRect(0,0,canvas.width,canvas.height);
       drawNoiseOverlay(6);
     }
     requestAnimationFrame(gameLoop);
   }
 
-  // --- START ---
-  async function startGame() {
+  // ===== START =====
+  async function startGame(){
     if (gameStarted) return;
     gameStarted = true;
-    if (startOverlay && startOverlay.style) startOverlay.style.display = "none";
+    startOverlay.style.display = "none";
     await ensureAudioRunning();
     generateLevel();
   }
 
-  // Boot
+  // boot
   generateLevel();
   gameLoop();
 })();
 </script>
 </body>
 </html>
+
 
 
