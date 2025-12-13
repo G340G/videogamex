@@ -411,15 +411,21 @@
   function lerp(a,b,t){ return a+(b-a)*t; }
 
   // Low-res noise overlay (generated each frame, cheap)
-  const noiseImg = ctx.createImageData(W,H);
-  const noiseData = noiseImg.data;
-  function fillNoise(intensity){
-    // intensity 0..1
-    const amt = 10 + intensity*70;
-    for(let i=0;i<noiseData.length;i+=4){
-      const n = (Math.random()*amt)|0;
-      noiseData[i]=n; noiseData[i+1]=n; noiseData[i+2]=n; noiseData[i+3]=255;
-    }
+// NOTE: putImageData ignores globalAlpha, so we draw via an offscreen canvas.
+const noiseCan = document.createElement('canvas');
+noiseCan.width = W; noiseCan.height = H;
+const nctx = noiseCan.getContext('2d', { alpha: true });
+const noiseImg = nctx.createImageData(W,H);
+const noiseData = noiseImg.data;
+function fillNoise(intensity){
+  // intensity 0..1
+  const amt = 10 + intensity*70;
+  for(let i=0;i<noiseData.length;i+=4){
+    const n = (Math.random()*amt)|0;
+    noiseData[i]=n; noiseData[i+1]=n; noiseData[i+2]=n; noiseData[i+3]=255;
+  }
+  nctx.putImageData(noiseImg, 0, 0);
+}
   }
 
   // ====== Game logic ======
@@ -695,32 +701,35 @@
     }
 
     // glitch/static overlay when stalker is close
-    {
-      const g = clamp(glitch.level*0.9 + glitch.kick*0.6, 0, 1);
-      if(g > 0.02){
-        fillNoise(g);
-        ctx.globalAlpha = 0.06 + g*0.18;
-        ctx.putImageData(noiseImg, 0, 0);
+{
+  const g = clamp(glitch.level*0.9 + glitch.kick*0.6, 0, 1);
+  if(g > 0.02){
+    fillNoise(g);
 
-        // scanline tear
-        if(g > 0.2 && rng() < 0.35 + glitch.kick*0.5){
-          const y = (rng()*H)|0;
-          const h = 2 + ((rng()*10)|0);
-          const dx = ((rng()*2-1) * (8 + g*22))|0;
-          ctx.globalAlpha = 0.15 + g*0.25;
-          ctx.drawImage(canvas, 0, y, W, h, dx, y, W, h);
-        }
+    // static grain
+    ctx.globalAlpha = 0.06 + g*0.18;
+    ctx.drawImage(noiseCan, 0, 0);
 
-        // chroma-ish offset (fake)
-        if(g > 0.35){
-          ctx.globalAlpha = 0.08 + g*0.12;
-          ctx.globalCompositeOperation = 'screen';
-          ctx.drawImage(canvas, 0, 0, W, H, (rng()*2-1)*g*2, (rng()*2-1)*g*1, W, H);
-          ctx.globalCompositeOperation = 'source-over';
-        }
+    // scanline tear
+    if(g > 0.2 && rng() < 0.35 + glitch.kick*0.5){
+      const y = (rng()*H)|0;
+      const h = 2 + ((rng()*10)|0);
+      const dx = ((rng()*2-1) * (8 + g*22))|0;
+      ctx.globalAlpha = 0.15 + g*0.25;
+      ctx.drawImage(canvas, 0, y, W, h, dx, y, W, h);
+    }
 
-        ctx.globalAlpha = 1;
-      }
+    // chroma-ish offset (fake)
+    if(g > 0.35){
+      ctx.globalAlpha = 0.08 + g*0.12;
+      ctx.globalCompositeOperation = 'screen';
+      ctx.drawImage(canvas, 0, 0, W, H, (rng()*2-1)*g*2, (rng()*2-1)*g*1, W, H);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    ctx.globalAlpha = 1;
+  }
+}
     }
 
     // win flash (a sickly red pulse)
@@ -776,3 +785,4 @@
 </script>
 </body>
 </html>
+
