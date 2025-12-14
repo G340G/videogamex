@@ -1,1 +1,177 @@
+:root{
+  --bg:#050505;
+  --crt:#aaddaa;
+  --dim:rgba(170,221,170,.25);
+  --warn:#ffcc00;
+  --danger:#ff2a2a;
+}
+
+html,body{
+  height:100%;
+  margin:0;
+  background:#020202;
+  font-family:'VT323',monospace;
+  color:var(--crt);
+  overflow:hidden;
+  user-select:none;
+}
+
+#main{
+  width:100%;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+#crt-frame{
+  position:relative;
+  width:min(900px, 96vw);
+  aspect-ratio: 4 / 3;
+  background:#000;
+  border:2px solid #333;
+  box-shadow:0 0 50px rgba(0,0,0,.85);
+  overflow:hidden;
+}
+
+canvas{
+  width:100%;
+  height:100%;
+  display:block;
+  image-rendering:pixelated;
+}
+
+/* CRT FX */
+.scanlines{
+  position:absolute; inset:0; pointer-events:none; z-index:50;
+  background:linear-gradient(to bottom,
+    rgba(255,255,255,0), rgba(255,255,255,0) 50%,
+    rgba(0,0,0,.30) 50%, rgba(0,0,0,.30));
+  background-size:100% 4px;
+  mix-blend-mode:overlay;
+  opacity:.85;
+}
+.vignette{
+  position:absolute; inset:0; pointer-events:none; z-index:51;
+  background:radial-gradient(circle, rgba(0,0,0,0) 45%, rgba(0,0,0,.90) 100%);
+}
+
+/* HUD */
+#ui{
+  position:absolute; inset:0; z-index:40;
+  pointer-events:none;
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+.hud-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.hud-row.bottom{ align-items:flex-end; }
+.hud-box{
+  background:rgba(0,0,0,.60);
+  border:1px solid var(--dim);
+  padding:8px 10px;
+  font-size:1.15rem;
+  text-shadow:0 0 6px rgba(170,221,170,.18);
+  max-width:46%;
+}
+#hud-left{ max-width:54%; }
+#hud-right{ max-width:40%; }
+
+.hud-warn{ color:var(--warn); }
+.hud-dim{ opacity:.85; }
+
+.hud-label{ font-size:1.05rem; opacity:.85; }
+.hud-mini{ font-size:1.0rem; opacity:.8; margin-top:6px; }
+
+.bar{
+  width:160px;
+  height:8px;
+  background:#222;
+  border:1px solid #444;
+  margin:3px 0 6px;
+}
+.bar.slim{ width:100%; height:6px; margin-top:10px; }
+.fill{
+  height:100%;
+  width:100%;
+  background:var(--crt);
+  transition:width .12s linear;
+}
+.fill.red{ background:var(--danger); box-shadow:0 0 8px rgba(255,42,42,.5); }
+
+/* Overlays */
+.overlay{
+  position:absolute; inset:0; z-index:80;
+  background:rgba(0,0,0,.84);
+  backdrop-filter: blur(3px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:auto;
+}
+.hidden{ display:none !important; }
+
+.panel{
+  width:min(520px, 92%);
+  border:2px solid var(--crt);
+  background:#0b0b0b;
+  padding:20px 22px;
+  box-shadow:0 0 26px rgba(170,221,170,.18);
+}
+.panel.terminal{ width:min(360px, 92%); }
+.panel.prompt{ width:min(520px, 92%); }
+
+h1{ margin:0 0 8px; font-size:3.2rem; letter-spacing:3px; }
+h2{ margin:0 0 10px; font-size:2.0rem; color:var(--warn); }
+
+.sub{ opacity:.85; font-size:1.2rem; }
+.sub.tiny{ font-size:1.0rem; opacity:.72; margin-top:10px; }
+.hint{ margin:14px 0 10px; opacity:.8; font-size:1.15rem; }
+
+.form{ margin-top:12px; display:flex; flex-direction:column; gap:6px; }
+label{ opacity:.85; font-size:1.15rem; }
+
+input,select{
+  font-family:'VT323',monospace;
+  font-size:1.25rem;
+  background:#000;
+  border:1px solid #555;
+  color:var(--crt);
+  padding:7px 10px;
+  outline:none;
+}
+input:focus, select:focus{ border-color:var(--crt); box-shadow:0 0 0 2px rgba(170,221,170,.15); }
+
+.row{ display:flex; gap:10px; margin-top:14px; justify-content:center; flex-wrap:wrap; }
+button{
+  font-family:'VT323',monospace;
+  font-size:1.5rem;
+  padding:8px 14px;
+  background:transparent;
+  color:var(--crt);
+  border:1px solid var(--crt);
+  cursor:pointer;
+  transition: all .12s ease;
+}
+button:hover{ background:var(--crt); color:#000; }
+button.ghost{ border-color:#666; color:#aaa; }
+button.ghost:hover{ background:#777; color:#000; }
+
+.code{ display:flex; gap:10px; justify-content:center; margin:14px 0; }
+.digit{
+  width:60px;
+  text-align:center;
+  font-size:2rem;
+  padding:10px 0;
+}
+
+.prompt-text{ font-size:1.45rem; }
+.prompt-choices{ margin-top:10px; font-size:1.35rem; }
+.flash{
+  position:absolute; inset:0; z-index:70;
+  pointer-events:none;
+  mix-blend-mode:screen;
+  opacity:0;
+}
 
