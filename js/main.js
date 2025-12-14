@@ -61,8 +61,7 @@ ui.btnMute.addEventListener("click", ()=>{
   if (state.audio && !state.muted) state.audio.resume().catch(()=>{});
 });
 
-// IMPORTANT: Clicking name input must NOT start the game.
-// We start ONLY on pressing the “INITIALIZE RUN” button.
+// Start ONLY via button.
 ui.btnStart.addEventListener("click", async ()=>{
   const name = ui.nameInput.value;
   const role = ui.roleSelect.value;
@@ -82,20 +81,12 @@ ui.roleSelect.addEventListener("change", ()=> previewLore());
 ui.nameInput.addEventListener("input", ()=> previewLore());
 
 function previewLore(){
-  // lightweight preview without starting
-  const tmpName = ui.nameInput.value || "SUBJECT";
-  const tmpRole = ui.roleSelect.value;
-  state.name = tmpName.toUpperCase().slice(0,16);
-  state.role = tmpRole;
-
-  // show random-ish, without committing seed
-  ui.introLore.textContent = "…";
+  ui.diffPreview.textContent = "DIFF: (randomized when you start)";
+  ui.introLore.textContent = "Type a name. Choose a role. Initialize.";
 }
 
 /* ========= TERMINAL ========= */
-ui.btnAbort.addEventListener("click", ()=>{
-  closeTerminal();
-});
+ui.btnAbort.addEventListener("click", closeTerminal);
 ui.btnExec.addEventListener("click", ()=>{
   const guess = `${ui.d1.value||""}${ui.d2.value||""}${ui.d3.value||""}`;
   const ok = tryUnlock(state, guess);
@@ -103,8 +94,9 @@ ui.btnExec.addEventListener("click", ()=>{
     closeTerminal();
     unlockExit();
   }else{
-    ui.terminal.querySelector(".panel").style.filter = "brightness(1.3)";
-    setTimeout(()=> ui.terminal.querySelector(".panel").style.filter="", 120);
+    const panel = ui.terminal.querySelector(".panel");
+    panel.style.filter = "brightness(1.3)";
+    setTimeout(()=> panel.style.filter="", 120);
   }
 });
 for (const el of [ui.d1,ui.d2,ui.d3]){
@@ -132,7 +124,6 @@ function showPrompt(p){
   setLog(state, "INPUT REQUIRED.");
   state.audio?.blip?.(0.8);
 }
-
 function choosePrompt(choice){
   if(!state.prompt.active) return;
   const fn = state.prompt.onChoose;
@@ -183,21 +174,21 @@ function buildLevel(){
     taken:false
   });
 
-  // chests: unlock missions
+  // chests
   const chestCount = 3;
   for(let i=0;i<chestCount;i++){
     const c = randomFloorCell(state, {x:1,y:1,d:8+i*2});
     state.pickups.push({ kind:"chest", x:(c.x+0.5)*state.tileSize, y:(c.y+0.5)*state.tileSize, taken:false });
   }
 
-  // oxygen tanks (baseline ≥ 60s, tanks make it generous)
+  // oxygen tanks
   const tankCount = (state.role==="butcher" ? 4 : 3);
   for(let i=0;i<tankCount;i++){
     const c = randomFloorCell(state, {x:1,y:1,d:10+i});
     state.pickups.push({ kind:"oxygen", x:(c.x+0.5)*state.tileSize, y:(c.y+0.5)*state.tileSize, taken:false, val: 18 + (state.r()*10|0) });
   }
 
-  // ammo for thief (ranged)
+  // ammo
   if (state.player.ranged){
     const ammoCount = 4 + state.difficulty.spawnExtra;
     for(let i=0;i<ammoCount;i++){
@@ -206,13 +197,13 @@ function buildLevel(){
     }
   }
 
-  // secret perk (optional)
+  // secret perk
   if (state.r() < 0.55){
     const c = randomFloorCell(state, {x:1,y:1,d:16});
     state.pickups.push({ kind:"perk", x:(c.x+0.5)*state.tileSize, y:(c.y+0.5)*state.tileSize, taken:false });
   }
 
-  // enemies (increasing difficulty)
+  // enemies
   const baseEnemies = 2 + state.level + state.difficulty.spawnExtra;
   for(let i=0;i<baseEnemies;i++){
     const far = randomFloorCell(state, {x:1,y:1,d:18});
@@ -223,7 +214,6 @@ function buildLevel(){
   ui.hudLoc.textContent = `LOC: ${state.theme.name}`;
   ui.hudObj.textContent = "OBJ: FIND THE CODE + OPEN TERMINAL";
   ui.hudMission.textContent = `— ${state.theme.perk}`;
-  ui.diffPreview.textContent = `DIFF: ${state.difficulty.label} · enemies x${state.difficulty.enemyMult.toFixed(2)} · oxygen drain x${state.difficulty.oxygenDrain.toFixed(2)}`;
 
   // intro lore line
   ui.introLore.textContent = personalizeText(state, themeLore(state));
@@ -284,15 +274,11 @@ function completeMission(){
   state.mission.completed = true;
   setLog(state, "TASK COMPLETE. EXIT WEAKENED.");
   ui.hudObj.textContent = "OBJ: UNLOCK EXIT (TERMINAL)";
-
-  // reduce immediate heat
   state.player.sanity = clamp(state.player.sanity + 8, 0, state.player.sanityMax);
 }
 
 /* ========= EXIT UNLOCK ========= */
 function unlockExit(){
-  // must have mission completed (or none started yet? you asked: chests unlock missions; mission needed)
-  // We enforce: need mission completed + terminal solved.
   const can = state.puzzle.solved && state.mission.completed;
   if(!can){
     setLog(state, "EXIT RESISTS. COMPLETE THE TASK.");
@@ -307,28 +293,25 @@ function unlockExit(){
 function interact(){
   if(state.paused) return;
 
-  // terminal
   if(canOpenTerminal(state)){
     openTerminal();
     return;
   }
 
-  // “pulse” / echo
   if(state.mission.active && state.mission.type==="ECHO"){
     state.mission.data.used++;
     if(state.mission.data.used > state.mission.data.N){
-      // overflow resets progress
       state.mission.data.used = 0;
       setLog(state, "ECHO OVERFLOW. TRY AGAIN.");
       state.escalation += 0.6;
       state.audio?.corrupt?.();
     }
   }
+
   state.audio?.blip?.(0.9);
   setLog(state, "PULSE SENT.");
 }
 
-/* ========= TERMINAL OPEN/CLOSE ========= */
 function openTerminal(){
   state.paused = true;
   ui.terminal.classList.remove("hidden");
@@ -343,7 +326,7 @@ function closeTerminal(){
   state.paused = false;
 }
 
-/* ========= PROMPTS (lore choices) ========= */
+/* ========= PROMPTS ========= */
 const PROMPTS = [
   {
     text:`A speaker hisses: "{NAME}, do you want to be seen?"`,
@@ -372,7 +355,6 @@ const PROMPTS = [
         spawnFaceFlash(state);
         setLog(state, "CONFESSION ACCEPTED.");
       }else{
-        // reward + penalty
         if(state.player.ranged) state.player.ammo += 4;
         else state.player.oxyTimer = Math.min(state.player.oxyTimerMax, state.player.oxyTimer + 8);
         state.audio?.corrupt?.();
@@ -383,7 +365,7 @@ const PROMPTS = [
   }
 ];
 
-/* ========= GAME LOOP (fixed timestep for smoothness) ========= */
+/* ========= LOOP ========= */
 let last = performance.now();
 let acc = 0;
 const STEP = 1/60;
@@ -396,16 +378,19 @@ function loop(t){
   frame = Math.min(frame, 0.05);
   acc += frame;
 
-  // audio tick (even if paused, faint ambience)
   if(state.audio && !state.muted) state.audio.tickMusic(state);
 
   while(acc >= STEP){
-    state.dt = STEP;
     update(STEP);
     acc -= STEP;
   }
 
+  // ✅ render normally
   render(state, R);
+
+  // ✅ then update DOM flash (no reassignment of imported render)
+  updateFlashDOM();
+
   clearFrame(input);
 }
 
@@ -413,7 +398,7 @@ function loop(t){
 function update(dt){
   if(!state.running) return;
 
-  // menu closed => game running. Paused blocks logic except prompt timers.
+  // prompt timer still ticks
   if(state.prompt.active){
     state.prompt.timer -= dt;
     ui.promptBar.style.width = `${clamp((state.prompt.timer/7.0)*100, 0, 100)}%`;
@@ -428,30 +413,24 @@ function update(dt){
 
   state.t++;
 
-  // cooldowns
   const p = state.player;
   p.cooldown = Math.max(0, p.cooldown - dt);
   p.dashCd = Math.max(0, p.dashCd - dt);
   p.invuln = Math.max(0, p.invuln - dt);
 
-  // oxygen system: >=60s baseline, drain depends on sprint + difficulty + escalation
   const sprinting = key(input, "ShiftLeft") || key(input, "ShiftRight");
   p._sprinting = sprinting;
 
   const drain = (sprinting ? 1.55 : 1.0) * state.difficulty.oxygenDrain * (1 + state.escalation*0.02);
   p.oxyTimer = Math.max(0, p.oxyTimer - dt*drain);
-
-  // convert timer to bar %
   p.oxy = (p.oxyTimer / p.oxyTimerMax) * 100;
 
-  // if oxygen empty => hp drains slowly (not instant)
   if(p.oxyTimer <= 0){
     p.hp -= dt * (6 + state.escalation*0.8);
     p.sanity = clamp(p.sanity - dt*3, 0, p.sanityMax);
     if(Math.random()<0.02) state.audio?.corrupt?.();
   }
 
-  // movement input (smooth velocity, normalized)
   let mx = 0, my = 0;
   if(key(input,"KeyW")||key(input,"ArrowUp")) my -= 1;
   if(key(input,"KeyS")||key(input,"ArrowDown")) my += 1;
@@ -465,32 +444,23 @@ function update(dt){
   const accel = 18.0;
   const friction = 10.5;
 
-  // facing toward mouse
   const camX = p.x - canvas.width/2;
   const camY = p.y - canvas.height/2;
   const fx = (input.mouseX + camX) - p.x;
   const fy = (input.mouseY + camY) - p.y;
   p.facing = Math.atan2(fy, fx);
 
-  // desired vel
   const dvx = mx * base;
   const dvy = my * base;
 
-  // accelerate
   p.vx += (dvx - p.vx) * clamp(accel*dt, 0, 1);
   p.vy += (dvy - p.vy) * clamp(accel*dt, 0, 1);
 
-  // friction when no input
   if(mx===0 && my===0){
     p.vx *= Math.max(0, 1 - friction*dt);
     p.vy *= Math.max(0, 1 - friction*dt);
   }
 
-  // dash (thief)
-  if(state.role==="thief" && wasPressed(input,"Space") && p.dashCd<=0 && p.cooldown<=0){
-    // if ranged thief: Space attacks; dash on Shift+Space
-    // keep it simple: dash on Shift+E? No. We'll do Shift+Space dash.
-  }
   if(state.role==="thief" && wasPressed(input,"Space") && sprinting && p.dashCd<=0){
     p.dashCd = 1.2;
     p.invuln = 0.18;
@@ -501,48 +471,33 @@ function update(dt){
     state.audio?.blip?.(0.55);
   }
 
-  // move with robust collision (prevents corner attachment)
   moveWithCollision(state, p, dt);
 
-  // interactions
   if(wasPressed(input,"KeyE")) interact();
-
-  // attack
   if(wasPressed(input,"Space")) attack(state);
 
   // mission updates
   if(state.mission.active){
     if(state.mission.type==="STILL"){
-      // stand near code decal
       const code = state.decals.find(d=>d.type==="code");
       const near = code && dist(p.x,p.y, code.x,code.y) < 80;
       const moving = Math.hypot(p.vx,p.vy) > 10;
       if(near && !moving) state.mission.progress += dt;
       else state.mission.progress = Math.max(0, state.mission.progress - dt*0.6);
-
-      if(state.mission.progress >= state.mission.data.S){
-        completeMission();
-      }
+      if(state.mission.progress >= state.mission.data.S) completeMission();
     }
     if(state.mission.type==="NO_SPRINT"){
-      if(sprinting){
-        state.mission.progress = Math.max(0, state.mission.progress - dt*2.0);
-      }else{
-        state.mission.progress += dt;
-      }
-      if(state.mission.progress >= state.mission.data.S){
-        completeMission();
-      }
+      if(sprinting) state.mission.progress = Math.max(0, state.mission.progress - dt*2.0);
+      else state.mission.progress += dt;
+      if(state.mission.progress >= state.mission.data.S) completeMission();
     }
     if(state.mission.type==="ECHO"){
       state.mission.progress = state.mission.data.used;
-      if(state.mission.progress >= state.mission.data.N){
-        completeMission();
-      }
+      if(state.mission.progress >= state.mission.data.N) completeMission();
     }
   }
 
-  // pickups collisions
+  // pickups
   for(const it of state.pickups){
     if(it.taken) continue;
     const d = dist(p.x,p.y, it.x,it.y);
@@ -551,21 +506,10 @@ function update(dt){
         it.taken = true;
         setLog(state, "CHEST OPENED.");
         state.audio?.blip?.(1.0);
-
-        if(!state.mission.active && !state.mission.completed){
-          startMission();
-        }else{
-          // lore prompt sometimes
-          if(state.r() < 0.55){
-            const pr = pick(state.r, PROMPTS);
-            showPrompt(pr);
-          }
-        }
-
-        // creepy flash
+        if(!state.mission.active && !state.mission.completed) startMission();
+        else if(state.r() < 0.55) showPrompt(pick(state.r, PROMPTS));
         if(state.r() < 0.65) spawnFaceFlash(state);
       }
-
       if(it.kind==="oxygen"){
         it.taken = true;
         const gain = it.val ?? 20;
@@ -573,39 +517,31 @@ function update(dt){
         setLog(state, `OXYGEN TANK +${gain|0}s`);
         state.audio?.blip?.(0.7);
       }
-
       if(it.kind==="ammo"){
         it.taken = true;
         p.ammo += it.val ?? 4;
         setLog(state, `AMMO +${it.val ?? 4}`);
         state.audio?.blip?.(0.6);
       }
-
       if(it.kind==="perk"){
         it.taken = true;
         state.secretsFound++;
-        // hidden perk: reduce oxygen drain and slightly slow escalation
         state.difficulty.oxygenDrain = Math.max(0.85, state.difficulty.oxygenDrain - 0.08);
         state.escalation = Math.max(0, state.escalation - 0.6);
         p.sanity = clamp(p.sanity + 12, 0, p.sanityMax);
         setLog(state, "HIDDEN PERK: YOUR BREATH IS LESS LOUD.");
         state.audio?.blip?.(0.9);
       }
-
       if(it.kind==="exit"){
         if(it.locked){
           setLog(state, "EXIT LOCKED.");
           state.audio?.blip?.(0.4);
         }else{
-          // win level -> next
           state.level++;
           setLog(state, "SEQUENCE COMPLETE. DESCENDING…");
           state.audio?.blip?.(1.0);
-
-          // increase difficulty progressively
           state.difficulty.enemyMult += 0.06;
           state.difficulty.oxygenDrain += 0.04;
-
           buildLevel();
           return;
         }
@@ -613,13 +549,10 @@ function update(dt){
     }
   }
 
-  // bullets
   updateBullets(state, dt);
-
-  // enemies
   updateEnemies(state, dt);
 
-  // fear audio based on nearest enemy
+  // fear audio
   let nearest = 9999;
   for(const e of state.entities){
     if(!e.alive) continue;
@@ -628,14 +561,7 @@ function update(dt){
   const fear = clamp(1 - nearest/260, 0, 1);
   state.audio?.setFear?.(fear);
 
-  // spawn extra enemies over time as escalation rises (but keep escapable)
-  if(state.r() < (0.002 + state.enemySpawnRate*0.0005)){
-    const far = randomFloorCell(state, {x:(p.x/state.tileSize)|0, y:(p.y/state.tileSize)|0, d:18});
-    spawnEnemy(state, "stalker", far);
-    setLog(state, "SOMETHING ENTERED THE GRID.");
-  }
-
-  // effects timers
+  // effects
   updateEffects(state, dt);
 
   // prompt input
@@ -644,13 +570,12 @@ function update(dt){
     if(wasPressed(input,"Digit2") || wasPressed(input,"KeyN")) choosePrompt(2);
   }
 
-  // terminal unlocking check: if solved + mission completed => unlock exit
+  // unlock exit once both conditions met
   if(state.puzzle.solved && state.mission.completed){
     const ex = state.pickups.find(p=>p.kind==="exit");
     if(ex) ex.locked = false;
   }
 
-  // death
   if(p.hp <= 0){
     state.running = false;
     alert("CRITICAL FAILURE. SUBJECT TERMINATED.");
@@ -662,23 +587,21 @@ function update(dt){
 
 /* ========= FLASH EFFECT (DOM) ========= */
 function updateFlashDOM(){
-  // driven by effects of type FACE_FLASH
   const fx = state.effects.find(e=>e.type==="FACE_FLASH");
   if(!fx){
     ui.flash.classList.add("hidden");
     ui.flash.style.opacity = "0";
     ui.flash.style.background = "";
+    ui.flash.style.transform = "";
     return;
   }
 
-  // generate procedural creepy face gradients (cheap + distorted)
   const a = 1 - (fx.t/fx.dur);
   const op = clamp(a*0.85, 0, 0.85);
-
   const skew = (Math.random()*12-6)|0;
+
   ui.flash.classList.remove("hidden");
   ui.flash.style.opacity = String(op);
-
   ui.flash.style.transform = `translate(${skew}px, ${(Math.random()*10-5)|0}px) skewX(${(Math.random()*10-5)|0}deg)`;
 
   ui.flash.style.background = `
@@ -691,17 +614,8 @@ function updateFlashDOM(){
   `;
 }
 
-/* ========= HOOK RENDER TO FLASH DOM ========= */
-const _origRender = render;
-function renderHooked(state, R){
-  _origRender(state, R);
-  updateFlashDOM();
-}
-render = renderHooked; // eslint-disable-line no-func-assign
-
 /* ========= START ========= */
 ui.diffPreview.textContent = "DIFF: (randomized when you start)";
 ui.introLore.textContent = "Type a name. Choose a role. Initialize.";
 previewLore();
 requestAnimationFrame(loop);
-
