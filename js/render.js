@@ -79,7 +79,7 @@ export function render(ctx, S){
     return;
   }
 
-  const tilePx = S.tilePx || 32;
+  const tilePx = S.tilePx || 40;
 
   // camera
   const camX = hero.x * tilePx - W/2;
