@@ -1,13 +1,13 @@
 // render.js
-import { clamp } from "./utils.js";
+import { clamp, dist } from "./utils.js";
 
-const TILE_PX = 32; // must match your game's tile pixel size
+function safeArr(a){ return Array.isArray(a) ? a : []; }
 
 function drawNoise(ctx, amount){
   if (amount <= 0) return;
   ctx.save();
   ctx.globalAlpha = Math.min(0.22, amount / 45);
-  for (let i = 0; i < 220; i++){
+  for (let i = 0; i < 260; i++){
     const x = Math.random() * ctx.canvas.width;
     const y = Math.random() * ctx.canvas.height;
     const w = 1 + (Math.random() * 2);
@@ -22,11 +22,38 @@ function drawFog(ctx, strength=0.9){
   ctx.save();
   const W = ctx.canvas.width, H = ctx.canvas.height;
   ctx.globalAlpha = strength;
-  const g = ctx.createRadialGradient(W/2, H/2, 60, W/2, H/2, Math.max(W, H)*0.75);
+  const g = ctx.createRadialGradient(W/2, H/2, 70, W/2, H/2, Math.max(W, H)*0.78);
   g.addColorStop(0, "rgba(0,0,0,0.0)");
   g.addColorStop(1, "rgba(0,0,0,1.0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
+
+function drawMist(ctx, amount){
+  if(amount <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = Math.min(0.22, amount);
+  for(let i=0;i<20;i++){
+    const y = (Math.random()*ctx.canvas.height)|0;
+    const h = 8 + ((Math.random()*30)|0);
+    ctx.fillStyle = "rgba(190,190,210,0.06)";
+    ctx.fillRect(0, y, ctx.canvas.width, h);
+  }
+  ctx.restore();
+}
+
+function drawRain(ctx, amt){
+  if(amt <= 0) return;
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  ctx.save();
+  ctx.globalAlpha = 0.15 + amt*0.25;
+  for(let i=0;i<140;i++){
+    const x = Math.random()*W;
+    const y = Math.random()*H;
+    ctx.fillStyle = "rgba(180,220,255,0.25)";
+    ctx.fillRect(x, y, 1, 6 + Math.random()*10);
+  }
   ctx.restore();
 }
 
@@ -37,183 +64,235 @@ function drawSprite(ctx, img, x, y, scale=1, jitter=0){
   ctx.drawImage(img, (x + jx) | 0, (y + jy) | 0, (img.width*scale) | 0, (img.height*scale) | 0);
 }
 
-function softSmear(ctx, img, x, y, scale=1){
-  ctx.save();
-  ctx.globalAlpha = 0.25;
-  ctx.drawImage(img, (x-1) | 0, y | 0, (img.width*scale) | 0, (img.height*scale) | 0);
-  ctx.drawImage(img, x | 0, (y-1) | 0, (img.width*scale) | 0, (img.height*scale) | 0);
-  ctx.restore();
-}
-
-function safeArr(a){ return Array.isArray(a) ? a : []; }
-
 export function render(ctx, S){
   const W = ctx.canvas.width, H = ctx.canvas.height;
-
-  // clear
   ctx.fillStyle = "#050505";
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0,0,W,H);
 
   const map = S?.map;
   const hero = S?.hero;
-
-  // camera
-  let camX = 0, camY = 0;
-  if (hero) {
-    camX = hero.x * TILE_PX - W/2;
-    camY = hero.y * TILE_PX - H/2;
+  if(!map || !map.length || !hero){
+    // safe fallback: show something instead of black
+    ctx.fillStyle = "#111";
+    ctx.font = "16px VT323, monospace";
+    ctx.fillText("LOADING WORLD...", 20, 30);
+    return;
   }
 
-  // MAP (simple, safe, dark). Replace with your prettier one if you want.
-  if (map && map.length) {
-    const rows = map.length;
-    const cols = map[0]?.length ?? 0;
+  const tilePx = S.tilePx || 32;
 
-    const startX = Math.max(0, ((camX / TILE_PX) | 0) - 2);
-    const startY = Math.max(0, ((camY / TILE_PX) | 0) - 2);
-    const endX = Math.min(cols-1, (((camX + W) / TILE_PX) | 0) + 2);
-    const endY = Math.min(rows-1, (((camY + H) / TILE_PX) | 0) + 2);
+  // camera
+  const camX = hero.x * tilePx - W/2;
+  const camY = hero.y * tilePx - H/2;
 
-    for (let y = startY; y <= endY; y++){
-      const row = map[y];
-      if (!row) continue;
-      for (let x = startX; x <= endX; x++){
-        const v = row[x] ?? 1;
-        const sx = (x*TILE_PX - camX) | 0;
-        const sy = (y*TILE_PX - camY) | 0;
+  // theme palette
+  const theme = S.theme || { floor:"#09090b", wall:"#15151c", accent:"#ff2a5c", fog:0.92, rain:0.0 };
 
-        if (v === 1) {
-          ctx.fillStyle = "#1a1a1f";
-          ctx.fillRect(sx, sy, TILE_PX, TILE_PX);
-          ctx.strokeStyle = "rgba(0,0,0,0.35)";
-          ctx.strokeRect(sx, sy, TILE_PX, TILE_PX);
-        } else {
-          ctx.fillStyle = "#09090b";
-          ctx.fillRect(sx, sy, TILE_PX, TILE_PX);
+  // visible bounds
+  const rows = map.length;
+  const cols = map[0]?.length ?? 0;
+  const startX = Math.max(0, ((camX / tilePx) | 0) - 2);
+  const startY = Math.max(0, ((camY / tilePx) | 0) - 2);
+  const endX = Math.min(cols-1, (((camX + W) / tilePx) | 0) + 2);
+  const endY = Math.min(rows-1, (((camY + H) / tilePx) | 0) + 2);
 
-          // subtle grime specks
-          if (Math.random() < 0.06) {
-            ctx.fillStyle = "rgba(90,60,70,0.12)";
-            ctx.fillRect(sx + ((Math.random()*TILE_PX)|0), sy + ((Math.random()*TILE_PX)|0), 1, 1);
-          }
+  // psychedelic states
+  const poison = hero.poison > 0;
+  const reveal = hero.reveal > 0;
+
+  // draw tiles
+  for(let y=startY; y<=endY; y++){
+    const row = map[y];
+    if(!row) continue;
+    for(let x=startX; x<=endX; x++){
+      const v = row[x] ?? 1;
+      const sx = (x*tilePx - camX) | 0;
+      const sy = (y*tilePx - camY) | 0;
+
+      if(v === 1){
+        ctx.fillStyle = theme.wall;
+        ctx.fillRect(sx,sy,tilePx,tilePx);
+        ctx.strokeStyle = "rgba(0,0,0,0.4)";
+        ctx.strokeRect(sx,sy,tilePx,tilePx);
+        if(Math.random()<0.03){
+          ctx.fillStyle = "rgba(255,255,255,0.02)";
+          ctx.fillRect(sx+((Math.random()*tilePx)|0), sy+((Math.random()*tilePx)|0), 1, 1);
         }
+      } else {
+        ctx.fillStyle = theme.floor;
+        ctx.fillRect(sx,sy,tilePx,tilePx);
+        if(Math.random()<0.06){
+          ctx.fillStyle = "rgba(120,40,60,0.08)";
+          ctx.fillRect(sx+((Math.random()*tilePx)|0), sy+((Math.random()*tilePx)|0), 1, 1);
+        }
+      }
+
+      // poison hue shift hint
+      if(poison && v===0 && Math.random()<0.04){
+        ctx.fillStyle = "rgba(130,80,190,0.06)";
+        ctx.fillRect(sx,sy,tilePx,tilePx);
       }
     }
   }
 
-  // KEYS / PORTAL / NPC markers (safe minimal shapes so nothing disappears)
-  for (const k of safeArr(S?.keysOnMap)) {
-    if (k?.taken) continue;
-    const sx = ((k.x+0.5)*TILE_PX - camX) | 0;
-    const sy = ((k.y+0.5)*TILE_PX - camY) | 0;
+  // keys
+  for(const k of safeArr(S.keysOnMap)){
+    if(!k || k.taken) continue;
+    const sx = ((k.x+0.5)*tilePx - camX) | 0;
+    const sy = ((k.y+0.5)*tilePx - camY) | 0;
     ctx.fillStyle = "rgba(210, 200, 90, 0.95)";
     ctx.fillRect(sx-3, sy-3, 6, 6);
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(sx-1, sy-1, 2, 2);
   }
 
-  const p = S?.portal;
-  if (p) {
-    const sx = ((p.x+0.5)*TILE_PX - camX) | 0;
-    const sy = ((p.y+0.5)*TILE_PX - camY) | 0;
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.beginPath();
-    ctx.arc(sx, sy, 8, 0, Math.PI*2);
-    ctx.fill();
-    ctx.fillStyle = "rgba(255,60,90,0.55)";
-    ctx.beginPath();
-    ctx.arc(sx, sy, 4, 0, Math.PI*2);
-    ctx.fill();
+  // oxygen tanks
+  for(const t of safeArr(S.tanks)){
+    if(!t || t.taken) continue;
+    const sx = ((t.x)*tilePx - camX) | 0;
+    const sy = ((t.y)*tilePx - camY) | 0;
+    ctx.fillStyle = "rgba(140,220,255,0.75)";
+    ctx.fillRect(sx-4, sy-5, 8, 10);
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.fillRect(sx-2, sy-4, 2, 8);
   }
 
-  for (const n of safeArr(S?.npcs)) {
-    if (!n || n.used) continue;
-    const sx = ((n.x+0.5)*TILE_PX - camX) | 0;
-    const sy = ((n.y+0.5)*TILE_PX - camY) | 0;
+  // peasants
+  for(const n of safeArr(S.npcs)){
+    if(!n || n.used) continue;
+    const sx = ((n.x)*tilePx - camX) | 0;
+    const sy = ((n.y)*tilePx - camY) | 0;
     ctx.fillStyle = "rgba(170, 220, 170, 0.65)";
-    ctx.fillRect(sx-3, sy-5, 6, 10);
+    ctx.fillRect(sx-3, sy-6, 6, 12);
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(sx-2, sy-1, 1, 1);
+    ctx.fillRect(sx+1, sy-1, 1, 1);
   }
 
-  // ENEMIES (simple blobs; your real enemy art can remain in other render pieces)
-  for (const e of safeArr(S?.enemies)) {
-    if (!e || !e.alive) continue;
-    const sx = (e.x*TILE_PX - camX) | 0;
-    const sy = (e.y*TILE_PX - camY) | 0;
+  // notes
+  for(const n of safeArr(S.notes)){
+    if(!n || n.taken) continue;
+    const sx = ((n.x)*tilePx - camX) | 0;
+    const sy = ((n.y)*tilePx - camY) | 0;
+    ctx.fillStyle = "rgba(255,255,255,0.20)";
+    ctx.fillRect(sx-4, sy-3, 8, 6);
+  }
 
-    ctx.fillStyle = "rgba(255, 40, 70, 0.25)";
-    ctx.beginPath();
-    ctx.arc(sx, sy, 10, 0, Math.PI*2);
-    ctx.fill();
+  // portal
+  if(S.portal){
+    const sx = ((S.portal.x+0.5)*tilePx - camX) | 0;
+    const sy = ((S.portal.y+0.5)*tilePx - camY) | 0;
+    const unlocked = (S.keysCollected >= S.totalKeys);
+    ctx.fillStyle = unlocked ? "rgba(255,255,255,0.85)" : "rgba(80,10,20,0.75)";
+    ctx.beginPath(); ctx.arc(sx,sy, 9, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = unlocked ? "rgba(255,60,90,0.55)" : "rgba(0,0,0,0.35)";
+    ctx.beginPath(); ctx.arc(sx,sy, 4, 0, Math.PI*2); ctx.fill();
+  }
 
-    if (Math.random() < 0.35) {
-      ctx.fillStyle = "rgba(255, 40, 70, 0.65)";
-      ctx.fillRect(sx-3, sy-2, 2, 2);
-      ctx.fillRect(sx+2, sy-2, 2, 2);
+  // enemies
+  for(const e of safeArr(S.enemies)){
+    if(!e || !e.alive) continue;
+    const sx = (e.x*tilePx - camX) | 0;
+    const sy = (e.y*tilePx - camY) | 0;
+
+    const jitter = (hero.sanity < 40 || poison) ? 2.0 : 1.0;
+    ctx.fillStyle = "rgba(255, 40, 70, 0.22)";
+    ctx.beginPath(); ctx.arc(sx,sy, 10, 0, Math.PI*2); ctx.fill();
+
+    if(Math.random() < 0.55){
+      ctx.fillStyle = "rgba(255, 40, 70, 0.70)";
+      ctx.fillRect(sx-4+(Math.random()*2|0), sy-3, 2, 2);
+      ctx.fillRect(sx+2+(Math.random()*2|0), sy-3, 2, 2);
+    }
+
+    // extra smear
+    if(Math.random() < 0.18){
+      ctx.globalAlpha = 0.20;
+      ctx.fillRect(sx-10, sy+6, 20, 2);
+      ctx.globalAlpha = 1;
     }
   }
 
-  // PROJECTILES (visible bullets)
-  for (const pr of safeArr(S?.projectiles)) {
-    if (!pr || !pr.alive) continue;
-    const sx = (pr.x*TILE_PX - camX) | 0;
-    const sy = (pr.y*TILE_PX - camY) | 0;
-
-    ctx.fillStyle = pr.from === "hero" ? "rgba(230,230,230,0.9)" : "rgba(255,60,90,0.8)";
+  // projectiles
+  for(const pr of safeArr(S.projectiles)){
+    if(!pr || !pr.alive) continue;
+    const sx = (pr.x*tilePx - camX) | 0;
+    const sy = (pr.y*tilePx - camY) | 0;
+    ctx.fillStyle = pr.from==="hero" ? "rgba(240,240,240,0.9)" : "rgba(255,60,90,0.8)";
     ctx.fillRect(sx-2, sy-1, 4, 2);
+    if(pr.from==="hero"){
+      ctx.fillStyle = "rgba(255,255,255,0.15)";
+      ctx.fillRect(sx-6, sy-1, 4, 2);
+    }
   }
 
-  // HERO sprite (the main change)
-  if (hero && S?.sprites) {
-    // animate
-    hero.animT += (S.dt || 1/60);
-    hero.shootFlash = Math.max(0, hero.shootFlash - (S.dt || 1/60));
+  // hero sprite (from sprites.js bank)
+  const bank = S.sprites?.[hero.role] || S.sprites?.thief;
+  if(bank){
+    hero.animT += S.dt;
+    hero.shootFlash = Math.max(0, hero.shootFlash - S.dt);
+    if(hero._moving && hero.shootFlash<=0.01) hero.walkPhase += S.dt * 10.5;
 
-    const moving = !!hero._moving || (hero._mvLen ?? 0) > 0.01;
-    if (moving && hero.shootFlash <= 0.01) {
-      hero.walkPhase += (S.dt || 1/60) * 10.5;
-    }
-
-    const bank = S.sprites[hero.role] || S.sprites.thief;
     const dir = hero.dir8 || "S";
     const set = bank[dir] || bank.S;
-
-    const walkToggle = ((hero.walkPhase | 0) & 1) === 1;
-    const pose =
-      hero.shootFlash > 0.01 ? "shoot" :
-      moving ? (walkToggle ? "walk" : "idle") :
-      "idle";
-
+    const walkToggle = ((hero.walkPhase|0)&1)===1;
+    const pose = hero.shootFlash>0.01 ? "shoot" : (hero._moving ? (walkToggle?"walk":"idle") : "idle");
     const img = set[pose] || set.idle;
 
-    const px = hero.x * TILE_PX - camX;
-    const py = hero.y * TILE_PX - camY;
+    const px = hero.x*tilePx - camX;
+    const py = hero.y*tilePx - camY;
 
-    // 12x12 -> scale 2 => 24px (smaller than 32px tile)
-    const scale = 2;
+    const scale = 2; // 12px -> 24px
     const sx = (px - (img.width*scale)/2) | 0;
     const sy = (py - (img.height*scale)/2) | 0;
 
-    const stress = clamp((1 - hero.sanity/120) + (hero.oxy <= 0 ? 0.65 : 0), 0, 1);
-    const jitter = 0.5 + stress * 1.6;
-
-    // subtle smear on turns
-    if (moving && Math.random() < 0.25) softSmear(ctx, img, sx, sy, scale);
+    const stress = clamp((1 - hero.sanity/120) + (hero.oxy<=0 ? 0.65 : 0), 0, 1);
+    const jitter = 0.3 + stress*1.5;
 
     drawSprite(ctx, img, sx, sy, scale, jitter);
 
-    // mild gore accent when sanity low
-    if (hero.sanity < 35 && Math.random() < 0.12) {
-      ctx.save();
-      ctx.globalAlpha = 0.55;
-      ctx.fillStyle = "rgba(160,20,40,0.75)";
-      ctx.fillRect(sx + 6, sy + 18, 2, 2);
-      ctx.restore();
-    }
+    // brutal “shadow” under hero
+    ctx.save();
+    ctx.globalAlpha = 0.20;
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.ellipse(px, py+10, 10, 5, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
   }
 
-  // atmosphere overlays
-  const anxiety = clamp((1 - (hero?.sanity ?? 100)/120) * 18, 0, 18);
+  // overlays
+  const anxiety = clamp((1 - hero.sanity/120) * 18, 0, 18);
   drawNoise(ctx, anxiety);
-  drawFog(ctx, 0.86);
 
-  // prompt / mission windows are handled by your HUD DOM; render stays clean.
+  drawMist(ctx, poison ? 0.35 : 0.18);
+  drawRain(ctx, S.theme?.rain || 0);
+
+  // fog stronger unless reveal
+  drawFog(ctx, reveal ? (S.theme?.fog ?? 0.9) - 0.18 : (S.theme?.fog ?? 0.9));
+
+  // prompt box (if active)
+  if(S.prompt){
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.80)";
+    ctx.fillRect(18, H-110, W-36, 92);
+    ctx.strokeStyle = "rgba(170,220,170,0.35)";
+    ctx.strokeRect(18, H-110, W-36, 92);
+
+    ctx.fillStyle = "rgba(230,230,230,0.95)";
+    ctx.font = "18px VT323, monospace";
+    ctx.fillText(S.prompt.q, 30, H-85);
+    ctx.fillStyle = "rgba(200,200,200,0.85)";
+    ctx.fillText(S.prompt.a, 30, H-60);
+    ctx.fillText(S.prompt.b, 30, H-40);
+
+    // timer bar
+    ctx.fillStyle = "rgba(255,60,90,0.8)";
+    const wBar = (W-60) * clamp(S.prompt.t/6.5, 0, 1);
+    ctx.fillRect(30, H-28, wBar, 3);
+
+    ctx.restore();
+  }
 }
+
 
