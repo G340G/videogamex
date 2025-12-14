@@ -49,7 +49,7 @@ export function createAudio(state){
   drone.start();
 
   // detune LFO
-  const lfo = ac.createOscillator(); lfo.type="sine"; lfo.frequency.value = 0.09;
+  const lfo = ac.createOscillator(); lfo.type="sine"; lfo.frequency.value = 0.15;
   const lfoG = ac.createGain(); lfoG.gain.value = 15;
   lfo.connect(lfoG); lfoG.connect(drone.frequency);
   lfo.start();
