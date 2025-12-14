@@ -1,104 +1,82 @@
-import { clamp, hashStr, rng } from "./utils.js";
-import { THEMES } from "./map.js";
+import { clamp } from "./utils.js";
 
 export function createState(){
+  const seed = (Math.random()*1e9)|0;
+  let s = seed >>> 0;
+  const rng = ()=> (s = (s*1664525 + 1013904223)>>>0, (s/4294967296));
+
   return {
-    // runtime
-    running:false,
-    paused:false,
-    muted:false,
-    t:0,
-    dt:0,
-    seed: (Math.random()*1e9)|0,
-    r: null,
+    seed,
+    r: rng,
 
-    // run setup
-    name:"SUBJECT",
-    role:"thief",
+    ui: null,
+    muted: false,
+    audio: null,
+
+    running: false,
+    paused: false,
+    t: 0,
+    level: 1,
+
+    tileSize: 32,
+    mapW: 31,
+    mapH: 21,
+    map: [],
+    theme: { name:"—", floor:"#111", wall:"#222", noise:0.2, perk:"" },
+
+    role: "thief",
+    name: "SUBJECT",
+    player: {
+      x: 0, y: 0,
+      vx: 0, vy: 0,
+      facing: 0,
+      speed: 165,
+      sprint: 1.35,
+
+      hp: 100, hpMax: 100,
+      sanity: 100, sanityMax: 100,
+
+      // oxygen lasts at least ~60s baseline
+      oxyTimerMax: 70,
+      oxyTimer: 70,
+      oxy: 100,
+
+      ammo: 0,
+      ranged: false,
+
+      cooldown: 0,
+      dashCd: 0,
+      invuln: 0,
+    },
+
+    // difficulty (easier baseline)
     difficulty: {
-      label:"…",
-      enemyMult:1.0,
-      puzzleCorrupt:0.0,
-      oxygenDrain:1.0,
-      missionHard:0.0,
-      spawnExtra:0
+      oxygenDrain: 1.0,     // 1x baseline (we tuned for ~60-70s)
+      enemyMult: 1.0,
+      spawnExtra: 0,
+      keyCount: 3,
     },
 
-    // world
-    level:1,
-    themeKey:"asylum",
-    theme: THEMES.asylum,
-    map:null, // filled by map.js
-    tiles:null,
-    w:0, h:0,
-    tileSize:32,
+    escalation: 0, // grows with noise/events
 
-    // player
-    player:{
-      x:0, y:0,
-      vx:0, vy:0,
-      r:10, // radius for collision
-      speed:140,
-      sprint:1.45,
-      hp:100, hpMax:100,
-      sanity:100, sanityMax:100,
-      oxy:100, oxyMax:100, // oxygen percent
-      oxyTimer:60.0, // seconds baseline (>= 60s), refilled by tanks
-      oxyTimerMax:60.0,
-      ammo:0,
-      cooldown:0,
-      dashCd:0,
-      invuln:0,
-      damage:18,
-      ranged:false,
-      facing:0
-    },
+    // collectibles / objects
+    pickups: [],
+    entities: [],
+    bullets: [],
+    decals: [],
 
-    // entities
-    entities:[],   // enemies
-    bullets:[],    // projectiles
-    pickups:[],    // items, chests, oxygen, ammo, perks
-    decals:[],     // codes, notes, gore
-    effects:[],    // hallucinations, flashes, screen stuff
+    // hallucinations / overlays
+    effects: [],
 
-    // progression
-    kills:0,
-    escalation:0,          // goes up on killing
-    enemySpawnRate:0.0,    // grows with escalation
-    secretsFound:0,
+    // key win condition
+    keysTotal: 3,
+    keysFound: 0,
 
-    // missions and prompts
-    mission:{
-      active:false,
-      title:"",
-      desc:"",
-      type:"",
-      progress:0,
-      goal:1,
-      data:null,
-      completed:false
-    },
-    prompt:{
-      active:false,
-      text:"",
-      a:"",
-      b:"",
-      timer:0,
-      onChoose:null
-    },
-    puzzle:{
-      code:"000",
-      solved:false,
-      termX:0, termY:0,
-      codeX:0, codeY:0,
-      lies:false
-    },
+    // mission/prompt (still used for peasants + lore)
+    mission: { active:false, completed:false, type:"", title:"", desc:"", goal:1, progress:0, data:null },
+    prompt: { active:false, text:"", a:"", b:"", timer:0, onChoose:null },
 
-    // UI hooks (populated in main.js)
-    ui:null,
-
-    // audio handle (audio.js)
-    audio:null
+    secretsFound: 0,
   };
 }
 
@@ -106,125 +84,79 @@ export function configureRun(state, {name, role}){
   state.name = (name && name.trim()) ? name.trim().slice(0,16).toUpperCase() : "SUBJECT";
   state.role = role;
 
-  // seeded RNG uses name+role to feel “personal”
-  state.seed = (hashStr(state.name + "::" + role) ^ ((Math.random()*1e9)|0)) >>> 0;
-  state.r = rng(state.seed);
+  // randomized difficulty each run (but *not* brutal)
+  const r = state.r();
+  const diffTier = r < 0.33 ? 0 : r < 0.75 ? 1 : 2;
 
-  // randomized difficulty per run
-  const r = state.r;
-  const roll = r();
-  const d = state.difficulty;
-
-  if (roll < 0.25){
-    d.label = "FRAIL SIGNAL";
-    d.enemyMult = 0.95;
-    d.oxygenDrain = 0.90;
-    d.puzzleCorrupt = 0.10;
-    d.missionHard = 0.10;
-    d.spawnExtra = 0;
-  } else if (roll < 0.60){
-    d.label = "NORMAL DECAY";
-    d.enemyMult = 1.10;
-    d.oxygenDrain = 1.00;
-    d.puzzleCorrupt = 0.18;
-    d.missionHard = 0.20;
-    d.spawnExtra = 1;
-  } else if (roll < 0.85){
-    d.label = "BLACKOUT LOOP";
-    d.enemyMult = 1.25;
-    d.oxygenDrain = 1.10;
-    d.puzzleCorrupt = 0.28;
-    d.missionHard = 0.35;
-    d.spawnExtra = 2;
-  } else {
-    d.label = "CULT HOSTILE";
-    d.enemyMult = 1.40;
-    d.oxygenDrain = 1.20;
-    d.puzzleCorrupt = 0.40;
-    d.missionHard = 0.50;
-    d.spawnExtra = 3;
-  }
+  state.difficulty.spawnExtra = diffTier;          // 0..2
+  state.difficulty.enemyMult  = 0.95 + diffTier*0.12;
+  state.difficulty.oxygenDrain = 0.95 + diffTier*0.12; // still ~60s+
+  state.difficulty.keyCount   = 3 + diffTier;      // 3..5
+  state.keysTotal = state.difficulty.keyCount;
+  state.keysFound = 0;
 
   // role stats
   const p = state.player;
-  p.hpMax = 100;
-  p.sanityMax = 100;
-  p.oxyTimerMax = 60.0;     // >= 60 seconds baseline
-  p.oxyTimer = p.oxyTimerMax;
-  p.ammo = 0;
+  p.hpMax = 100; p.hp = 100;
+  p.sanityMax = 100; p.sanity = 100;
+  p.oxyTimerMax = 70; p.oxyTimer = 70;
+
   p.ranged = false;
-  p.damage = 18;
-  p.speed = 140;
-  p.sprint = 1.45;
+  p.ammo = 0;
 
-  if (role === "thief"){
-    p.speed = 160;
-    p.damage = 14;
-    p.ranged = false;
-    p.ammo = 0;
-  } else if (role === "killer"){
-    p.speed = 145;
-    p.damage = 22;
-    p.ranged = false;
-    p.sanityMax = 90;
-  } else if (role === "butcher"){
-    p.speed = 130;
-    p.damage = 28;
-    p.ranged = false;
-    // butcher gets more oxygen tanks (handled in pickups spawn)
-    p.oxyTimerMax = 75.0;
-    p.oxyTimer = p.oxyTimerMax;
-    p.hpMax = 115;
+  if(role === "thief"){
+    p.speed = 175;
+    p.sprint = 1.42;
+    p.hpMax = 90; p.hp = 90;
+  } else if(role === "killer"){
+    p.speed = 165;
+    p.sprint = 1.35;
+    p.hpMax = 100; p.hp = 100;
+  } else { // butcher
+    p.speed = 155;
+    p.sprint = 1.30;
+    p.hpMax = 120; p.hp = 120;
   }
-
-  p.hp = p.hpMax;
-  p.sanity = p.sanityMax;
-  p.oxy = 100;
-  p.cooldown = 0;
-  p.dashCd = 0;
-  p.invuln = 0;
-
-  state.escalation = 0;
-  state.kills = 0;
-  state.enemySpawnRate = 0;
-  state.secretsFound = 0;
-}
-
-export function setTheme(state){
-  const keys = Object.keys(THEMES);
-  const r = state.r;
-  const themeKey = keys[(r()*keys.length)|0];
-  state.themeKey = themeKey;
-  state.theme = THEMES[themeKey];
-}
-
-export function personalizeText(state, text){
-  // simple personalization tokens
-  return text
-    .replaceAll("{NAME}", state.name)
-    .replaceAll("{ROLE}", state.role.toUpperCase())
-    .replaceAll("{LOC}", state.theme?.name ?? "UNKNOWN");
 }
 
 export function setLog(state, msg){
-  if (!state.ui) return;
-  state.ui.log.textContent = msg;
-  state.ui.log.style.opacity = "1";
-  clearTimeout(state.ui._logTO);
-  state.ui._logTO = setTimeout(()=> state.ui.log.style.opacity = "0.65", 1800);
+  if(state.ui?.log) state.ui.log.textContent = msg;
 }
 
 export function updateBars(state){
-  if (!state.ui) return;
   const p = state.player;
-  state.ui.barOxy.style.width = `${clamp(p.oxy,0,100)}%`;
-  state.ui.barSan.style.width = `${clamp((p.sanity/p.sanityMax)*100,0,100)}%`;
+  p.oxy = clamp((p.oxyTimer/p.oxyTimerMax)*100, 0, 100);
 
-  state.ui.stats.textContent =
-    `${state.name} / ${state.role.toUpperCase()} · LVL ${state.level} · DIFF: ${state.difficulty.label}`;
-
-  // ammo / cooldown readout
-  const ammo = p.ranged ? `AMMO: ${p.ammo}` : `BLADE: READY`;
-  state.ui.ammo.textContent = `${ammo} · KILLS: ${state.kills}`;
+  if(state.ui?.barOxy){
+    state.ui.barOxy.style.width = `${p.oxy}%`;
+  }
+  if(state.ui?.barSan){
+    const s = clamp((p.sanity/p.sanityMax)*100, 0, 100);
+    state.ui.barSan.style.width = `${s}%`;
+  }
+  if(state.ui?.stats){
+    state.ui.stats.textContent = `VIT: ${Math.max(0, Math.ceil(p.hp))}%`;
+  }
+  if(state.ui?.ammo){
+    state.ui.ammo.textContent = p.ranged ? `AMMO: ${p.ammo}` : `AMMO: —`;
+  }
 }
+
+export function personalizeText(state, s){
+  return (s||"")
+    .replaceAll("{NAME}", state.name)
+    .replaceAll("{ROLE}", state.role.toUpperCase());
+}
+
+export function setTheme(state){
+  const themes = [
+    { key:"asylum",   name:"ASYLUM WARD",  floor:"#121213", wall:"#2a2d33", noise:0.10, perk:"White tiles that remember screaming." },
+    { key:"catacomb", name:"CATACOMBS",    floor:"#0f0c0a", wall:"#241610", noise:0.22, perk:"Bone dust in the air." },
+    { key:"prison",   name:"PRISON BLOCK", floor:"#0b0b0b", wall:"#1c2a2a", noise:0.14, perk:"Bars hum with old prayers." },
+    { key:"cemetery", name:"CEMETERY",     floor:"#090a08", wall:"#1b1f13", noise:0.18, perk:"Graves rearrange themselves." },
+    { key:"dungeon",  name:"DUNGEON",      floor:"#0a0a0c", wall:"#1f1f28", noise:0.16, perk:"Chains count your steps." },
+  ];
+  state.theme = themes[(state.r()*themes.length)|0];
+}
+
 
