@@ -1,4 +1,4 @@
-import { clamp, dist, loadImage } from "./utils.js";
+import { clamp, dist } from "./utils.js";
 import { createAudio } from "./audio.js";
 import { render } from "./render.js";
 import { createState, generateLevel, setMsg, maybeStartPrompt, maybeStartMission, completeMission } from "./state.js";
@@ -25,26 +25,7 @@ const roleSelect = document.getElementById("roleSelect");
 const S = createState();
 let audio = null;
 
-const ASSET_PATHS = {
-  face1: "./assets/face1.png",
-  face2: "./assets/face2.png",
-  player: "./assets/player.png",
-  tileset:"./assets/tileset.png",
-};
-
-async function loadAssets(){
-  const [face1, face2, player, tileset] = await Promise.all([
-    loadImage(ASSET_PATHS.face1),
-    loadImage(ASSET_PATHS.face2),
-    loadImage(ASSET_PATHS.player),
-    loadImage(ASSET_PATHS.tileset),
-  ]);
-  return { face1, face2, player, tileset };
-}
-
-let assets = null;
-
-// prevent “clicking name input starts game”
+// prevent “clicking inputs starts game”
 ["pointerdown","mousedown","click","keydown"].forEach(ev=>{
   nameInput.addEventListener(ev, (e)=> e.stopPropagation());
   roleSelect.addEventListener(ev, (e)=> e.stopPropagation());
@@ -54,26 +35,14 @@ btnStart.addEventListener("click", async () => {
   const name = (nameInput.value || "SUBJECT").trim().slice(0,16);
   const role = roleSelect.value;
 
-  // audio MUST start from gesture
   audio = audio || createAudio();
   await audio.resume();
-
-  if (!assets){
-    try { assets = await loadAssets(); }
-    catch(e){
-      console.error(e);
-      alert("ASSET LOAD FAILED.\nCheck /assets filenames & case sensitivity.");
-      return;
-    }
-  }
 
   menu.style.display = "none";
   S.running = true;
 
   generateLevel(S, name, role);
-  S.assets = assets;
   uiRole.textContent = `ROLE: ${role.toUpperCase()}`;
-
   audio.setTheme(S.theme.key);
 
   last = performance.now();
@@ -86,7 +55,6 @@ window.addEventListener("keydown", (e)=>{
   S.input.down.add(e.code);
   S.input.just.add(e.code);
 
-  // prompt answers
   if (S.prompt.active){
     if (e.code === "Digit1" || e.code === "KeyY") choosePrompt(1);
     if (e.code === "Digit2" || e.code === "KeyN") choosePrompt(2);
@@ -126,38 +94,46 @@ function win(){
   location.reload();
 }
 
+function bloodBurst(x, y, power=1){
+  const n = 8 + ((Math.random()*10)|0);
+  for (let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2;
+    const sp = (1.5 + Math.random()*4.5) * power;
+    S.blood.push({
+      x, y,
+      vx: Math.cos(a)*sp,
+      vy: Math.sin(a)*sp,
+      life: 0.35 + Math.random()*0.45,
+      sz: 1 + Math.random()*2.2,
+      col: Math.random()<0.7 ? "#ff2a3a" : "#a10f18"
+    });
+  }
+}
+
 function applyPeasant(effect){
   const h = S.hero;
-
   if (effect === "reveal"){
     S.buffs.reveal = Math.max(S.buffs.reveal, 12);
     setMsg(S, `"I CAN SHOW YOU EVERYTHING, ${h.name}."`, 3.2);
-
   } else if (effect === "oxy"){
     h.oxy = clamp(h.oxy + 55, 0, h.oxyMax);
     setMsg(S, "OXYGEN TANK — lungs quiet down.", 2.8);
-
   } else if (effect === "poison"){
     S.curses.poison = Math.max(S.curses.poison, 14);
     setMsg(S, "POISON — the walls begin to melt.", 2.8);
-
   } else if (effect === "compass"){
     S.buffs.compass = Math.max(S.buffs.compass, 12);
     setMsg(S, "COMPASS — you feel the portal’s direction.", 2.8);
-
   } else if (effect === "calm"){
     S.buffs.calm = Math.max(S.buffs.calm, 12);
     h.sanity = clamp(h.sanity + 20, 0, 120);
     setMsg(S, "CALM — your hands stop shaking.", 2.8);
-
   } else {
-    // grief slow + damage buff
     S.curses.grief = Math.max(S.curses.grief, 12);
     h.griefBuff = Math.max(h.griefBuff, 10);
     h.sanity = Math.max(0, h.sanity - 8);
     setMsg(S, `"GRIEF MAKES YOU STRONG."`, 2.8);
   }
-
   audio?.blip?.(0.9);
 }
 
@@ -170,11 +146,15 @@ function heroShoot(){
 
   const dmgBuff = (S.buffs.damage > 0 ? 1.35 : 1.0) * (h.griefBuff>0 ? 1.25 : 1.0);
 
+  // muzzle flash & shoot anim
+  h.shootT = 0.12;
+  S.fx.muzzle = 1.0;
+
   if (h.role === "thief"){
     h.atkCd = 0.14;
     const spd = 11.6;
     const dmg = 11 * dmgBuff;
-    S.projectiles.push(makeProjectile(h.x + fx*0.65, h.y + fy*0.65, fx*spd, fy*spd, "hero", dmg, 0.13));
+    S.projectiles.push(makeProjectile(h.x + fx*0.70, h.y + fy*0.70, fx*spd, fy*spd, "hero", dmg, 0.13));
     audio?.blip?.(0.45);
 
   } else if (h.role === "killer"){
@@ -185,14 +165,14 @@ function heroShoot(){
     const ang = h.facing + spread;
     const vx = Math.cos(ang)*spd;
     const vy = Math.sin(ang)*spd;
-    S.projectiles.push(makeProjectile(h.x + Math.cos(ang)*0.70, h.y + Math.sin(ang)*0.70, vx, vy, "hero", dmg, 0.12));
+    S.projectiles.push(makeProjectile(h.x + Math.cos(ang)*0.75, h.y + Math.sin(ang)*0.75, vx, vy, "hero", dmg, 0.12));
     audio?.blip?.(0.60);
 
-  } else { // butcher
+  } else {
     h.atkCd = 0.32;
     const spd = 9.3;
     const dmg = 22 * dmgBuff;
-    S.projectiles.push(makeProjectile(h.x + fx*0.85, h.y + fy*0.85, fx*spd, fy*spd, "hero", dmg, 0.15));
+    S.projectiles.push(makeProjectile(h.x + fx*0.90, h.y + fy*0.90, fx*spd, fy*spd, "hero", dmg, 0.15));
     audio?.blip?.(0.78);
   }
 }
@@ -210,7 +190,6 @@ function update(dt){
   const h = S.hero;
   if (!h) return;
 
-  // message timer
   if (S.msgT > 0) S.msgT -= dt;
 
   // prompt timer
@@ -223,24 +202,23 @@ function update(dt){
     }
   }
 
-  // cooldowns & statuses
+  // cooldowns / anim timers
   h.atkCd = Math.max(0, h.atkCd - dt);
   h.griefBuff = Math.max(0, h.griefBuff - dt);
+  h.shootT = Math.max(0, h.shootT - dt);
 
-  // buffs/curses decay
   for (const k of Object.keys(S.buffs)) S.buffs[k] = Math.max(0, S.buffs[k] - dt);
   for (const k of Object.keys(S.curses)) S.curses[k] = Math.max(0, S.curses[k] - dt);
 
-  // oxygen drain (nerfed + tanks abundant)
-  const sprint = S.input.down.has("ShiftLeft") || S.input.down.has("ShiftRight");
+  S.fx.shock = Math.max(0, S.fx.shock - dt*1.3);
+  S.fx.muzzle = Math.max(0, S.fx.muzzle - dt*8);
+  S.fx.hitVignette = Math.max(0, S.fx.hitVignette - dt*2.2);
 
-  // baseline tuned to be survivable > 60s
+  // oxygen drain (survivable)
+  const sprint = S.input.down.has("ShiftLeft") || S.input.down.has("ShiftRight");
   const baseDrain = (S.difficulty === 1 ? 0.85 : S.difficulty === 2 ? 1.05 : 1.25);
   const sprintExtra = (sprint ? 0.80 : 0);
-
-  // calm buff reduces drain
   const calmMul = (S.buffs.calm > 0 ? 0.78 : 1.0);
-
   const drain = (baseDrain + sprintExtra) * calmMul;
 
   h.oxy = Math.max(0, h.oxy - drain * dt);
@@ -254,7 +232,7 @@ function update(dt){
     h.sanity = Math.min(120, h.sanity + 3.2 * dt);
   }
 
-  // movement (smooth, no corner sticking)
+  // movement
   let mx=0, my=0;
   if (S.input.down.has("KeyW") || S.input.down.has("ArrowUp")) my -= 1;
   if (S.input.down.has("KeyS") || S.input.down.has("ArrowDown")) my += 1;
@@ -265,13 +243,15 @@ function update(dt){
   mx/=len; my/=len;
 
   let spd = h.speed * (sprint ? 1.25 : 1.0);
-
-  // grief curse slows you
   if (S.curses.grief > 0) spd *= 0.78;
-
   if (h.oxy <= 0) spd *= 0.72;
 
-  if (Math.abs(mx)+Math.abs(my) > 0.01) h.facing = Math.atan2(my,mx);
+  if (Math.abs(mx)+Math.abs(my) > 0.01){
+    h.facing = Math.atan2(my,mx);
+    h.stepT += dt * (sprint ? 10 : 7);
+  } else {
+    h.stepT += dt * 2.0;
+  }
 
   tryMoveCircle(S.map, h, mx*spd*dt, my*spd*dt);
 
@@ -279,7 +259,6 @@ function update(dt){
   if (S.input.just.has("Space")) heroShoot();
 
   if (S.input.just.has("KeyE")){
-    // talk to peasants
     for (const n of S.npcs){
       if (n.used) continue;
       if (dist(n.x,n.y,h.x,h.y) < 1.05){
@@ -288,7 +267,6 @@ function update(dt){
         break;
       }
     }
-    // activate shrine
     for (const sh of S.shrines){
       if (sh.used) continue;
       if (dist(sh.x,sh.y,h.x,h.y) < 1.1){
@@ -306,19 +284,18 @@ function update(dt){
     }
   }
 
-  // collect notes (story)
+  // notes
   for (const n of S.notes){
     if (n.taken) continue;
     if (dist(n.x+0.5,n.y+0.5,h.x,h.y) < 0.9){
       n.taken = true;
       setMsg(S, n.text, 4.0);
       audio?.blip?.(0.65);
-      // some notes start missions sometimes
       if (!S.mission.active && Math.random() < 0.35) maybeStartMission(S);
     }
   }
 
-  // oxygen tanks pickup
+  // oxygen tanks
   for (const t of S.tanks){
     if (t.taken) continue;
     if (dist(t.x+0.5,t.y+0.5,h.x,h.y) < 0.9){
@@ -329,7 +306,7 @@ function update(dt){
     }
   }
 
-  // keys pickup
+  // keys
   for (const k of S.keysOnMap){
     if (k.taken) continue;
     if (dist(k.x+0.5,k.y+0.5,h.x,h.y) < 0.9){
@@ -338,7 +315,6 @@ function update(dt){
       audio?.blip?.(0.85);
       setMsg(S, `KEY ACQUIRED (${S.keysCollected}/${S.totalKeys}).`, 2.2);
 
-      // creepy “always different” whisper
       if (Math.random() < 0.55){
         setMsg(S, `THE FILE REWRITES ${h.name}.`, 2.6);
       }
@@ -358,7 +334,7 @@ function update(dt){
     }
   }
 
-  // mission update
+  // missions
   if (S.mission.active){
     if (S.mission.type === "still"){
       if (Math.abs(mx)+Math.abs(my) < 0.01){
@@ -378,20 +354,21 @@ function update(dt){
       }
     }
     if (S.mission.type === "note"){
-      // complete when any note taken; we approximate via count
       const taken = S.notes.filter(n=>n.taken).length;
       S.mission.prog = taken > 0 ? 1 : 0;
       if (S.mission.prog >= 1) completeMission(S);
     }
   }
 
-  // enemies update (damage + can kill)
+  // enemies
   let nearest = 99;
   for (const e of S.enemies){
     if (!e.alive) continue;
 
     e.hitCd = Math.max(0, e.hitCd - dt);
-    e.stun = Math.max(0, e.stun - dt);
+    e.stun  = Math.max(0, e.stun - dt);
+    e.hurtT = Math.max(0, e.hurtT - dt);
+    e.stepT += dt * 6.0;
 
     const d = dist(e.x,e.y,h.x,h.y);
     nearest = Math.min(nearest, d);
@@ -406,18 +383,19 @@ function update(dt){
       const lx = -vy * wob;
       const ly =  vx * wob;
 
-      // slow down near hero to avoid “body-block corridors”
       let es = e.speed;
       if (d < 1.25) es *= 0.52;
 
       tryMoveCircle(S.map, e, (vx+lx)*es*dt, (vy+ly)*es*dt);
     }
 
-    // melee
     if (d < 0.88 && e.hitCd <= 0){
       e.hitCd = 0.65;
       h.hp = Math.max(0, h.hp - e.dmg);
       h.sanity = Math.max(0, h.sanity - 6);
+      S.fx.hitVignette = Math.max(S.fx.hitVignette, 1.0);
+
+      bloodBurst(h.x, h.y, 0.7);
 
       audio?.blip?.(1.0);
       if (Math.random() < 0.5) setMsg(S, `IT BITES, ${h.name}.`, 1.8);
@@ -426,19 +404,9 @@ function update(dt){
     }
   }
 
-  // fear-driven audio
   audio?.setFear?.(clamp(1 - nearest/7, 0, 1));
 
-  // face flash near enemies
-  if ((!S.fx.faceFlash || S.fx.faceFlash.t >= S.fx.faceFlash.dur) && nearest < 2.2 && Math.random() < 0.07){
-    S.fx.faceFlash = { t:0, dur:0.55, which: Math.random()<0.5?1:2 };
-  }
-  if (S.fx.faceFlash) S.fx.faceFlash.t += dt;
-
-  // shock decay
-  S.fx.shock = Math.max(0, S.fx.shock - dt*1.3);
-
-  // projectiles update
+  // projectiles
   for (const pr of S.projectiles){
     if (!pr.alive) continue;
     pr.t += dt;
@@ -458,23 +426,20 @@ function update(dt){
         if (!e.alive) continue;
         if (dist(pr.x,pr.y,e.x,e.y) < (e.r + pr.r)){
           e.hp -= pr.dmg;
-          e.stun = 0.25;
+          e.stun = 0.22;
+          e.hurtT = 0.18;
           pr.alive = false;
+
+          bloodBurst(e.x, e.y, 1.0);
 
           audio?.blip?.(0.5);
 
           if (e.hp <= 0){
             e.alive = false;
-
-            // SHATTER INTO PIECES
-            spawnGibs(S, e.x, e.y, 1.0 + S.difficulty*0.25);
-
-            // killing has consequence: hallucination + grief
+            spawnGibs(S, e.x, e.y, 0.9 + S.difficulty*0.2);
+            setMsg(S, "TARGET DOWN. SOMETHING FOLLOWS YOU NOW.", 3.0);
             S.curses.poison = Math.max(S.curses.poison, 6);
             S.curses.ghost = Math.max(S.curses.ghost, 5);
-            setMsg(S, "TARGET DOWN. SOMETHING FOLLOWS YOU NOW.", 3.0);
-
-            // tiny shock
             S.fx.shock = Math.max(S.fx.shock, 0.9);
           }
           break;
@@ -483,7 +448,17 @@ function update(dt){
     }
   }
 
-  // gibs update
+  // blood update
+  for (const b of S.blood){
+    b.life -= dt;
+    b.x += b.vx * dt * 0.12;
+    b.y += b.vy * dt * 0.12;
+    b.vx *= 0.92;
+    b.vy *= 0.92;
+  }
+  S.blood = S.blood.filter(b => b.life > 0);
+
+  // gibs update (already in entities.js style)
   for (const g of S.gibs){
     g.life -= dt;
     g.x += g.vx * dt * 0.10;
@@ -493,9 +468,7 @@ function update(dt){
   }
   S.gibs = S.gibs.filter(g=>g.life > 0);
 
-  // clear just-pressed
   S.input.just.clear();
-
   updateHUD();
 }
 
