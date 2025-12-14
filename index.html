@@ -1,893 +1,121 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
-<title>ENTROPY.DAT // RE:ITERATION</title>
-<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #050505;
-    --crt-color: #aaddaa;
-    --danger: #ff2a2a;
-    --warn: #ffcc00;
-    --dim: rgba(170, 221, 170, 0.3);
-  }
-  
-  html, body {
-    height: 100%; margin: 0; background: #020202; overflow: hidden;
-    font-family: 'VT323', monospace; color: var(--crt-color);
-    user-select: none; -webkit-user-select: none;
-  }
-
-  /* --- LAYOUT --- */
-  #main {
-    position: relative; width: 100%; height: 100%;
-    display: flex; justify-content: center; align-items: center;
-  }
-
-  #crt-frame {
-    position: relative;
-    width: 800px; height: 600px;
-    background: #000;
-    border: 2px solid #333;
-    box-shadow: 0 0 50px rgba(0,0,0,0.8);
-    overflow: hidden;
-  }
-
-  canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
-
-  /* --- UI OVERLAY --- */
-  #ui-layer {
-    position: absolute; inset: 0; pointer-events: none;
-    display: flex; flex-direction: column; justify-content: space-between;
-    padding: 20px;
-  }
-
-  .hud-row { display: flex; justify-content: space-between; align-items: flex-start; }
-  .hud-box {
-    background: rgba(0, 0, 0, 0.7);
-    border: 1px solid var(--dim);
-    padding: 8px 12px;
-    font-size: 1.2rem;
-    text-shadow: 0 0 4px var(--dim);
-  }
-  
-  .bar-container { width: 150px; height: 8px; background: #222; margin-top: 4px; border: 1px solid #444; }
-  .bar-fill { height: 100%; background: var(--crt-color); width: 100%; transition: width 0.2s; }
-  .bar-fill.red { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
-
-  /* --- CRT EFFECTS --- */
-  .scanlines {
-    position: absolute; inset: 0; pointer-events: none; z-index: 50;
-    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.3));
-    background-size: 100% 4px; mix-blend-mode: overlay; opacity: 0.8;
-  }
-  .vignette {
-    position: absolute; inset: 0; pointer-events: none; z-index: 51;
-    background: radial-gradient(circle, rgba(0,0,0,0) 50%, rgba(0,0,0,0.8) 100%);
-  }
-  
-  /* --- MENUS --- */
-  #menu-overlay {
-    position: absolute; inset: 0; z-index: 100;
-    background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    pointer-events: auto;
-  }
-  
-  .panel {
-    border: 2px solid var(--crt-color); background: #111;
-    padding: 2rem; width: 400px; text-align: center;
-    box-shadow: 0 0 20px rgba(170, 221, 170, 0.2);
-  }
-  
-  h1 { font-size: 3rem; margin: 0 0 1rem; letter-spacing: 4px; text-shadow: 2px 2px 0 var(--dim); }
-  h2 { font-size: 1.5rem; color: var(--warn); margin: 0 0 1rem; }
-  
-  button {
-    background: transparent; border: 1px solid var(--crt-color); color: var(--crt-color);
-    font-family: 'VT323'; font-size: 1.5rem; padding: 0.5rem 1rem; cursor: pointer;
-    margin: 0.5rem; transition: all 0.2s;
-  }
-  button:hover { background: var(--crt-color); color: #000; }
-  
-  input {
-    background: #000; border: 1px solid #555; color: var(--crt-color);
-    font-family: 'VT323'; font-size: 1.2rem; padding: 5px; width: 60px; text-align: center;
-  }
-
-  /* --- TERMINAL --- */
-  #terminal-modal {
-    display: none; position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%, -50%); z-index: 90;
-    background: #0a0a0a; border: 2px solid var(--crt-color);
-    padding: 20px; width: 300px;
-  }
-  .hidden { display: none !important; }
-  .flicker { animation: flicker 0.15s infinite; }
-  @keyframes flicker { 0% {opacity:0.9;} 50% {opacity:1.0;} 100% {opacity:0.9;} }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+  <title>ENTROPY.DAT // RE:ITERATION</title>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
 </head>
 <body>
+  <div id="main">
+    <div id="crt-frame" aria-label="ENTROPY.DAT CRT">
+      <canvas id="game" width="640" height="480"></canvas>
 
-<div id="main">
-  <div id="crt-frame">
-    <div class="scanlines"></div>
-    <div class="vignette"></div>
-    
-    <canvas id="game-canvas" width="640" height="480"></canvas>
+      <!-- CRT FX -->
+      <div class="scanlines"></div>
+      <div class="vignette"></div>
 
-    <div id="ui-layer">
-      <div class="hud-row">
-        <div class="hud-box">
-          <div id="hud-theme">LOC: LOADING...</div>
-          <div id="hud-obj" style="color:var(--warn)">OBJ: FIND CODE</div>
+      <!-- HUD -->
+      <div id="ui" aria-hidden="true">
+        <div class="hud-row">
+          <div class="hud-box" id="hud-left">
+            <div id="hud-loc">LOC: …</div>
+            <div id="hud-obj" class="hud-warn">OBJ: …</div>
+            <div id="hud-mission" class="hud-dim">—</div>
+          </div>
+
+          <div class="hud-box" id="hud-right">
+            <div class="hud-label">OXYGEN</div>
+            <div class="bar"><div id="bar-oxy" class="fill"></div></div>
+            <div class="hud-label">SANITY</div>
+            <div class="bar"><div id="bar-san" class="fill red"></div></div>
+            <div class="hud-mini" id="hud-stats">…</div>
+          </div>
         </div>
-        <div class="hud-box">
-          <div>OXYGEN</div>
-          <div class="bar-container"><div id="bar-oxy" class="bar-fill"></div></div>
-          <div style="margin-top:5px">SANITY</div>
-          <div class="bar-container"><div id="bar-san" class="bar-fill red" style="width:100%"></div></div>
+
+        <div class="hud-row bottom">
+          <div class="hud-box" id="hud-log">SYSTEM READY…</div>
+          <div class="hud-box" id="hud-ammo">—</div>
         </div>
       </div>
-      
-      <div class="hud-row" style="margin-top:auto">
-        <div class="hud-box">
-          <div id="hud-log">SYSTEM READY...</div>
-        </div>
-        <div class="hud-box" style="text-align:right">
-           <div id="hud-ammo">AMMO: [|||||]</div>
-           <div id="hud-hp">VIT: 100%</div>
+
+      <!-- MENU / INTRO -->
+      <div id="menu" class="overlay" role="dialog" aria-label="Start menu">
+        <div class="panel">
+          <h1>ENTROPY.DAT</h1>
+          <div class="sub">A facility that edits your choices while you watch.</div>
+
+          <div class="form">
+            <label>PROTAGONIST NAME</label>
+            <input id="nameInput" type="text" maxlength="16" placeholder="type a name…" autocomplete="off" />
+          </div>
+
+          <div class="form">
+            <label>ROLE</label>
+            <select id="roleSelect">
+              <option value="thief">THIEF (fast dash, low ammo)</option>
+              <option value="killer">KILLER (melee burst, unstable sanity)</option>
+              <option value="butcher">BUTCHER (slow, heavy hits, more oxygen tanks)</option>
+            </select>
+          </div>
+
+          <div class="form">
+            <label>DIFFICULTY (RANDOMIZED EACH RUN)</label>
+            <div class="sub tiny" id="diffPreview">…</div>
+          </div>
+
+          <div class="hint">
+            Controls: WASD/Arrows move · Shift sprint · <b>Space attack</b> · <b>E interact/pulse</b> · 1/2 answer prompts
+            <br/>Tip: Killing keeps you alive — and makes the place remember you.
+          </div>
+
+          <div class="row">
+            <button id="btnStart">INITIALIZE RUN</button>
+            <button id="btnMute" class="ghost">AUDIO: ON</button>
+          </div>
+
+          <div class="sub tiny" id="introLore">…</div>
         </div>
       </div>
+
+      <!-- TERMINAL / CODE LOCK -->
+      <div id="terminal" class="overlay hidden" role="dialog" aria-label="Security terminal">
+        <div class="panel terminal">
+          <h2>SECURITY LOCK</h2>
+          <div class="sub">ENTER 3-DIGIT OVERRIDE</div>
+          <div class="code">
+            <input class="digit" id="d1" maxlength="1" inputmode="numeric" />
+            <input class="digit" id="d2" maxlength="1" inputmode="numeric" />
+            <input class="digit" id="d3" maxlength="1" inputmode="numeric" />
+          </div>
+          <div class="row">
+            <button id="btnExec">EXECUTE</button>
+            <button id="btnAbort" class="ghost">ABORT</button>
+          </div>
+          <div class="sub tiny" id="termHint">…</div>
+        </div>
+      </div>
+
+      <!-- PROMPT / LORE CHOICE -->
+      <div id="prompt" class="overlay hidden" role="dialog" aria-label="Lore prompt">
+        <div class="panel prompt">
+          <div id="promptText" class="prompt-text">…</div>
+          <div class="prompt-choices">
+            <div id="promptA">1) …</div>
+            <div id="promptB">2) …</div>
+          </div>
+          <div class="bar slim"><div id="promptBar" class="fill red"></div></div>
+          <div class="sub tiny">Press 1 / 2 (or Y / N)</div>
+        </div>
+      </div>
+
+      <!-- IMAGE FLASH OVERLAY -->
+      <div id="flash" class="flash hidden" aria-hidden="true"></div>
+
     </div>
-
-    <div id="menu-overlay">
-      <div class="panel">
-        <h1>ENTROPY.DAT</h1>
-        <div id="menu-content">
-          <p>The facility shifts. The codes change. <br>Violence creates ghosts.</p>
-          <br>
-          <label>IDENTITY:</label>
-          <select id="role-select" style="font-family:'VT323'; background:#000; color:white; font-size:1.2rem; padding:5px;">
-            <option value="detective">DETECTIVE (High Sanity)</option>
-            <option value="soldier">SOLDIER (High Ammo)</option>
-            <option value="cultist">CULTIST (See Spirits)</option>
-          </select>
-          <br><br>
-          <button id="btn-start">INITIALIZE RUN</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="terminal-modal" class="hidden">
-      <h2 style="text-align:center; border-bottom:1px solid #444; padding-bottom:10px;">SECURITY LOCK</h2>
-      <p style="text-align:center; font-size:1.1rem; color:#888;">ENTER 3-DIGIT OVERRIDE</p>
-      <div style="display:flex; justify-content:center; gap:10px; margin: 15px 0;">
-        <input type="text" maxlength="1" id="code-1" />
-        <input type="text" maxlength="1" id="code-2" />
-        <input type="text" maxlength="1" id="code-3" />
-      </div>
-      <div style="text-align:center;">
-        <button id="btn-unlock" style="font-size:1rem;">EXECUTE</button>
-        <button id="btn-close-term" style="font-size:1rem; border-color:#555; color:#555;">ABORT</button>
-      </div>
-    </div>
-
   </div>
-</div>
 
-<script>
-/* =========================================================================
-   ENTROPY.DAT // ENGINE CORE
-   ========================================================================= */
-
-// --- CONFIG & CONSTANTS ---
-const TILE_SIZE = 32;
-const MAP_W = 30;
-const MAP_H = 20;
-const FOV_RADIUS = 180;
-
-const COLORS = {
-  void: '#000000',
-  ui: '#aaddaa',
-  blood: '#aa0000',
-  fow: 'rgba(0,0,0,1)'
-};
-
-const THEMES = {
-  asylum: { name: "ASYLUM WARD", floor: "#e0e0e0", wall: "#a0b0b0", noise: 0.05, text: "#333", perk: "Bright but sterile." },
-  catacombs: { name: "OLD CATACOMBS", floor: "#3e2723", wall: "#1a100c", noise: 0.3, text: "#d7ccc8", perk: "Tight corridors." },
-  factory: { name: "INDUSTRIAL ZONE", floor: "#263238", wall: "#37474f", noise: 0.15, text: "#cfd8dc", perk: "Metallic echoes." },
-  flesh: { name: "BIOLOGICAL WASTE", floor: "#4a1414", wall: "#290808", noise: 0.2, text: "#ffcccc", perk: "The walls breathe." }
-};
-
-// --- GAME STATE ---
-let game = {
-  running: false,
-  paused: false,
-  t: 0,
-  lvl: 1,
-  theme: null,
-  map: [],
-  entities: [],
-  particles: [],
-  decals: [], // Blood stains, codes
-  hero: { x:0, y:0, hp:100, maxHp:100, oxy:100, sanity:100, ammo: 0, role: 'detective', angle: 0 },
-  keys: {},
-  mouse: { x:0, y:0 },
-  camera: { x:0, y:0 },
-  puzzle: { code: "000", solved: false, loc: {x:0, y:0} },
-  exitLoc: {x:0, y:0}
-};
-
-const canvas = document.getElementById('game-canvas');
-const ctx = canvas.getContext('2d', { alpha: false });
-
-/* =========================================================================
-   AUDIO ENGINE (Procedural Industrial/Dungeon Synth)
-   ========================================================================= */
-const Audio = (() => {
-  let ac, master, drumGain, droneOsc;
-  let nextNoteTime = 0;
-  let tempo = 110;
-  let beatCount = 0;
-  let initialized = false;
-
-  function init() {
-    if(initialized) return;
-    const AC = window.AudioContext || window.webkitAudioContext;
-    ac = new AC();
-    master = ac.createGain();
-    master.gain.value = 0.4;
-    master.connect(ac.destination);
-
-    // Background Drone
-    droneOsc = ac.createOscillator();
-    droneOsc.type = 'sawtooth';
-    droneOsc.frequency.value = 55; // Low A
-    const filter = ac.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 120;
-    const lfo = ac.createOscillator();
-    lfo.frequency.value = 0.1;
-    const lfoGain = ac.createGain();
-    lfoGain.gain.value = 50;
-    
-    lfo.connect(lfoGain).connect(filter.frequency);
-    droneOsc.connect(filter).connect(master);
-    droneOsc.start();
-    lfo.start();
-    
-    initialized = true;
-    scheduler();
-  }
-
-  function playKick(t) {
-    const osc = ac.createOscillator();
-    const g = ac.createGain();
-    osc.frequency.setValueAtTime(150, t);
-    osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.5);
-    g.gain.setValueAtTime(1, t);
-    g.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
-    
-    // Distortion
-    const dist = ac.createWaveShaper();
-    dist.curve = makeDistortionCurve(400);
-    dist.oversample = '4x';
-
-    osc.connect(g).connect(dist).connect(master);
-    osc.start(t);
-    osc.stop(t + 0.5);
-  }
-
-  function playSnare(t) {
-    const noise = ac.createBufferSource();
-    noise.buffer = createNoiseBuffer(ac);
-    const noiseFilter = ac.createBiquadFilter();
-    noiseFilter.type = 'highpass';
-    noiseFilter.frequency.value = 1000;
-    const noiseEnv = ac.createGain();
-    noiseEnv.gain.setValueAtTime(0.5, t);
-    noiseEnv.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
-    noise.connect(noiseFilter).connect(noiseEnv).connect(master);
-    noise.start(t);
-  }
-
-  function playAlarm(t) {
-    const osc = ac.createOscillator();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(800, t);
-    osc.frequency.linearRampToValueAtTime(400, t+0.3);
-    const g = ac.createGain();
-    g.gain.setValueAtTime(0.1, t);
-    g.gain.linearRampToValueAtTime(0, t+0.3);
-    osc.connect(g).connect(master);
-    osc.start(t);
-  }
-
-  function scheduler() {
-    const lookahead = 25.0;
-    const scheduleAheadTime = 0.1;
-    while (nextNoteTime < ac.currentTime + scheduleAheadTime) {
-      // Martial Pattern: Kick on 1, 2, 3, 4. Snare on 3.
-      // 4/4 time
-      if(beatCount % 4 === 0) playKick(nextNoteTime);
-      if(beatCount % 4 === 2) { playKick(nextNoteTime); playSnare(nextNoteTime); }
-      if(beatCount % 8 === 7 && Math.random() > 0.5) playSnare(nextNoteTime + 0.1); // ghost note
-      
-      // Random industrial clank
-      if(Math.random() < 0.1) playAlarm(nextNoteTime);
-
-      const secondsPerBeat = 60.0 / tempo;
-      nextNoteTime += secondsPerBeat;
-      beatCount++;
-    }
-    setTimeout(scheduler, lookahead);
-  }
-
-  function makeDistortionCurve(amount) {
-    let k = typeof amount === 'number' ? amount : 50,
-      n_samples = 44100,
-      curve = new Float32Array(n_samples),
-      deg = Math.PI / 180,
-      i = 0, x;
-    for ( ; i < n_samples; ++i ) {
-      x = i * 2 / n_samples - 1;
-      curve[i] = ( 3 + k ) * x * 20 * deg / ( Math.PI + k * Math.abs(x) );
-    }
-    return curve;
-  }
-
-  function createNoiseBuffer(ctx) {
-    const size = ctx.sampleRate;
-    const buffer = ctx.createBuffer(1, size, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
-    return buffer;
-  }
-
-  return { init, playKick, playSnare };
-})();
-
-/* =========================================================================
-   ASSET GENERATION (Procedural Textures)
-   ========================================================================= */
-const Assets = (() => {
-  const cache = {};
-  
-  function createNoisePattern(colorHex, noiseAmt) {
-    const k = colorHex + noiseAmt;
-    if(cache[k]) return cache[k];
-    
-    const c = document.createElement('canvas');
-    c.width = 32; c.height = 32;
-    const x = c.getContext('2d');
-    
-    x.fillStyle = colorHex;
-    x.fillRect(0,0,32,32);
-    
-    for(let i=0; i<120; i++) {
-      x.fillStyle = Math.random() > 0.5 ? 'rgba(0,0,0,'+noiseAmt+')' : 'rgba(255,255,255,'+(noiseAmt/2)+')';
-      x.fillRect(Math.random()*32, Math.random()*32, 2, 2);
-    }
-    
-    const p = ctx.createPattern(c, 'repeat');
-    cache[k] = p;
-    return p;
-  }
-
-  function createGridPattern(colorHex) {
-    const c = document.createElement('canvas');
-    c.width = 32; c.height = 32;
-    const x = c.getContext('2d');
-    x.fillStyle = colorHex;
-    x.fillRect(0,0,32,32);
-    x.strokeStyle = "rgba(0,0,0,0.3)";
-    x.strokeRect(0,0,32,32);
-    return ctx.createPattern(c, 'repeat');
-  }
-
-  return { createNoisePattern, createGridPattern };
-})();
-
-/* =========================================================================
-   ENTITIES & LOGIC
-   ========================================================================= */
-
-class Entity {
-  constructor(x, y, type) {
-    this.x = x; this.y = y; this.type = type;
-    this.vx = 0; this.vy = 0;
-    this.hp = 100;
-    this.dead = false;
-  }
-}
-
-class Enemy extends Entity {
-  constructor(x, y, kind) {
-    super(x, y, 'enemy');
-    this.kind = kind || 'grunt';
-    this.speed = 1.0 + Math.random();
-    this.state = 'IDLE'; // IDLE, CHASE, STUN
-    this.stunTimer = 0;
-    this.detectionRad = 180;
-  }
-  
-  update(dt, hero) {
-    if(this.dead) return;
-    
-    if(this.stunTimer > 0) {
-      this.stunTimer -= dt;
-      return;
-    }
-
-    const dx = hero.x - this.x;
-    const dy = hero.y - this.y;
-    const dist = Math.hypot(dx, dy);
-    
-    // Line of sight check (simple)
-    if(dist < this.detectionRad) {
-      this.state = 'CHASE';
-    } else {
-      this.state = 'IDLE';
-    }
-
-    if(this.state === 'CHASE') {
-      const angle = Math.atan2(dy, dx);
-      this.vx = Math.cos(angle) * this.speed;
-      this.vy = Math.sin(angle) * this.speed;
-      
-      this.x += this.vx;
-      this.y += this.vy;
-      
-      // Damage Hero
-      if(dist < 15) {
-        hero.takeDamage(0.5); // Damage per frame essentially
-      }
-    }
-    
-    // Simple wall collision
-    if(mapSolid(this.x, this.y)) {
-      this.x -= this.vx * 2;
-      this.y -= this.vy * 2;
-    }
-  }
-  
-  takeDamage(amount) {
-    this.hp -= amount;
-    this.stunTimer = 10; // Stun frames
-    game.particles.push(new Particle(this.x, this.y, COLORS.blood, 10));
-    if(this.hp <= 0) {
-      this.dead = true;
-      // Spawn corpse decal
-      game.decals.push({x: this.x, y: this.y, type: 'corpse'});
-      // Penalty for killing: More entropy
-      game.hero.sanity -= 5;
-      log("TARGET ELIMINATED. SANITY COMPROMISED.");
-    }
-  }
-}
-
-class Particle {
-  constructor(x, y, color, speed) {
-    this.x = x; this.y = y;
-    const angle = Math.random() * Math.PI * 2;
-    this.vx = Math.cos(angle) * Math.random() * speed;
-    this.vy = Math.sin(angle) * Math.random() * speed;
-    this.life = 1.0;
-    this.color = color;
-  }
-  update(dt) {
-    this.x += this.vx;
-    this.y += this.vy;
-    this.life -= 0.05;
-  }
-}
-
-/* =========================================================================
-   MAP GENERATION (Braided Maze)
-   ========================================================================= */
-function mapSolid(x, y) {
-  const tx = Math.floor(x / TILE_SIZE);
-  const ty = Math.floor(y / TILE_SIZE);
-  if(tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return true;
-  return game.map[ty][tx] === 1;
-}
-
-function generateLevel() {
-  // Pick theme
-  const keys = Object.keys(THEMES);
-  const tKey = keys[Math.floor(Math.random() * keys.length)];
-  game.theme = THEMES[tKey];
-  document.getElementById('hud-theme').innerText = "LOC: " + game.theme.name;
-
-  // Initialize maze
-  game.map = [];
-  for(let y=0; y<MAP_H; y++) {
-    game.map[y] = [];
-    for(let x=0; x<MAP_W; x++) {
-      game.map[y][x] = 1; // Wall
-    }
-  }
-
-  // Recursive Backtracker
-  const stack = [{x: 1, y: 1}];
-  game.map[1][1] = 0;
-  
-  while(stack.length > 0) {
-    const current = stack[stack.length - 1];
-    const dirs = [[0,-2], [0,2], [-2,0], [2,0]].sort(() => Math.random() - 0.5);
-    let carved = false;
-    
-    for(let dir of dirs) {
-      const nx = current.x + dir[0];
-      const ny = current.y + dir[1];
-      if(nx > 0 && nx < MAP_W-1 && ny > 0 && ny < MAP_H-1 && game.map[ny][nx] === 1) {
-        game.map[ny][nx] = 0;
-        game.map[current.y + dir[1]/2][current.x + dir[0]/2] = 0;
-        stack.push({x: nx, y: ny});
-        carved = true;
-        break;
-      }
-    }
-    if(!carved) stack.pop();
-  }
-  
-  // Add braiding (remove dead ends)
-  for(let y=1; y<MAP_H-1; y++){
-    for(let x=1; x<MAP_W-1; x++){
-      if(game.map[y][x] === 0) {
-        let walls = 0;
-        if(game.map[y-1][x]) walls++;
-        if(game.map[y+1][x]) walls++;
-        if(game.map[y][x-1]) walls++;
-        if(game.map[y][x+1]) walls++;
-        if(walls === 3 && Math.random() < 0.5) {
-          // Punch a hole
-          if(game.map[y-1][x]) game.map[y-1][x]=0;
-          else if(game.map[y+1][x]) game.map[y+1][x]=0;
-          else if(game.map[y][x-1]) game.map[y][x-1]=0;
-          else if(game.map[y][x+1]) game.map[y][x+1]=0;
-        }
-      }
-    }
-  }
-
-  // Place Hero
-  game.hero.x = TILE_SIZE * 1.5;
-  game.hero.y = TILE_SIZE * 1.5;
-
-  // Place Enemies
-  game.entities = [];
-  let enemyCount = 3 + game.lvl;
-  while(enemyCount > 0) {
-    const ex = Math.floor(Math.random() * (MAP_W-2)) + 1;
-    const ey = Math.floor(Math.random() * (MAP_H-2)) + 1;
-    if(game.map[ey][ex] === 0 && Math.hypot(ex*TILE_SIZE - game.hero.x, ey*TILE_SIZE - game.hero.y) > 200) {
-      game.entities.push(new Enemy(ex * TILE_SIZE + 16, ey * TILE_SIZE + 16));
-      enemyCount--;
-    }
-  }
-
-  // Place Puzzle Code
-  let placedCode = false;
-  while(!placedCode) {
-    const rx = Math.floor(Math.random() * (MAP_W-2)) + 1;
-    const ry = Math.floor(Math.random() * (MAP_H-2)) + 1;
-    if(game.map[ry][rx] === 0) {
-      game.puzzle.code = Math.floor(100 + Math.random() * 899).toString();
-      game.decals.push({x: rx * TILE_SIZE + 16, y: ry * TILE_SIZE + 16, type: 'code', val: game.puzzle.code});
-      placedCode = true;
-    }
-  }
-
-  // Place Terminal (Exit Trigger)
-  let placedTerm = false;
-  while(!placedTerm) {
-    const tx = Math.floor(Math.random() * (MAP_W-2)) + 1;
-    const ty = Math.floor(Math.random() * (MAP_H-2)) + 1;
-    // ensure it's far from player
-    if(game.map[ty][tx] === 0 && Math.hypot(tx*TILE_SIZE - game.hero.x, ty*TILE_SIZE - game.hero.y) > 300) {
-       game.puzzle.loc = {x: tx*TILE_SIZE + 16, y: ty*TILE_SIZE + 16};
-       placedTerm = true;
-    }
-  }
-  
-  // Place Exit
-  // For now, exit is same as terminal location, unlocks after code.
-  game.puzzle.solved = false;
-}
-
-/* =========================================================================
-   INPUT & INTERACTION
-   ========================================================================= */
-
-window.addEventListener('keydown', e => {
-  game.keys[e.key.toLowerCase()] = true;
-  if(e.code === 'Space') attack();
-  if(e.key.toLowerCase() === 'e') interact();
-});
-window.addEventListener('keyup', e => game.keys[e.key.toLowerCase()] = false);
-canvas.addEventListener('mousemove', e => {
-  const rect = canvas.getBoundingClientRect();
-  game.mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
-  game.mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
-});
-
-function interact() {
-  if(!game.running) return;
-  // Check distance to terminal
-  const d = Math.hypot(game.puzzle.loc.x - game.hero.x, game.puzzle.loc.y - game.hero.y);
-  if(d < 40) {
-    if(!game.puzzle.solved) {
-      document.getElementById('terminal-modal').classList.remove('hidden');
-      game.paused = true;
-    } else {
-      nextLevel();
-    }
-  }
-}
-
-function attack() {
-  if(game.paused || game.hero.ammo <= 0) return;
-  
-  // Melee or Shoot logic
-  game.hero.ammo--; // Stamina or ammo
-  updateHUD();
-  
-  // Hitbox in front of player
-  const reach = 60;
-  const ax = game.hero.x + Math.cos(game.hero.angle) * 20;
-  const ay = game.hero.y + Math.sin(game.hero.angle) * 20;
-  
-  // Visual
-  game.particles.push(new Particle(ax, ay, '#fff', 5));
-  
-  // Check collision with enemies
-  game.entities.forEach(e => {
-    if(e.dead) return;
-    const d = Math.hypot(e.x - ax, e.y - ay);
-    if(d < reach) {
-      e.takeDamage(35);
-    }
-  });
-}
-
-document.getElementById('btn-unlock').onclick = () => {
-  const i1 = document.getElementById('code-1').value;
-  const i2 = document.getElementById('code-2').value;
-  const i3 = document.getElementById('code-3').value;
-  const guess = i1+i2+i3;
-  
-  if(guess === game.puzzle.code) {
-    game.puzzle.solved = true;
-    document.getElementById('terminal-modal').classList.add('hidden');
-    game.paused = false;
-    log("ACCESS GRANTED. EXIT UNLOCKED.");
-    document.getElementById('hud-obj').innerText = "OBJ: ESCAPE";
-    document.getElementById('hud-obj').style.color = "#aaddaa";
-  } else {
-    document.getElementById('terminal-modal').classList.add('flicker');
-    setTimeout(()=>document.getElementById('terminal-modal').classList.remove('flicker'), 500);
-    log("ERROR. INVALID CREDENTIALS.");
-  }
-};
-
-document.getElementById('btn-close-term').onclick = () => {
-  document.getElementById('terminal-modal').classList.add('hidden');
-  game.paused = false;
-};
-
-document.getElementById('btn-start').onclick = () => {
-  const role = document.getElementById('role-select').value;
-  game.hero.role = role;
-  if(role === 'soldier') { game.hero.maxHp = 150; game.hero.ammo = 10; }
-  else if(role === 'detective') { game.hero.sanity = 120; game.hero.ammo = 5; }
-  else { game.hero.ammo = 3; }
-  
-  document.getElementById('menu-overlay').style.display = 'none';
-  Audio.init();
-  generateLevel();
-  game.running = true;
-  game.hero.hp = game.hero.maxHp;
-  updateHUD();
-  loop();
-};
-
-/* =========================================================================
-   CORE LOOP
-   ========================================================================= */
-
-function log(msg) {
-  const el = document.getElementById('hud-log');
-  el.innerText = msg;
-  el.style.opacity = 1;
-  setTimeout(() => el.style.opacity = 0.5, 2000);
-}
-
-function nextLevel() {
-  game.lvl++;
-  game.hero.sanity = Math.min(100, game.hero.sanity + 20);
-  log("DESCENDING DEEPER...");
-  generateLevel();
-  document.getElementById('hud-obj').innerText = "OBJ: FIND CODE";
-  document.getElementById('hud-obj').style.color = "var(--warn)";
-}
-
-function updateHUD() {
-  document.getElementById('bar-oxy').style.width = game.hero.oxy + "%";
-  document.getElementById('bar-san').style.width = game.hero.sanity + "%";
-  document.getElementById('hud-hp').innerText = `VIT: ${Math.ceil(game.hero.hp)}%`;
-  
-  let ammoStr = "[";
-  for(let i=0; i<game.hero.ammo; i++) ammoStr += "|";
-  ammoStr += "]";
-  document.getElementById('hud-ammo').innerText = ammoStr;
-}
-
-game.hero.takeDamage = function(amt) {
-  this.hp -= amt;
-  document.getElementById('main').style.backgroundColor = "#200";
-  setTimeout(()=>document.getElementById('main').style.backgroundColor = "#020202", 50);
-  if(this.hp <= 0) {
-    alert("CRITICAL FAILURE. SUBJECT TERMINATED.");
-    location.reload();
-  }
-}
-
-function loop() {
-  requestAnimationFrame(loop);
-  if(!game.running || game.paused) return;
-
-  // --- LOGIC ---
-  const dt = 1; // Simplistic fixed time step
-  game.t++;
-  
-  // Movement
-  let mx = 0, my = 0;
-  if(game.keys['w']) my -= 1;
-  if(game.keys['s']) my += 1;
-  if(game.keys['a']) mx -= 1;
-  if(game.keys['d']) mx += 1;
-  
-  // Sprint (Shift)
-  const speed = game.keys['shift'] ? 4 : 2;
-  if(game.keys['shift']) game.hero.oxy -= 0.1;
-  else if(game.hero.oxy < 100) game.hero.oxy += 0.05;
-  
-  if(mx !== 0 || my !== 0) {
-    const nextX = game.hero.x + mx * speed;
-    const nextY = game.hero.y + my * speed;
-    if(!mapSolid(nextX, game.hero.y)) game.hero.x = nextX;
-    if(!mapSolid(game.hero.x, nextY)) game.hero.y = nextY;
-  }
-  
-  // Rotation (look at mouse) based on camera offset
-  const camX = game.hero.x - canvas.width/2;
-  const camY = game.hero.y - canvas.height/2;
-  const dx = (game.mouse.x + camX) - game.hero.x;
-  const dy = (game.mouse.y + camY) - game.hero.y;
-  game.hero.angle = Math.atan2(dy, dx);
-
-  // Entities
-  game.entities.forEach(e => e.update(dt, game.hero));
-  
-  // Particles
-  game.particles.forEach((p, i) => {
-    p.update();
-    if(p.life <= 0) game.particles.splice(i, 1);
-  });
-
-  // --- RENDER ---
-  ctx.fillStyle = COLORS.void;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
-  ctx.save();
-  // Camera Follow
-  ctx.translate(-Math.floor(game.hero.x - canvas.width/2), -Math.floor(game.hero.y - canvas.height/2));
-
-  // 1. Draw Map (visible area only for optimization)
-  const startCol = Math.floor((game.hero.x - canvas.width/2) / TILE_SIZE);
-  const endCol = startCol + (canvas.width / TILE_SIZE) + 1;
-  const startRow = Math.floor((game.hero.y - canvas.height/2) / TILE_SIZE);
-  const endRow = startRow + (canvas.height / TILE_SIZE) + 1;
-
-  const wallPat = Assets.createGridPattern(game.theme.wall);
-  const floorPat = Assets.createNoisePattern(game.theme.floor, game.theme.noise);
-
-  for(let y = startRow; y <= endRow; y++) {
-    for(let x = startCol; x <= endCol; x++) {
-      if(y>=0 && y<MAP_H && x>=0 && x<MAP_W) {
-        if(game.map[y][x] === 1) {
-          ctx.fillStyle = wallPat;
-          ctx.fillRect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE);
-        } else {
-          ctx.fillStyle = floorPat;
-          ctx.fillRect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE);
-        }
-      }
-    }
-  }
-
-  // 2. Draw Decals
-  game.decals.forEach(d => {
-    if(d.type === 'blood' || d.type === 'corpse') {
-      ctx.fillStyle = COLORS.blood;
-      ctx.beginPath();
-      ctx.arc(d.x, d.y, 10, 0, Math.PI*2);
-      ctx.fill();
-    } else if(d.type === 'code') {
-      ctx.fillStyle = "#ff0000";
-      ctx.font = "bold 20px VT323";
-      ctx.fillText(d.val, d.x, d.y);
-    }
-  });
-  
-  // 3. Draw Terminal
-  ctx.fillStyle = game.puzzle.solved ? "#55ff55" : "#5555ff";
-  ctx.fillRect(game.puzzle.loc.x - 10, game.puzzle.loc.y - 10, 20, 20);
-  if(!game.puzzle.solved) {
-    ctx.shadowColor = "#5555ff"; ctx.shadowBlur = 10;
-    ctx.fillRect(game.puzzle.loc.x - 5, game.puzzle.loc.y - 5, 10, 10);
-    ctx.shadowBlur = 0;
-  }
-
-  // 4. Draw Entities
-  game.entities.forEach(e => {
-    if(e.dead) return;
-    ctx.save();
-    ctx.translate(e.x, e.y);
-    // Draw Enemy Sprite (Procedural)
-    ctx.fillStyle = "#882222";
-    if(e.state === 'CHASE') ctx.fillStyle = "#ff0000";
-    ctx.fillRect(-10, -10, 20, 20);
-    // Eyes
-    ctx.fillStyle = "#ffff00";
-    ctx.fillRect(-5, -5, 4, 4);
-    ctx.fillRect(2, -5, 4, 4);
-    ctx.restore();
-  });
-
-  // 5. Draw Hero
-  ctx.save();
-  ctx.translate(game.hero.x, game.hero.y);
-  ctx.rotate(game.hero.angle);
-  ctx.fillStyle = COLORS.ui;
-  ctx.fillRect(-8, -8, 16, 16);
-  // Flashlight beam
-  ctx.fillStyle = "rgba(255, 255, 200, 0.1)";
-  ctx.beginPath();
-  ctx.moveTo(0,0);
-  ctx.arc(0, 0, 150, -0.3, 0.3);
-  ctx.fill();
-  ctx.restore();
-
-  // 6. Particles
-  game.particles.forEach(p => {
-    ctx.globalAlpha = p.life;
-    ctx.fillStyle = p.color;
-    ctx.fillRect(p.x, p.y, 3, 3);
-    ctx.globalAlpha = 1;
-  });
-
-  // 7. Fog of War (Darkness)
-  ctx.restore(); // Back to screen space
-  
-  // Create a radial gradient for the vision
-  const grd = ctx.createRadialGradient(
-    canvas.width/2, canvas.height/2, 60,
-    canvas.width/2, canvas.height/2, FOV_RADIUS
-  );
-  grd.addColorStop(0, "rgba(0,0,0,0)");
-  grd.addColorStop(1, "rgba(0,0,0,0.95)");
-  
-  ctx.fillStyle = grd;
-  ctx.fillRect(0,0, canvas.width, canvas.height);
-
-  updateHUD();
-}
-</script>
+  <script type="module" src="./js/main.js"></script>
 </body>
 </html>
