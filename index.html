@@ -3,65 +3,80 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
-  <title>ENTROPY.DAT // KEYS</title>
+  <title>ENTROPY.DAT // KEYRITE</title>
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-  <div id="main">
-    <div id="crt-frame">
+  <div id="wrap">
+    <div id="crt">
       <canvas id="game" width="640" height="480"></canvas>
 
       <div class="scanlines"></div>
       <div class="vignette"></div>
+      <div class="chromaburn"></div>
 
-      <div id="ui">
-        <div class="hud left">
-          <div id="hud-loc">LOC: --</div>
-          <div id="hud-obj">OBJ: --</div>
-          <div id="hud-msg">...</div>
+      <div id="hud">
+        <div class="hud-left">
+          <div class="box">
+            <div id="hud-loc">LOC: --</div>
+            <div id="hud-obj">OBJ: --</div>
+            <div id="hud-msg" class="msg">...</div>
+          </div>
         </div>
 
-        <div class="hud right">
-          <div>OXYGEN</div>
-          <div class="bar"><div id="bar-oxy" class="fill"></div></div>
-
-          <div style="margin-top:8px;">SANITY</div>
-          <div class="bar"><div id="bar-san" class="fill red"></div></div>
-
-          <div style="margin-top:8px;" id="hud-keys">KEYS: 0/0</div>
+        <div class="hud-right">
+          <div class="box">
+            <div class="row">
+              <div>HP</div>
+              <div class="bar"><div id="bar-hp" class="fill hp"></div></div>
+            </div>
+            <div class="row">
+              <div>OXY</div>
+              <div class="bar"><div id="bar-oxy" class="fill oxy"></div></div>
+            </div>
+            <div class="row">
+              <div>SAN</div>
+              <div class="bar"><div id="bar-san" class="fill san"></div></div>
+            </div>
+            <div class="tiny" id="hud-keys">KEYS: 0/0</div>
+            <div class="tiny" id="hud-role">ROLE: --</div>
+          </div>
         </div>
       </div>
 
-      <div id="menu">
+      <div id="menu" role="dialog" aria-label="Start menu">
         <div class="panel">
-          <h1>ENTROPY.DAT</h1>
-          <p class="sub">The facility rearranges itself around your name.</p>
+          <div class="title">ENTROPY.DAT</div>
+          <div class="subtitle">Type your name. Choose a role. The maze will use both.</div>
 
           <label class="lbl">PROTAGONIST NAME</label>
           <input id="nameInput" type="text" maxlength="16" placeholder="type..." autocomplete="off" />
 
-          <label class="lbl" style="margin-top:14px;">ROLE</label>
+          <label class="lbl">ROLE</label>
           <select id="roleSelect">
-            <option value="thief">THIEF (fast, stealth pulse)</option>
-            <option value="killer">KILLER (balanced, brutal strike)</option>
-            <option value="butcher">BUTCHER (slow, heavy cleave)</option>
+            <option value="thief">THIEF — fast throws, lower HP</option>
+            <option value="killer">KILLER — pistol, balanced</option>
+            <option value="butcher">BUTCHER — cleaver shockwave, high HP</option>
           </select>
 
-          <div class="row">
-            <button id="btnStart">INITIALIZE</button>
+          <div class="difficulty">
+            <span>DIFFICULTY IS RANDOMIZED EACH RUN.</span>
+            <span class="tiny">More monsters / less oxygen / nastier tasks.</span>
           </div>
 
-          <p class="tiny">
-            WASD / Arrows move · Shift sprint · Space attack · E interact<br/>
-            Collect all keys → enter portal.
-          </p>
+          <button id="btnStart">INITIALIZE</button>
+
+          <div class="controls">
+            WASD/Arrows move · Shift sprint · Space attack · E interact<br/>
+            Collect all KEYS → Enter PORTAL · Don’t suffocate.
+          </div>
         </div>
       </div>
+
     </div>
   </div>
 
   <script type="module" src="./js/main.js"></script>
 </body>
 </html>
-
