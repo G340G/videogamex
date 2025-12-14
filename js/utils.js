@@ -1,16 +1,17 @@
-export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-export const dist = (x1, y1, x2, y2) => Math.hypot(x1 - x2, y1 - y2);
-export const lerp = (a, b, t) => a + (b - a) * t;
+export function clamp(v, a, b){ return v < a ? a : v > b ? b : v; }
+export function dist(ax, ay, bx, by){ return Math.hypot(ax - bx, ay - by); }
+export function rand(){ return Math.random(); }
+export function randInt(a, b){ return a + ((Math.random() * (b - a + 1)) | 0); }
+export function pick(arr){ return arr[(Math.random() * arr.length) | 0]; }
 
-export function makeRng(seed = 123456) {
-  let x = seed | 0;
-  return function rng() {
-    x ^= x << 13; x |= 0;
-    x ^= x >>> 17; x |= 0;
-    x ^= x << 5;  x |= 0;
-    return ((x >>> 0) / 4294967296);
-  };
+export function loadImage(src){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Failed to load: " + src));
+    img.src = src;
+  });
 }
-export const randInt = (rng, a, b) => a + ((rng() * (b - a + 1)) | 0);
-export const pick = (rng, arr) => arr[(rng() * arr.length) | 0];
+
 
