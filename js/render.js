@@ -1,271 +1,340 @@
-import { clamp, dist } from "./utils.js";
+import { clamp } from "./utils.js";
 
-export function render(ctx, S) {
-  const W = ctx.canvas.width, H = ctx.canvas.height;
+const scratch = document.createElement("canvas");
+scratch.width = 160;
+scratch.height = 160;
+const sctx = scratch.getContext("2d", { alpha:true });
 
-  // guard
-  if (!S.map || !S.map.length) {
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0,0,W,H);
-    ctx.fillStyle = "#a7ffb5";
-    ctx.font = "24px VT323";
-    ctx.textAlign = "center";
-    ctx.fillText("INITIALIZING...", W/2, H/2);
-    return;
+function drawGlitchImage(ctx, img, x, y, w, h, strength){
+  if (!img) return;
+  sctx.clearRect(0,0,scratch.width,scratch.height);
+  sctx.drawImage(img, 0, 0, scratch.width, scratch.height);
+
+  const slices = 6 + (strength * 18)|0;
+  for (let i=0;i<slices;i++){
+    const sy = (Math.random()*scratch.height)|0;
+    const sh = 2 + (Math.random()*10)|0;
+    const dx = ((Math.random()-0.5) * 26 * strength)|0;
+    sctx.globalAlpha = 0.9;
+    sctx.drawImage(scratch, 0, sy, scratch.width, sh, dx, sy, scratch.width, sh);
   }
+  sctx.globalAlpha = 1;
 
+  ctx.save();
+  const off = 2 + strength*7;
+  ctx.globalAlpha = 0.75;
+  ctx.drawImage(scratch, x - off, y, w, h);
+  ctx.globalAlpha = 0.55;
+  ctx.drawImage(scratch, x + off, y, w, h);
+  ctx.globalAlpha = 0.95;
+  ctx.drawImage(scratch, x, y, w, h);
+  ctx.restore();
+}
+
+function fogMask(ctx, W, H, centerX, centerY, radius, density){
+  const g = ctx.createRadialGradient(centerX, centerY, radius*0.25, centerX, centerY, radius);
+  g.addColorStop(0, "rgba(0,0,0,0)");
+  g.addColorStop(1, `rgba(0,0,0,${density})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
+}
+
+function drawRain(ctx, W, H, amt, t){
+  if (amt <= 0.01) return;
+  ctx.save();
+  ctx.globalAlpha = 0.18 + amt*0.28;
+  for (let i=0;i<90 + amt*260;i++){
+    const x = (Math.random()*W)|0;
+    const y = ((Math.random()*H) + (t*60)) % H;
+    const len = 6 + Math.random()*10;
+    ctx.fillStyle = Math.random()<0.5 ? "#0b0b0b" : "#141414";
+    ctx.fillRect(x, y, 1, len);
+  }
+  ctx.restore();
+}
+
+function drawMist(ctx, W, H, amt, t){
+  if (amt <= 0.01) return;
+  ctx.save();
+  ctx.globalAlpha = 0.08 + amt*0.22;
+  for (let i=0;i<18 + amt*30;i++){
+    const x = (Math.random()*W)|0;
+    const y = (Math.random()*H)|0;
+    const w = 40 + Math.random()*120;
+    const h = 8 + Math.random()*30;
+    ctx.fillStyle = Math.random()<0.5 ? "rgba(90,90,110,0.35)" : "rgba(40,40,55,0.35)";
+    ctx.fillRect(x, y, w, h);
+  }
+  ctx.restore();
+}
+
+export function render(ctx, S){
+  const W = ctx.canvas.width, H = ctx.canvas.height;
   const map = S.map;
-  const theme = S.theme;
+  if (!map) return;
+
+  const tile = S.tile;
   const h = S.hero;
 
-  // camera px
-  const tilePx = S.tilePx;
-  const camX = h.x * tilePx - W/2;
-  const camY = h.y * tilePx - H/2;
+  // camera
+  S.camX = (h.x*tile) - W/2;
+  S.camY = (h.y*tile) - H/2;
 
-  // fog radius in tiles
-  let fov = S.baseFov;
-  if (h.reveal > 0) fov = 999; // floodlight
-  if (h.poison > 0) fov = Math.max(4.2, fov - 1.0);
-
-  // background
-  ctx.fillStyle = "#000";
+  // theme base
+  ctx.fillStyle = S.theme?.floor || "#050505";
   ctx.fillRect(0,0,W,H);
 
-  // visible bounds
-  const mapH = map.length, mapW = map[0].length;
-  const minTX = clamp(Math.floor(camX/tilePx)-2, 0, mapW-1);
-  const maxTX = clamp(Math.floor((camX+W)/tilePx)+2, 0, mapW-1);
-  const minTY = clamp(Math.floor(camY/tilePx)-2, 0, mapH-1);
-  const maxTY = clamp(Math.floor((camY+H)/tilePx)+2, 0, mapH-1);
+  // draw visible tiles (simple but stylish)
+  const startX = Math.floor(S.camX / tile) - 1;
+  const startY = Math.floor(S.camY / tile) - 1;
+  const endX = startX + Math.ceil(W/tile) + 2;
+  const endY = startY + Math.ceil(H/tile) + 2;
 
-  // tiles with gritty “pixel texture”
-  for (let ty=minTY; ty<=maxTY; ty++){
-    const row = map[ty];
-    for (let tx=minTX; tx<=maxTX; tx++){
-      const t = row[tx] ?? 1;
+  for (let ty=startY; ty<=endY; ty++){
+    for (let tx=startX; tx<=endX; tx++){
+      if (ty<0 || tx<0 || ty>=S.mapH || tx>=S.mapW) continue;
+      const cell = map[ty][tx];
+      const sx = tx*tile - S.camX;
+      const sy = ty*tile - S.camY;
 
-      const d = dist(tx+0.5, ty+0.5, h.x, h.y);
-      if (d > fov) continue;
-
-      let vis = 1 - (d/fov);
-      vis = Math.pow(vis, 0.55);
-      ctx.globalAlpha = clamp(vis, 0, 1);
-
-      const px = tx*tilePx - camX;
-      const py = ty*tilePx - camY;
-
-      if (t===1){
-        // walls: layered bricks + damp moss
-        ctx.fillStyle = theme.wall;
-        ctx.fillRect(px,py,tilePx,tilePx);
-
-        // brick seams
-        ctx.globalAlpha *= 0.35;
-        ctx.fillStyle = "#000";
-        ctx.fillRect(px, py + ((ty%2)*8), tilePx, 1);
-        ctx.fillRect(px + ((tx%2)*8), py, 1, tilePx);
-
-        // moss specks
-        ctx.globalAlpha *= 0.9;
-        if (((tx*7+ty*11+S.t)|0) % 13 === 0) {
-          ctx.fillStyle = theme.moss;
-          ctx.fillRect(px + 2 + ((tx+ty)%4), py + 2 + ((tx*3+ty)%5), 2, 2);
-        }
+      if (cell === 1){
+        ctx.fillStyle = S.theme.wall;
+        ctx.fillRect(sx,sy,tile,tile);
+        ctx.fillStyle = "rgba(0,0,0,0.22)";
+        ctx.fillRect(sx,sy,tile,2);
+        ctx.fillRect(sx,sy,2,tile);
       } else {
-        // floor: grime + blood rust highlights
-        ctx.fillStyle = theme.floor;
-        ctx.fillRect(px,py,tilePx,tilePx);
-
-        if (((tx+ty*3+S.t)|0) % 19 === 0) {
-          ctx.globalAlpha *= 0.35;
-          ctx.fillStyle = theme.accent;
-          ctx.fillRect(px + ((tx*5+ty)%12), py + ((tx+ty*7)%12), 1, 1);
+        ctx.fillStyle = S.theme.floor;
+        ctx.fillRect(sx,sy,tile,tile);
+        // subtle grit
+        if (Math.random() < 0.10){
+          ctx.fillStyle = "rgba(0,0,0,0.12)";
+          ctx.fillRect(sx + (Math.random()*tile)|0, sy + (Math.random()*tile)|0, 1, 1);
         }
       }
     }
   }
-  ctx.globalAlpha = 1;
 
-  // keys
-  for (const k of S.keysOnMap) {
+  // objects: keys, tanks, notes, portal, shrines, peasants
+  const drawIcon = (x,y,color,shape)=>{
+    const sx = x*tile - S.camX;
+    const sy = y*tile - S.camY;
+    ctx.fillStyle = color;
+    if (shape==="diamond"){
+      ctx.beginPath();
+      ctx.moveTo(sx+tile/2, sy+4);
+      ctx.lineTo(sx+tile-4, sy+tile/2);
+      ctx.lineTo(sx+tile/2, sy+tile-4);
+      ctx.lineTo(sx+4, sy+tile/2);
+      ctx.closePath();
+      ctx.fill();
+    } else if (shape==="circle"){
+      ctx.beginPath();
+      ctx.arc(sx+tile/2, sy+tile/2, tile*0.22, 0, Math.PI*2);
+      ctx.fill();
+    } else {
+      ctx.fillRect(sx+tile*0.28, sy+tile*0.28, tile*0.44, tile*0.44);
+    }
+  };
+
+  for (const k of S.keysOnMap){
     if (k.taken) continue;
-    const d = dist(k.x+0.5, k.y+0.5, h.x, h.y);
-    if (d > Math.min(fov, 10)) continue;
-    const px = (k.x+0.5)*tilePx - camX;
-    const py = (k.y+0.5)*tilePx - camY;
-    const pulse = 0.65 + Math.sin(S.t*0.12 + k.x*2) * 0.25;
-    ctx.fillStyle = `rgba(255,210,90,${pulse})`;
-    ctx.fillRect(px-5, py-5, 10, 10);
-    ctx.fillStyle = `rgba(0,0,0,${pulse*0.6})`;
-    ctx.fillRect(px-2, py-2, 4, 4);
+    drawIcon(k.x, k.y, S.theme.accent, "diamond");
+  }
+  for (const t of S.tanks){
+    if (t.taken) continue;
+    drawIcon(t.x, t.y, "#86b7ff", "box");
+  }
+  for (const n of S.notes){
+    if (n.taken) continue;
+    drawIcon(n.x, n.y, "#ddd", "circle");
   }
 
   // portal
-  if (S.portal) {
-    const p = S.portal;
-    const d = dist(p.x+0.5, p.y+0.5, h.x, h.y);
-    if (d < Math.min(fov+2, 12)) {
-      const px = (p.x+0.5)*tilePx - camX;
-      const py = (p.y+0.5)*tilePx - camY;
-      const ready = (S.keysCollected >= S.totalKeys);
-      const a = ready ? 0.95 : 0.35;
-      ctx.globalAlpha = a;
-      ctx.fillStyle = "rgba(240,240,255,0.85)";
-      ctx.beginPath();
-      ctx.arc(px, py, 14 + Math.sin(S.t*0.06)*2, 0, Math.PI*2);
-      ctx.fill();
-      ctx.fillStyle = "rgba(255,40,90,0.65)";
-      ctx.beginPath();
-      ctx.arc(px, py, 7 + Math.cos(S.t*0.08)*2, 0, Math.PI*2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-  }
-
-  // peasants
-  for (const n of S.npcs) {
-    if (n.used) continue;
-    const d = dist(n.x, n.y, h.x, h.y);
-    if (d > Math.min(fov+1.5, 12)) continue;
-
-    const px = n.x*tilePx - camX;
-    const py = n.y*tilePx - camY;
-
-    // silhouette
-    ctx.globalAlpha = 0.75;
-    ctx.fillStyle = "rgba(0,0,0,0.6)";
-    ctx.fillRect(px-6, py-10, 12, 20);
-
-    // “mask”
-    ctx.globalAlpha = 0.85;
-    ctx.fillStyle = "rgba(220,220,230,0.18)";
-    ctx.fillRect(px-4, py-8, 8, 6);
-
-    // effect glyph
-    ctx.globalAlpha = 0.95;
-    const col = n.effect === "reveal" ? "rgba(255,255,255,0.85)"
-              : n.effect === "oxy"    ? "rgba(120,220,255,0.85)"
-              : n.effect === "poison" ? "rgba(180,120,255,0.85)"
-              : "rgba(255,170,120,0.85)";
-    ctx.fillStyle = col;
-    ctx.fillRect(px-2, py+2, 4, 4);
-    ctx.globalAlpha = 1;
-  }
-
-  // projectiles (visible shots)
-  for (const pr of S.projectiles) {
-    if (!pr.alive) continue;
-    const px = pr.x*tilePx - camX;
-    const py = pr.y*tilePx - camY;
-
-    // trail
+  if (S.portal){
+    const c = (S.keysCollected >= S.totalKeys) ? "#ffffff" : "#550000";
+    drawIcon(S.portal.x, S.portal.y, c, "diamond");
+    // portal shimmer
+    const sx = S.portal.x*tile - S.camX;
+    const sy = S.portal.y*tile - S.camY;
     ctx.globalAlpha = 0.25;
-    ctx.fillStyle = pr.from === "hero" ? "rgba(255,220,140,1)" : "rgba(255,40,90,1)";
-    ctx.fillRect(px - pr.vx*6, py - pr.vy*6, 3, 3);
+    ctx.fillStyle = "#ff3355";
+    ctx.fillRect(sx+tile/2-1, sy+4, 2, tile-8);
+    ctx.globalAlpha = 1;
+  }
 
-    ctx.globalAlpha = 0.95;
-    ctx.fillStyle = pr.from === "hero" ? "rgba(255,210,90,1)" : "rgba(255,40,90,1)";
+  // shrines / peasants
+  for (const s of S.shrines){
+    if (s.used) continue;
+    const sx = s.x*tile - S.camX;
+    const sy = s.y*tile - S.camY;
+    ctx.fillStyle = "rgba(255,60,90,0.45)";
+    ctx.fillRect(sx-3, sy-3, 6, 6);
+  }
+  for (const p of S.npcs){
+    if (p.used) continue;
+    const sx = p.x*tile - S.camX;
+    const sy = p.y*tile - S.camY;
+    ctx.fillStyle = "rgba(170,221,170,0.65)";
+    ctx.fillRect(sx-3, sy-6, 6, 12);
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.fillRect(sx-6, sy-2, 12, 1);
+  }
+
+  // projectiles (visible)
+  for (const pr of S.projectiles){
+    if (!pr.alive) continue;
+    const px = pr.x*tile - S.camX;
+    const py = pr.y*tile - S.camY;
+    ctx.fillStyle = pr.from === "hero" ? "#ffddaa" : "#ff3355";
     ctx.fillRect(px-2, py-2, 4, 4);
-    ctx.globalAlpha = 1;
-  }
-
-  // enemies (more creepy)
-  for (const e of S.enemies) {
-    if (!e.alive) continue;
-    const d = dist(e.x, e.y, h.x, h.y);
-    if (d > Math.min(fov+2, 14)) continue;
-
-    const px = e.x*tilePx - camX;
-    const py = e.y*tilePx - camY;
-    const fear = clamp(1 - d/7, 0, 1);
-
-    const jx = (Math.sin((S.t*0.11) + e.jitter) * 3) * fear;
-    const jy = (Math.cos((S.t*0.09) + e.jitter) * 3) * fear;
-
-    // shadow mass
-    ctx.globalAlpha = 0.22 + fear*0.25;
-    ctx.fillStyle = "rgba(255,0,70,1)";
-    ctx.fillRect(px-14+jx, py-14+jy, 28, 28);
-
-    // body
-    ctx.globalAlpha = 0.9;
-    ctx.fillStyle = "rgba(5,5,8,0.95)";
-    ctx.fillRect(px-10+jx, py-12+jy, 20, 24);
-
-    // “teeth”
-    ctx.globalAlpha = 0.75;
-    ctx.fillStyle = "rgba(240,240,255,0.25)";
-    ctx.fillRect(px-6+jx, py+4+jy, 12, 3);
-
-    // eyes
-    ctx.globalAlpha = 0.9;
-    ctx.fillStyle = "rgba(255,40,90,0.85)";
-    ctx.fillRect(px-6+jx, py-4+jy, 3, 2);
-    ctx.fillRect(px+3+jx, py-4+jy, 3, 2);
-    ctx.globalAlpha = 1;
-  }
-
-  // hero: bigger, brutal, animated
-  {
-    const px = h.x*tilePx - camX;
-    const py = h.y*tilePx - camY;
-    const bob = Math.sin(S.t*0.13) * 1.5;
-
-    // cloak/shadow
     ctx.globalAlpha = 0.35;
-    ctx.fillStyle = "rgba(0,0,0,0.9)";
-    ctx.fillRect(px-12, py-10+bob, 24, 22);
-
-    // body
-    ctx.globalAlpha = 0.95;
-    ctx.fillStyle = "rgba(210,220,235,0.9)";
-    ctx.fillRect(px-9, py-14+bob, 18, 28);
-
-    // head mask
-    ctx.fillStyle = "rgba(25,25,35,0.95)";
-    ctx.fillRect(px-7, py-20+bob, 14, 8);
-
-    // eyes
-    ctx.fillStyle = "rgba(255,40,90,0.75)";
-    ctx.fillRect(px-4, py-18+bob, 2, 2);
-    ctx.fillRect(px+2, py-18+bob, 2, 2);
-
-    // weapon hint
-    ctx.fillStyle = h.role === "thief" ? "rgba(120,220,255,0.8)"
-                : h.role === "killer" ? "rgba(255,210,90,0.8)"
-                : "rgba(180,120,255,0.8)";
-    ctx.fillRect(px-2, py+10+bob, 4, 4);
-
+    ctx.fillRect(px-7, py-1, 3, 2);
     ctx.globalAlpha = 1;
   }
 
-  // poison distortion overlay
-  if (h.poison > 0) {
-    ctx.globalAlpha = 0.12;
-    ctx.fillStyle = "rgba(180,100,255,1)";
-    ctx.fillRect(0,0,W,H);
+  // gibs
+  for (const g of S.gibs){
+    const gx = g.x*tile - S.camX;
+    const gy = g.y*tile - S.camY;
+    ctx.globalAlpha = clamp(g.life, 0, 1);
+    ctx.fillStyle = g.col;
+    ctx.fillRect(gx, gy, g.sz, g.sz);
     ctx.globalAlpha = 1;
   }
 
-  // grief jitter overlay
-  if (h.grief > 0) {
-    ctx.globalAlpha = 0.12;
-    for (let i=0;i<120;i++){
-      ctx.fillStyle = Math.random()<0.5 ? "#0d0d0d" : "#1b1b22";
-      ctx.fillRect(Math.random()*W, Math.random()*H, 1+Math.random()*2, 1+Math.random()*2);
+  // enemies as face sprites
+  const assets = S.assets;
+  let nearest = 999;
+  for (const e of S.enemies){
+    if (!e.alive) continue;
+    const d = Math.hypot(h.x - e.x, h.y - e.y);
+    if (d < nearest) nearest = d;
+
+    const ex = e.x*tile - S.camX;
+    const ey = e.y*tile - S.camY;
+    const face = assets ? (e.facePick===2 ? assets.face2 : assets.face1) : null;
+    const strength = clamp(1 - d/6, 0, 1);
+    const size = 26 + strength*12;
+
+    if (face) drawGlitchImage(ctx, face, ex - size/2, ey - size/2, size, size, 0.20 + strength*0.85);
+    else {
+      ctx.fillStyle = "rgba(255,60,90,0.35)";
+      ctx.fillRect(ex - 10, ey - 10, 20, 20);
     }
-    ctx.globalAlpha = 1;
   }
 
-  // suffocation vignette (when oxygen = 0)
-  if (h.oxy <= 0) {
-    const a = clamp(h.suffocate / 6, 0, 1) * 0.55;
+  // player sprite (bigger/brutal)
+  const px = h.x*tile - S.camX;
+  const py = h.y*tile - S.camY;
+  const panic = clamp((1 - h.sanity/120) + (h.oxy<=10?0.5:0), 0, 1);
+  const jx = (Math.random()-0.5)*2.4*panic + (S.fx.shock>0? (Math.random()-0.5)*6 : 0);
+  const jy = (Math.random()-0.5)*2.4*panic + (S.fx.shock>0? (Math.random()-0.5)*6 : 0);
+
+  ctx.save();
+  ctx.translate(px + jx, py + jy);
+  ctx.rotate(h.facing || 0);
+  if (assets?.player){
+    ctx.drawImage(assets.player, -16, -16, 32, 32);
+  } else {
+    ctx.fillStyle = "#eee";
+    ctx.fillRect(-9, -9, 18, 18);
+  }
+  // brutal “cleaver shadow”
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = "#200";
+  ctx.fillRect(-18, 6, 36, 6);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // face flash overlay
+  if (assets && S.fx.faceFlash && S.fx.faceFlash.t < S.fx.faceFlash.dur){
+    const f = S.fx.faceFlash;
+    const k = 1 - (f.t / f.dur);
+    const a = Math.min(0.9, k * 0.85);
+    const img = f.which === 2 ? assets.face2 : assets.face1;
+
+    ctx.save();
     ctx.globalAlpha = a;
-    ctx.fillStyle = "rgba(0,0,0,1)";
-    ctx.fillRect(0,0,W,H);
+    drawGlitchImage(ctx, img, 0, 0, W, H, 0.45 + k*0.6);
+    ctx.restore();
+  }
+
+  // theme FX: rain + mist
+  S.fx.rainT += 0.016;
+  drawRain(ctx, W, H, S.theme.rain, S.fx.rainT);
+  drawMist(ctx, W, H, S.theme.haze + (S.curses.poison>0 ? 0.35 : 0), S.t*0.03);
+
+  // fog of war
+  // reveal buff increases radius
+  const baseR = 160;
+  const addR = (S.buffs.reveal>0 ? 120 : 0);
+  const rad = baseR + addR - (S.curses.grief>0 ? 30 : 0);
+  fogMask(ctx, W, H, W/2, H/2, rad, S.theme.fog);
+
+  // psychedelic poison distortion (cheap)
+  if (S.curses.poison > 0){
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    for (let i=0;i<10;i++){
+      ctx.fillStyle = Math.random()<0.5 ? "rgba(255,0,80,0.25)" : "rgba(0,255,200,0.18)";
+      ctx.fillRect(Math.random()*W, Math.random()*H, 30+Math.random()*120, 6+Math.random()*18);
+    }
+    ctx.restore();
+  }
+
+  // ghost follower (simple silhouette behind player)
+  if (S.curses.ghost > 0){
+    ctx.save();
+    ctx.globalAlpha = 0.18 + Math.random()*0.10;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(px - 26 + Math.sin(S.t*0.03)*3, py - 30, 12, 22);
     ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // prompt UI
+  if (S.prompt.active){
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.85)";
+    ctx.fillRect(80, 320, 480, 130);
+    ctx.strokeStyle = "#aaddaa";
+    ctx.strokeRect(80, 320, 480, 130);
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.font = "22px VT323";
+    ctx.fillText(S.prompt.q, 320, 350);
+    ctx.fillStyle = "#bbb";
+    ctx.fillText(S.prompt.a1, 320, 382);
+    ctx.fillText(S.prompt.a2, 320, 410);
+
+    // timer
+    ctx.fillStyle = "#ff3355";
+    const w = clamp(S.prompt.t / S.prompt.max, 0, 1) * 460;
+    ctx.fillRect(90, 438, w, 3);
+    ctx.restore();
+  }
+
+  // mission UI (small)
+  if (S.mission.active && !S.prompt.active){
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(12, 64, 240, 60);
+    ctx.fillStyle = "#aaddaa";
+    ctx.textAlign = "left";
+    ctx.font = "20px VT323";
+    ctx.fillText(S.mission.title, 20, 86);
+    ctx.fillStyle = "#888";
+    ctx.font = "18px VT323";
+    const line = (S.mission.desc.split("\n")[1] || "");
+    ctx.fillText(line, 20, 108);
+
+    const pct = clamp(S.mission.prog / Math.max(0.001, S.mission.goal), 0, 1);
+    ctx.fillStyle = "#333";
+    ctx.fillRect(20, 114, 200, 4);
+    ctx.fillStyle = "#aaddaa";
+    ctx.fillRect(20, 114, 200*pct, 4);
+    ctx.restore();
   }
 }
-
 
