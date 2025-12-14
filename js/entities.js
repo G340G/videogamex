@@ -1,165 +1,204 @@
 import { clamp, dist, pick } from "./utils.js";
-import { isSolid } from "./map.js";
+import { isWall } from "./map.js";
 
 export function spawnPlayer(state){
-  const p = state.player;
-  p.x = state.tileSize * 1.5;
-  p.y = state.tileSize * 1.5;
-  p.vx = p.vy = 0;
+  const ts = state.tileSize;
+  state.player.x = ts*1.5;
+  state.player.y = ts*1.5;
+  state.player.vx = 0;
+  state.player.vy = 0;
 }
 
-export function spawnEnemy(state, kind="stalker", atCell=null){
-  const r = state.r;
+export function spawnEnemy(state, kind, cell){
   const ts = state.tileSize;
-  const cell = atCell ?? {x: (r()*(state.w-2)|0)+1, y:(r()*(state.h-2)|0)+1};
-
   const e = {
-    type:"enemy",
     kind,
-    x: (cell.x + 0.5) * ts,
-    y: (cell.y + 0.5) * ts,
-    vx:0, vy:0,
-    r: 12,
-    hp: 55 + (state.level*6),
-    alive:true,
-    stagger:0,
-    atkCd:0,
-    // behavior
-    mode:"ROAM",
-    think: 0,
-    targetX:0,
-    targetY:0,
-    speed: 85 * state.difficulty.enemyMult,
-    damage: 10 * state.difficulty.enemyMult
+    x: (cell.x+0.5)*ts,
+    y: (cell.y+0.5)*ts,
+    vx: 0, vy: 0,
+    alive: true,
+    hp: 60 + (state.level*6|0),
+    speed: (65 + state.level*4) * state.difficulty.enemyMult,
+    aggro: 0.85 + state.r()*0.25,
+    cd: 0,
   };
   state.entities.push(e);
   return e;
 }
 
-// Smooth collision (circle) against tile walls: resolves “corner sticking”
-export function moveWithCollision(state, obj, dt){
+export function spawnPeasant(state, cell){
   const ts = state.tileSize;
-  const r = obj.r ?? 10;
+  const npc = {
+    kind: "peasant",
+    x: (cell.x+0.5)*ts,
+    y: (cell.y+0.5)*ts,
+    vx: 0, vy: 0,
+    alive: true,
+    mood: pick(state.r, ["weeping","smiling","empty"]),
+    offer: rollPeasantOffer(state),
+    used: false,
+    wanderT: 0,
+    wanderA: state.r()*Math.PI*2,
+  };
+  state.entities.push(npc);
+  return npc;
+}
 
-  // integrate velocity
-  let nx = obj.x + obj.vx * dt;
-  let ny = obj.y + obj.vy * dt;
+function rollPeasantOffer(state){
+  // “psych peasant” offers: powers/objects with tradeoffs
+  const offers = [
+    {
+      id:"LUMEN",
+      title:"LUMEN BEAM",
+      text:"A peasant offers a cold beam. It reveals everything.",
+      a:"1) ACCEPT (8s full-vision)",
+      b:"2) REFUSE",
+      apply:(state)=>{
+        state.effects.push({type:"LUMEN", t:0, dur:8.0, intensity:1});
+        state.player.sanity = clamp(state.player.sanity - 6, 0, state.player.sanityMax);
+      }
+    },
+    {
+      id:"POISON",
+      title:"POISON",
+      text:"A vial labeled: POISON. It distorts you. It slows them.",
+      a:"1) DRINK (warp vision, slow enemies 10s)",
+      b:"2) REFUSE",
+      apply:(state)=>{
+        state.effects.push({type:"POISON", t:0, dur:10.0, intensity:1});
+        // slow enemies globally while poison effect runs (handled in updateEnemies)
+      }
+    },
+    {
+      id:"GRIEF",
+      title:"GRIEF",
+      text:"He hands you GRIEF. It makes you anxious. It makes you lucky.",
+      a:"1) TAKE (anxiety +1 key appears)",
+      b:"2) REFUSE",
+      apply:(state)=>{
+        state.escalation += 1.1;
+        state.effects.push({type:"GRIEF", t:0, dur:12.0, intensity:1});
+        // spawn a bonus key somewhere (main.js handles if needed; here we mark flag)
+        state._spawnBonusKey = true;
+      }
+    },
+    {
+      id:"OXY",
+      title:"BREATH RELIEF",
+      text:"A sack of oxygen tanks. It smells like rust.",
+      a:"1) TAKE (+25s oxygen)",
+      b:"2) REFUSE",
+      apply:(state)=>{
+        state.player.oxyTimer = Math.min(state.player.oxyTimerMax, state.player.oxyTimer + 25);
+      }
+    },
+  ];
+  return offers[(state.r()*offers.length)|0];
+}
 
-  // attempt move X then Y (slide)
-  // sample 4 points around circle for collision
-  const collide = (x,y)=>{
-    const pts = [
-      [x-r, y-r],[x+r, y-r],[x-r, y+r],[x+r, y+r]
-    ];
-    for(const [px,py] of pts){
-      if(isSolid(state, px, py)) return true;
+export function moveWithCollision(state, ent, dt){
+  const ts = state.tileSize;
+
+  // circle collider (prevents corner snagging)
+  const r = 9; // collision radius in px
+
+  const tryAxis = (nx, ny)=>{
+    const tx1 = Math.floor((nx - r)/ts), tx2 = Math.floor((nx + r)/ts);
+    const ty1 = Math.floor((ny - r)/ts), ty2 = Math.floor((ny + r)/ts);
+    for(let ty=ty1; ty<=ty2; ty++){
+      for(let tx=tx1; tx<=tx2; tx++){
+        if(isWall(state, tx, ty)) return false;
+      }
     }
-    return false;
+    ent.x = nx; ent.y = ny;
+    return true;
   };
 
-  // X
-  if(!collide(nx, obj.y)){
-    obj.x = nx;
-  } else {
-    // push out of wall along X
-    const step = Math.sign(obj.vx) || 1;
-    for(let i=0;i<8;i++){
-      const tx = obj.x + step * (-(i+1));
-      if(!collide(tx, obj.y)){ obj.x = tx; break; }
-    }
-    obj.vx = 0;
-  }
+  // attempt x then y, with tiny “slide assist”
+  const nx = ent.x + ent.vx*dt;
+  const ny = ent.y + ent.vy*dt;
 
-  // Y
-  if(!collide(obj.x, ny)){
-    obj.y = ny;
-  } else {
-    const step = Math.sign(obj.vy) || 1;
-    for(let i=0;i<8;i++){
-      const ty = obj.y + step * (-(i+1));
-      if(!collide(obj.x, ty)){ obj.y = ty; break; }
-    }
-    obj.vy = 0;
+  if(!tryAxis(nx, ent.y)){
+    // slide assist: reduce x velocity when hitting corner
+    ent.vx *= 0.2;
+  }
+  if(!tryAxis(ent.x, ny)){
+    ent.vy *= 0.2;
   }
 }
 
 export function updateEnemies(state, dt){
   const p = state.player;
 
+  const poisonActive = state.effects.some(e=>e.type==="POISON");
+  const poisonSlow = poisonActive ? 0.55 : 1.0;
+
   for(const e of state.entities){
     if(!e.alive) continue;
 
-    // stagger / stun
-    if(e.stagger > 0){
-      e.stagger -= 1;
-      e.vx *= 0.85; e.vy *= 0.85;
+    if(e.kind==="peasant"){
+      // wander slowly, harmless
+      if(e.used) continue;
+      e.wanderT -= dt;
+      if(e.wanderT <= 0){
+        e.wanderT = 0.7 + state.r()*1.6;
+        e.wanderA += (state.r()*2-1)*1.2;
+      }
+      const sp = 18;
+      e.vx = Math.cos(e.wanderA)*sp;
+      e.vy = Math.sin(e.wanderA)*sp;
       moveWithCollision(state, e, dt);
       continue;
     }
 
-    if(e.atkCd > 0) e.atkCd -= dt;
+    // stalker-like chase
+    const dx = p.x - e.x;
+    const dy = p.y - e.y;
+    const d = Math.max(1, Math.hypot(dx,dy));
 
-    // Think
-    e.think -= dt;
-    if(e.think <= 0){
-      e.think = 0.25 + state.r()*0.30;
+    const hear = (p._sprinting ? 320 : 220);
+    const sees = d < hear;
 
-      const d = dist(e.x,e.y, p.x,p.y);
-      const hear = (p._sprinting ? 320 : 210) + state.escalation*10;
+    const speed = (e.speed * e.aggro) * poisonSlow;
 
-      if(d < hear){
-        e.mode = "CHASE";
-        e.targetX = p.x;
-        e.targetY = p.y;
-      } else {
-        e.mode = "ROAM";
-        // roam: pick a random point nearby that’s floor-ish
-        const ang = state.r() * Math.PI * 2;
-        e.targetX = e.x + Math.cos(ang) * (120 + state.r()*160);
-        e.targetY = e.y + Math.sin(ang) * (120 + state.r()*160);
+    if(sees){
+      e.vx = (dx/d)*speed;
+      e.vy = (dy/d)*speed;
+    }else{
+      // drift
+      e.cd -= dt;
+      if(e.cd <= 0){
+        e.cd = 0.6 + state.r()*1.3;
+        const ang = state.r()*Math.PI*2;
+        e.vx = Math.cos(ang)*speed*0.35;
+        e.vy = Math.sin(ang)*speed*0.35;
       }
     }
 
-    // Avoid “hard blocking”: if very close, strafe instead of sitting in corridor
-    const dx = (p.x - e.x);
-    const dy = (p.y - e.y);
-    const d = Math.max(0.0001, Math.hypot(dx,dy));
-
-    let tx = e.targetX, ty = e.targetY;
-
-    if(e.mode === "CHASE" && d < 90){
-      // strafe angle to create passable gaps
-      const side = (state.r()<0.5 ? -1 : 1);
-      tx = p.x + (-dy/d)*side*80;
-      ty = p.y + ( dx/d)*side*80;
-    }
-
-    const mx = tx - e.x;
-    const my = ty - e.y;
-    const md = Math.max(0.0001, Math.hypot(mx,my));
-    const sp = e.speed * (1 + 0.04*state.level + 0.03*state.escalation);
-
-    e.vx = (mx/md) * sp;
-    e.vy = (my/md) * sp;
-
     moveWithCollision(state, e, dt);
 
-    // Attack if close (with cooldown), actually damages player
-    const hitD = dist(e.x,e.y, p.x,p.y);
-    if(hitD < (e.r + p.r + 10) && e.atkCd <= 0 && p.invuln <= 0){
-      e.atkCd = 0.55 + state.r()*0.25;
-      p.hp -= e.damage;
-      p.invuln = 0.35;
-      state.effects.push({type:"HIT_FLASH", t:0, dur:0.20, intensity:1.0});
-
-      // sanity damage too
-      p.sanity = clamp(p.sanity - (4 + state.escalation*0.6), 0, p.sanityMax);
-
-      // knockback (gives escape window)
-      const k = 220;
-      p.vx += (dx/d) * k;
-      p.vy += (dy/d) * k;
+    // damage + close-range face flash
+    const hit = d < 18;
+    if(hit && p.invuln<=0){
+      p.hp -= dt * (9 + state.level*0.7);
+      p.sanity = clamp(p.sanity - dt*6, 0, p.sanityMax);
+      state.escalation += dt*0.25;
+      if(state.r() < 0.10){
+        state.effects.push({type:"FACE_FLASH", t:0, dur:0.45, intensity:1});
+      }
     }
   }
+}
+
+export function nearestPeasant(state){
+  let best=null, bestD=999999;
+  for(const e of state.entities){
+    if(!e.alive || e.kind!=="peasant" || e.used) continue;
+    const d = dist(state.player.x, state.player.y, e.x, e.y);
+    if(d < bestD){
+      bestD = d; best = e;
+    }
+  }
+  return {npc:best, d:bestD};
 }
 
