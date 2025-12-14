@@ -1,102 +1,52 @@
 import { clamp, dist } from "./utils.js";
 import { isWall } from "./map.js";
 
-export function makeHero(role, name) {
-  const h = {
-    name,
-    role,
-    x: 1.5, y: 1.5,
-    r: 0.30,          // BIGGER body collision (brutal)
-    speed: 3.0,       // tiles/sec
-    hp: 110, maxHp: 110,
-    oxy: 100, oxyMax: 100,
-    sanity: 100,
-    // combat
-    atkCd: 0,
-    facing: 0,
-    // status effects
-    reveal: 0,
-    poison: 0,
-    grief: 0,
-    griefBuff: 0,     // damage boost while “grief”
-    // suffocation
-    suffocate: 0,     // seconds since oxygen hit 0
-  };
+// robust circle sliding to avoid "corner sticking"
+export function tryMoveCircle(map, ent, dx, dy){
+  const r = ent.r || 0.38;
 
-  if (role === "thief") {
-    h.speed = 3.6;
-    h.hp = h.maxHp = 95;
-  } else if (role === "killer") {
-    h.speed = 3.1;
-    h.hp = h.maxHp = 110;
-  } else if (role === "butcher") {
-    h.speed = 2.8;
-    h.hp = h.maxHp = 135;
-  }
+  const tryAxis = (adx, ady) => {
+    const nx = ent.x + adx;
+    const ny = ent.y + ady;
 
-  return h;
-}
-
-export function makeEnemy(x, y, tier = 1) {
-  return {
-    kind: "enemy",
-    x, y,
-    r: 0.30,
-    hp: 55 + tier * 18,
-    speed: 2.1 + tier * 0.25,
-    dmg: 12 + tier * 3,
-    hitCd: 0,
-    stun: 0,
-    alive: true,
-    // cosmetic jitter
-    jitter: Math.random() * 1000
-  };
-}
-
-export function makeProjectile(x, y, vx, vy, from, dmg, life = 0.55) {
-  return {
-    kind: "proj",
-    x, y,
-    vx, vy,
-    r: 0.12,
-    from,  // "hero"|"enemy"
-    dmg,
-    life,
-    alive: true,
-    // trail
-    t: 0
-  };
-}
-
-export function makePeasant(x, y, effect) {
-  return { kind: "peasant", x, y, r: 0.28, effect, used: false };
-}
-
-export function tryMoveCircle(map, ent, dx, dy) {
-  const r = ent.r;
-
-  let nx = ent.x + dx;
-  let ny = ent.y;
-  if (!circleHits(map, nx, ny, r)) ent.x = nx;
-
-  nx = ent.x;
-  ny = ent.y + dy;
-  if (!circleHits(map, nx, ny, r)) ent.y = ny;
-}
-
-function circleHits(map, cx, cy, r) {
-  const minX = Math.floor(cx - r), maxX = Math.floor(cx + r);
-  const minY = Math.floor(cy - r), maxY = Math.floor(cy + r);
-
-  for (let ty = minY; ty <= maxY; ty++) {
-    for (let tx = minX; tx <= maxX; tx++) {
-      if (isWall(map, tx, ty)) {
-        const nearestX = clamp(cx, tx, tx + 1);
-        const nearestY = clamp(cy, ty, ty + 1);
-        if (dist(cx, cy, nearestX, nearestY) < r) return true;
-      }
+    // check 4 sample points around circle
+    const pts = [
+      [nx - r, ny - r],
+      [nx + r, ny - r],
+      [nx - r, ny + r],
+      [nx + r, ny + r],
+    ];
+    for (const [px, py] of pts){
+      if (isWall(map, Math.floor(px), Math.floor(py))) return false;
     }
+    ent.x = nx; ent.y = ny;
+    return true;
+  };
+
+  // move both, then slide
+  if (!tryAxis(dx, dy)){
+    if (!tryAxis(dx, 0)) tryAxis(0, dy);
   }
-  return false;
 }
+
+export function makeProjectile(x,y,vx,vy,from,dmg,r=0.12){
+  return { x,y,vx,vy,from,dmg,r,life:0.85,alive:true,t:0 };
+}
+
+export function spawnGibs(S, x, y, power=1){
+  const n = 14 + ((Math.random()*10)|0);
+  for (let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2;
+    const sp = (2 + Math.random()*6) * power;
+    S.gibs.push({
+      x, y,
+      vx: Math.cos(a)*sp,
+      vy: Math.sin(a)*sp,
+      life: 0.8 + Math.random()*0.7,
+      sz: 1 + Math.random()*2.5,
+      col: Math.random()<0.6 ? "#ff3355" : "#ddd"
+    });
+  }
+}
+
 
