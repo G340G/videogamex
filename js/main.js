@@ -2,7 +2,7 @@
 import { clamp, dist } from "./utils.js";
 import { createAudio } from "./audio.js";
 import { render } from "./render.js";
-import { createState, generateLevel, setMsg, updateHeroAnimHints, onHeroShoot } from "./state.js";
+import { createState, generateLevel, setMsg, tickStory } from "./state.js";
 import { tryMoveCircle, makeProjectile } from "./entities.js";
 import { isWall } from "./map.js";
 
