@@ -2,1783 +2,892 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1.0" />
-<title>ENTROPY.DAT</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+<title>ENTROPY.DAT // RE:ITERATION</title>
 <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg:#050505;
-    --fg:#cfe2da;
-    --ui:#ccffcc;
-    --danger:#ff3355;
-    --dim:rgba(204,255,204,.25);
+  :root {
+    --bg: #050505;
+    --crt-color: #aaddaa;
+    --danger: #ff2a2a;
+    --warn: #ffcc00;
+    --dim: rgba(170, 221, 170, 0.3);
   }
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:'VT323',monospace;overflow:hidden;}
-  #wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;user-select:none;}
-  #crt{
-    position:relative;width:640px;height:480px;background:#000;
-    border:1px solid #2a2a2a; box-shadow:0 0 25px rgba(0,0,0,.85);
+  
+  html, body {
+    height: 100%; margin: 0; background: #020202; overflow: hidden;
+    font-family: 'VT323', monospace; color: var(--crt-color);
+    user-select: none; -webkit-user-select: none;
   }
-  canvas{width:100%;height:100%;display:block;image-rendering:pixelated;background:#000;}
-  .scanlines{
-    position:absolute;inset:0;z-index:10;pointer-events:none;
-    background:linear-gradient(to bottom,
-      rgba(255,255,255,0),
-      rgba(255,255,255,0) 50%,
-      rgba(0,0,0,.22) 50%,
-      rgba(0,0,0,.22)
-    );
-    background-size:100% 4px;
-    mix-blend-mode:overlay;
-  }
-  #crt::after{
-    content:""; position:absolute; inset:0; z-index:10; pointer-events:none;
-    background:rgba(18,16,16,.10); opacity:0;
-    animation:flicker .14s infinite;
-  }
-  @keyframes flicker{0%{opacity:.02}50%{opacity:.06}100%{opacity:.02}}
 
-  /* compact HUD */
-  #hud{
-    position:absolute; top:6px; left:6px; z-index:20; pointer-events:none;
-    color:var(--ui); text-shadow:0 0 5px rgba(204,255,204,.6);
-    font-size:1.05rem; line-height:1.05;
-    background:rgba(0,0,0,0.33);
-    border:1px solid var(--dim);
-    border-radius:4px;
-    padding:6px 8px;
-    max-width:180px;
+  /* --- LAYOUT --- */
+  #main {
+    position: relative; width: 100%; height: 100%;
+    display: flex; justify-content: center; align-items: center;
   }
-  #hud .dim{opacity:.7}
-  #hud .red{color:var(--danger);text-shadow:0 0 5px rgba(255,51,85,.65)}
-  .bar{height:4px;background:rgba(255,255,255,.12);margin-top:4px;position:relative;overflow:hidden}
-  .bar > i{display:block;height:100%;width:50%;background:rgba(204,255,204,.9)}
-  .bar.red > i{background:rgba(255,51,85,.85)}
 
-  /* start overlay */
-  #overlay{
-    position:absolute; inset:0; z-index:30;
-    display:grid; place-items:center;
-    background:radial-gradient(circle at center, rgba(0,0,0,.30), rgba(0,0,0,.93));
+  #crt-frame {
+    position: relative;
+    width: 800px; height: 600px;
+    background: #000;
+    border: 2px solid #333;
+    box-shadow: 0 0 50px rgba(0,0,0,0.8);
+    overflow: hidden;
   }
-  .panel{
-    width:min(560px,92%); padding:14px 14px 10px;
-    border:1px solid rgba(204,255,204,.22);
-    border-radius:6px;
-    background:rgba(0,0,0,.55);
-    box-shadow:0 0 18px rgba(0,0,0,.6);
-    color:var(--ui);
-    text-shadow:0 0 8px rgba(204,255,204,.25);
-  }
-  .title{font-size:3.4rem;letter-spacing:2px;text-align:center;margin:0 0 10px}
-  .sub{font-size:1.4rem;text-align:center;opacity:.9;margin:6px 0}
-  .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:10px 0}
-  input,select,button{
-    font-family:'VT323'; font-size:1.25rem; padding:8px 10px;
-    background:#000; color:var(--fg);
-    border:1px solid rgba(255,255,255,.18);
-    outline:none;
-  }
-  input{min-width:240px}
-  button{cursor:pointer;border-color:rgba(204,255,204,.35);color:var(--ui)}
-  button:hover{filter:brightness(1.15)}
-  .tiny{opacity:.65;text-align:center;font-size:1.05rem}
 
-  .hint{
-    text-align:center; opacity:.6; font-size:1.2rem;
+  canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+
+  /* --- UI OVERLAY --- */
+  #ui-layer {
+    position: absolute; inset: 0; pointer-events: none;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 20px;
   }
+
+  .hud-row { display: flex; justify-content: space-between; align-items: flex-start; }
+  .hud-box {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid var(--dim);
+    padding: 8px 12px;
+    font-size: 1.2rem;
+    text-shadow: 0 0 4px var(--dim);
+  }
+  
+  .bar-container { width: 150px; height: 8px; background: #222; margin-top: 4px; border: 1px solid #444; }
+  .bar-fill { height: 100%; background: var(--crt-color); width: 100%; transition: width 0.2s; }
+  .bar-fill.red { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+  /* --- CRT EFFECTS --- */
+  .scanlines {
+    position: absolute; inset: 0; pointer-events: none; z-index: 50;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.3));
+    background-size: 100% 4px; mix-blend-mode: overlay; opacity: 0.8;
+  }
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 51;
+    background: radial-gradient(circle, rgba(0,0,0,0) 50%, rgba(0,0,0,0.8) 100%);
+  }
+  
+  /* --- MENUS --- */
+  #menu-overlay {
+    position: absolute; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    pointer-events: auto;
+  }
+  
+  .panel {
+    border: 2px solid var(--crt-color); background: #111;
+    padding: 2rem; width: 400px; text-align: center;
+    box-shadow: 0 0 20px rgba(170, 221, 170, 0.2);
+  }
+  
+  h1 { font-size: 3rem; margin: 0 0 1rem; letter-spacing: 4px; text-shadow: 2px 2px 0 var(--dim); }
+  h2 { font-size: 1.5rem; color: var(--warn); margin: 0 0 1rem; }
+  
+  button {
+    background: transparent; border: 1px solid var(--crt-color); color: var(--crt-color);
+    font-family: 'VT323'; font-size: 1.5rem; padding: 0.5rem 1rem; cursor: pointer;
+    margin: 0.5rem; transition: all 0.2s;
+  }
+  button:hover { background: var(--crt-color); color: #000; }
+  
+  input {
+    background: #000; border: 1px solid #555; color: var(--crt-color);
+    font-family: 'VT323'; font-size: 1.2rem; padding: 5px; width: 60px; text-align: center;
+  }
+
+  /* --- TERMINAL --- */
+  #terminal-modal {
+    display: none; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); z-index: 90;
+    background: #0a0a0a; border: 2px solid var(--crt-color);
+    padding: 20px; width: 300px;
+  }
+  .hidden { display: none !important; }
+  .flicker { animation: flicker 0.15s infinite; }
+  @keyframes flicker { 0% {opacity:0.9;} 50% {opacity:1.0;} 100% {opacity:0.9;} }
 </style>
 </head>
 <body>
-<div id="wrap">
-  <div id="crt">
+
+<div id="main">
+  <div id="crt-frame">
     <div class="scanlines"></div>
+    <div class="vignette"></div>
+    
+    <canvas id="game-canvas" width="640" height="480"></canvas>
 
-    <div id="hud">
-      <div id="hName">NAME: ???</div>
-      <div id="hRole" class="dim">ROLE: ???</div>
-      <div id="hDiff" class="dim">DIFF: ???</div>
-      <div id="hRun" class="dim">RUN: OFF</div>
-
-      <div style="margin-top:6px">
-        <div class="dim">OXYGEN</div>
-        <div class="bar red"><i id="hOxy"></i></div>
+    <div id="ui-layer">
+      <div class="hud-row">
+        <div class="hud-box">
+          <div id="hud-theme">LOC: LOADING...</div>
+          <div id="hud-obj" style="color:var(--warn)">OBJ: FIND CODE</div>
+        </div>
+        <div class="hud-box">
+          <div>OXYGEN</div>
+          <div class="bar-container"><div id="bar-oxy" class="bar-fill"></div></div>
+          <div style="margin-top:5px">SANITY</div>
+          <div class="bar-container"><div id="bar-san" class="bar-fill red" style="width:100%"></div></div>
+        </div>
       </div>
-
-      <div style="margin-top:6px">
-        <div class="dim">MISSION</div>
-        <div id="hMission" class="dim">LOCKED</div>
-        <div class="bar"><i id="hMis"></i></div>
-      </div>
-
-      <div style="margin-top:6px" class="dim">
-        <div id="hLoot">CHESTS 0/0</div>
-        <div id="hOff">OFFERINGS 0/0</div>
-        <div id="hAtk" class="dim">ACTION: READY</div>
+      
+      <div class="hud-row" style="margin-top:auto">
+        <div class="hud-box">
+          <div id="hud-log">SYSTEM READY...</div>
+        </div>
+        <div class="hud-box" style="text-align:right">
+           <div id="hud-ammo">AMMO: [|||||]</div>
+           <div id="hud-hp">VIT: 100%</div>
+        </div>
       </div>
     </div>
 
-    <canvas id="game" width="320" height="240"></canvas>
-
-    <div id="overlay">
+    <div id="menu-overlay">
       <div class="panel">
-        <div class="title">ENTROPY.DAT</div>
-        <div class="sub">IDENTITY REQUIRED</div>
-
-        <div class="row">
-          <input id="nameInput" type="text" autocomplete="off" spellcheck="false" placeholder="PROTAGONIST NAME">
-          <select id="roleInput">
-            <option value="thief">THIEF</option>
-            <option value="killer">KILLER</option>
-            <option value="butcher">BUTCHER</option>
+        <h1>ENTROPY.DAT</h1>
+        <div id="menu-content">
+          <p>The facility shifts. The codes change. <br>Violence creates ghosts.</p>
+          <br>
+          <label>IDENTITY:</label>
+          <select id="role-select" style="font-family:'VT323'; background:#000; color:white; font-size:1.2rem; padding:5px;">
+            <option value="detective">DETECTIVE (High Sanity)</option>
+            <option value="soldier">SOLDIER (High Ammo)</option>
+            <option value="cultist">CULTIST (See Spirits)</option>
           </select>
-        </div>
-
-        <div class="row">
-          <button id="startBtn" type="button">INITIALIZE</button>
-        </div>
-
-        <div class="tiny">
-          WASD / Arrows · Shift = run (louder) · E = Signal Pulse · Space = Action · 1/2 respond<br/>
-          Chests unlock missions. Finish mission to unseal exit. Oxygen lasts &gt; 60s.
+          <br><br>
+          <button id="btn-start">INITIALIZE RUN</button>
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="hint">
-    Run makes you easier to track. Killing creates hallucinations. The maze remembers your name.
+    <div id="terminal-modal" class="hidden">
+      <h2 style="text-align:center; border-bottom:1px solid #444; padding-bottom:10px;">SECURITY LOCK</h2>
+      <p style="text-align:center; font-size:1.1rem; color:#888;">ENTER 3-DIGIT OVERRIDE</p>
+      <div style="display:flex; justify-content:center; gap:10px; margin: 15px 0;">
+        <input type="text" maxlength="1" id="code-1" />
+        <input type="text" maxlength="1" id="code-2" />
+        <input type="text" maxlength="1" id="code-3" />
+      </div>
+      <div style="text-align:center;">
+        <button id="btn-unlock" style="font-size:1rem;">EXECUTE</button>
+        <button id="btn-close-term" style="font-size:1rem; border-color:#555; color:#555;">ABORT</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <script>
-(() => {
-  /* ============================================================
-     CONFIG
-  ============================================================ */
-  const W=320,H=240;
-  const TILE=16;
-  const COLS=20, ROWS=15;
+/* =========================================================================
+   ENTROPY.DAT // ENGINE CORE
+   ========================================================================= */
 
-  const TOTAL_OFFERINGS=3;
-  const CHESTS_PER_LEVEL=3;
-  const STAINS=8;
+// --- CONFIG & CONSTANTS ---
+const TILE_SIZE = 32;
+const MAP_W = 30;
+const MAP_H = 20;
+const FOV_RADIUS = 180;
 
-  const BASE_FOV=6.1, MIN_FOV=4.0, MAX_FOV=7.2;
+const COLORS = {
+  void: '#000000',
+  ui: '#aaddaa',
+  blood: '#aa0000',
+  fow: 'rgba(0,0,0,1)'
+};
 
-  // Movement + collision (no corner sticking)
-  const PLAYER_RADIUS=0.28;
-  const ACCEL=14.0;
-  const FRICTION=0.80;
-  const MAX_WALK=2.15;
-  const MAX_RUN=3.10;
+const THEMES = {
+  asylum: { name: "ASYLUM WARD", floor: "#e0e0e0", wall: "#a0b0b0", noise: 0.05, text: "#333", perk: "Bright but sterile." },
+  catacombs: { name: "OLD CATACOMBS", floor: "#3e2723", wall: "#1a100c", noise: 0.3, text: "#d7ccc8", perk: "Tight corridors." },
+  factory: { name: "INDUSTRIAL ZONE", floor: "#263238", wall: "#37474f", noise: 0.15, text: "#cfd8dc", perk: "Metallic echoes." },
+  flesh: { name: "BIOLOGICAL WASTE", floor: "#4a1414", wall: "#290808", noise: 0.2, text: "#ffcccc", perk: "The walls breathe." }
+};
 
-  // Oxygen pacing (>= 60s)
-  const BASE_OXYGEN=92;       // seconds (walking)
-  const RUN_OXY_MULT=1.55;
-  const OXY_TANKS=3;
-  const OXY_TANK_GAIN=35;
+// --- GAME STATE ---
+let game = {
+  running: false,
+  paused: false,
+  t: 0,
+  lvl: 1,
+  theme: null,
+  map: [],
+  entities: [],
+  particles: [],
+  decals: [], // Blood stains, codes
+  hero: { x:0, y:0, hp:100, maxHp:100, oxy:100, sanity:100, ammo: 0, role: 'detective', angle: 0 },
+  keys: {},
+  mouse: { x:0, y:0 },
+  camera: { x:0, y:0 },
+  puzzle: { code: "000", solved: false, loc: {x:0, y:0} },
+  exitLoc: {x:0, y:0}
+};
 
-  // Combat pacing
-  const ACTION_CD_BASE=0.55;
-  const ACTION_NOISE=1.0;
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d', { alpha: false });
 
-  // Hallucination after kill
-  const HALLU_GAIN_MIN=26;
-  const HALLU_GAIN_MAX=40;
-  const HALLU_DECAY_PER_SEC=1.2;
+/* =========================================================================
+   AUDIO ENGINE (Procedural Industrial/Dungeon Synth)
+   ========================================================================= */
+const Audio = (() => {
+  let ac, master, drumGain, droneOsc;
+  let nextNoteTime = 0;
+  let tempo = 110;
+  let beatCount = 0;
+  let initialized = false;
 
-  // Colors / vibe
-  const PAL={
-    wall:"#32343d",
-    floor:"#09090b",
-    fog:"#000000",
-    ui:"#ccffcc",
-    danger:"#ff3355",
-    white:"#f1f1f1"
-  };
-
-  /* ============================================================
-     DOM
-  ============================================================ */
-  const canvas=document.getElementById("game");
-  const ctx=canvas.getContext("2d",{alpha:false});
-
-  const overlay=document.getElementById("overlay");
-  const startBtn=document.getElementById("startBtn");
-  const nameInput=document.getElementById("nameInput");
-  const roleInput=document.getElementById("roleInput");
-
-  const hName=document.getElementById("hName");
-  const hRole=document.getElementById("hRole");
-  const hDiff=document.getElementById("hDiff");
-  const hRun=document.getElementById("hRun");
-  const hOxy=document.getElementById("hOxy");
-  const hMission=document.getElementById("hMission");
-  const hMis=document.getElementById("hMis");
-  const hLoot=document.getElementById("hLoot");
-  const hOff=document.getElementById("hOff");
-  const hAtk=document.getElementById("hAtk");
-
-  /* ============================================================
-     STATE
-  ============================================================ */
-  let keys={};
-  let started=false;
-
-  let map=[];
-  let stains=[];
-  let offerings=[];
-  let chests=[];
-  let oxyTanks=[];
-  let exit=null;
-  let exitLocked=true;
-
-  let messages=[];
-  let prompt={active:false,text:"",a:"",b:"",onChoose:null,timer:0};
-
-  let mission={
-    active:false, completed:false,
-    title:"", desc:"",
-    type:"", progress:0, goal:1, extra:null
-  };
-
-  const hero={
-    name:"UNKNOWN",
-    role:"thief",
-    x:1.5,y:1.5,
-    vx:0,vy:0,
-    oxygen:BASE_OXYGEN,
-    oxygenMax:BASE_OXYGEN,
-    sanity:100,
-    panic:0,
-    hitCD:0,
-    actionCD:0,
-    animT:0,
-    hallucination:0, // seconds
-    kills:0
-  };
-
-  const run={
-    anxiety:0,
-    diffIndex:0,
-    diffLabel:"",
-    monstersCount:1,
-    aggression:1.0,
-    oxygenDrain:1.0,
-    seedSalt:(Math.random()*1e9)|0
-  };
-
-  // monsters are non-solid “danger zones” (you can run through with risk)
-  let monsters=[]; // {x,y,hp,stun,deadTimer,respawnAt,stepCd,target,lastSeen,kind}
-
-  /* ============================================================
-     TEXT + LORE
-  ============================================================ */
-  const crypticPhrases=[
-    "IT KNOWS","BEHIND YOU","NULL REFERENCE","WHERE AM I","DONT STOP","STATIC...","1997",
-    "DE-SYNC","LOST SIGNAL","FRAME DROP","NO CLIP","DOOR IS NOT A DOOR",
-    "EYES IN THE FOG","THE MAZE REMEMBERS","YOU ARE DATA","THE FLOOR IS BREATHING",
-    "COPY OF A COPY","SHE IS STILL HERE","TAPE HISS","SIGNAL BLEED"
-  ];
-
-  const loreBits={
-    kidnapped:[
-      "They took her from a parking lot under a dead streetlight.",
-      "A van that smelled like wet carpet and iron.",
-      "You heard the tape recorder start. You never heard it stop.",
-      "They said your name like they owned it."
-    ],
-    thief:[
-      "You stole keys you didn't understand.",
-      "You can pick locks, but not guilt.",
-      "Every door you open remembers your fingerprints."
-    ],
-    killer:[
-      "You did it clean. Too clean.",
-      "There are faces in the fog that look like your work.",
-      "You keep rehearsing apologies you will never speak."
-    ],
-    butcher:[
-      "You know the weight of meat when it stops being alive.",
-      "Your hands remember cuts your mind refuses.",
-      "The maze smells familiar."
-    ],
-    endings:[
-      "The exit is not escape. It's upload.",
-      "Something will wear your voice after you leave.",
-      "Your breath becomes geometry."
-    ]
-  };
-
-  function pick(arr){ return arr[(Math.random()*arr.length)|0]; }
-
-  function generateLore(){
-    const name=hero.name.toUpperCase();
-    return `${name}. ${pick(loreBits.kidnapped)} ${pick(loreBits[hero.role])} ${pick(loreBits.endings)}`;
-  }
-
-  const lorePrompts=[
-    {
-      text:(n)=>`A smear spells: "${n}, DO YOU WANT TO BE SEEN?"`,
-      a:"1) YES (clearer, louder)",
-      b:"2) NO  (safer, dimmer)",
-      choose:(c)=>{
-        if(c===1){ run.anxiety=Math.max(run.anxiety,10); run.aggression+=0.10; pushMessage("YOU ARE VISIBLE", PAL.danger); }
-        else { run.aggression=Math.max(0.9, run.aggression-0.08); pushMessage("YOU ARE MISSING", PAL.ui); }
-      }
-    },
-    {
-      text:(n)=>`The CRT whispers: "${n}, SACRIFICE OXYGEN FOR SPEED?"`,
-      a:"1) ACCEPT (faster, drains more)",
-      b:"2) REFUSE (slower, calmer)",
-      choose:(c)=>{
-        if(c===1){ run.oxygenDrain*=1.18; pushMessage("HUNGER ENGINE", PAL.danger); }
-        else { run.oxygenDrain=Math.max(0.85, run.oxygenDrain*0.92); run.aggression+=0.06; pushMessage("SLOW MERCY", PAL.ui); }
-      }
-    },
-    {
-      text:(n)=>`A radio click: "${n}. WHICH PART OF YOU IS REAL?"`,
-      a:"1) HANDS",
-      b:"2) VOICE",
-      choose:(c)=>{
-        if(c===1){ hero.hitCD=Math.max(hero.hitCD,0.6); pushMessage("HANDS REMEMBER", "#fff"); }
-        else { run.anxiety=Math.max(run.anxiety,14); pushMessage("VOICE LIES", PAL.danger); }
-      }
-    }
-  ];
-
-  /* ============================================================
-     INPUT (typing does not start the game)
-  ============================================================ */
-  window.addEventListener("keydown",(e)=>{
-    keys[e.code]=true;
-    if(!started) return;
-
-    if(e.code==="KeyE") triggerPulse();
-    if(e.code==="Space") tryAction();
-
-    if(prompt.active){
-      if(e.code==="Digit1"||e.code==="Numpad1"||e.code==="KeyY") choosePrompt(1);
-      if(e.code==="Digit2"||e.code==="Numpad2"||e.code==="KeyN") choosePrompt(2);
-    }
-  },{passive:true});
-  window.addEventListener("keyup",(e)=>keys[e.code]=false,{passive:true});
-
-  startBtn.addEventListener("pointerdown",(e)=>{
-    e.preventDefault(); e.stopPropagation();
-    startGame();
-  });
-  overlay.addEventListener("pointerdown",(e)=>{ e.stopPropagation(); });
-
-  /* ============================================================
-     AUDIO (organic, scary, reactive)
-  ============================================================ */
-  let audio=null;
-
-  function initAudio(){
-    if(audio) return;
-    const AC=window.AudioContext||window.webkitAudioContext;
-    const ac=new AC();
-
-    const master=ac.createGain();
-    master.gain.value=0.75;
+  function init() {
+    if(initialized) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ac = new AC();
+    master = ac.createGain();
+    master.gain.value = 0.4;
     master.connect(ac.destination);
 
-    // pink-ish noise buffer
-    const noiseBuf=ac.createBuffer(1, ac.sampleRate*2, ac.sampleRate);
-    {
-      const d=noiseBuf.getChannelData(0);
-      let last=0;
-      for(let i=0;i<d.length;i++){
-        last=0.965*last + 0.035*(Math.random()*2-1);
-        d[i]=last;
-      }
-    }
-
-    const wind=ac.createBufferSource();
-    wind.buffer=noiseBuf; wind.loop=true;
-    const windLP=ac.createBiquadFilter();
-    windLP.type="lowpass"; windLP.frequency.value=240;
-    const windGain=ac.createGain(); windGain.gain.value=0.04;
-    wind.connect(windLP); windLP.connect(windGain); windGain.connect(master);
-    wind.start();
-
-    const radio=ac.createBufferSource();
-    radio.buffer=noiseBuf; radio.loop=true;
-    const radioBP=ac.createBiquadFilter();
-    radioBP.type="bandpass"; radioBP.frequency.value=1200; radioBP.Q.value=0.9;
-    const radioGain=ac.createGain(); radioGain.gain.value=0.015;
-    radio.connect(radioBP); radioBP.connect(radioGain); radioGain.connect(master);
-    radio.start();
-
-    // drone (two oscillators + slow FM)
-    const o1=ac.createOscillator(); o1.type="sine"; o1.frequency.value=46;
-    const o2=ac.createOscillator(); o2.type="triangle"; o2.frequency.value=69;
-
-    const fm=ac.createOscillator(); fm.type="sine"; fm.frequency.value=0.11;
-    const fmGain=ac.createGain(); fmGain.gain.value=11;
-    fm.connect(fmGain); fmGain.connect(o1.frequency);
-
-    const droneLP=ac.createBiquadFilter();
-    droneLP.type="lowpass"; droneLP.frequency.value=600;
-    const droneGain=ac.createGain(); droneGain.gain.value=0.022;
-
-    const mix=ac.createGain(); mix.gain.value=1;
-    o1.connect(mix); o2.connect(mix);
-    mix.connect(droneLP); droneLP.connect(droneGain); droneGain.connect(master);
-
-    o1.start(); o2.start(); fm.start();
-
-    // short “blip” event
-    function blip(intensity=0.4){
-      const t=ac.currentTime;
-      const osc=ac.createOscillator();
-      osc.type=Math.random()<0.5?"square":"triangle";
-      osc.frequency.value=80+Math.random()*2200;
-
-      const bp=ac.createBiquadFilter();
-      bp.type="bandpass"; bp.frequency.value=400+Math.random()*3200; bp.Q.value=7+Math.random()*5;
-
-      const g=ac.createGain();
-      g.gain.setValueAtTime(0,t);
-      g.gain.linearRampToValueAtTime(0.08*intensity, t+0.003);
-      g.gain.exponentialRampToValueAtTime(0.0001, t+0.12);
-
-      osc.connect(bp); bp.connect(g); g.connect(master);
-      osc.start(t); osc.stop(t+0.12);
-    }
-
-    // low throb
-    function throb(intensity=0.4){
-      const t=ac.currentTime;
-      const osc=ac.createOscillator();
-      osc.type="sine"; osc.frequency.value=24+Math.random()*18;
-      const g=ac.createGain();
-      g.gain.setValueAtTime(0,t);
-      g.gain.linearRampToValueAtTime(0.05*intensity, t+0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t+0.35);
-      osc.connect(g); g.connect(master);
-      osc.start(t); osc.stop(t+0.36);
-    }
-
-    function mutate(){
-      const t=ac.currentTime;
-      const fear=audio?.fear ?? 0;
-      const hallu=audio?.hallu ?? 0;
-
-      radioBP.frequency.setTargetAtTime(600 + Math.random()*3200, t, 1.4);
-      radioBP.Q.setTargetAtTime(0.8 + fear*9 + hallu*3 + Math.random()*1.2, t, 0.9);
-      radioGain.gain.setTargetAtTime(0.010 + 0.03*Math.random() + fear*0.08 + hallu*0.06, t, 0.25);
-
-      windLP.frequency.setTargetAtTime(110 + Math.random()*360, t, 2.2);
-      windGain.gain.setTargetAtTime(0.03 + 0.06*Math.random() + fear*0.08, t, 0.6);
-
-      droneLP.frequency.setTargetAtTime(240 + Math.random()*1100 + fear*600 + hallu*350, t, 1.7);
-      droneGain.gain.setTargetAtTime(0.016 + 0.03*Math.random() + fear*0.08 + hallu*0.04, t, 1.1);
-
-      o1.frequency.setTargetAtTime(34 + Math.random()*44 + hallu*8, t, 1.5);
-      o2.frequency.setTargetAtTime(50 + Math.random()*78 + hallu*12, t, 1.8);
-
-      // detune spikes during hallucination
-      if(hallu>0.25 && Math.random()<0.18){
-        o1.detune.setTargetAtTime((Math.random()<0.5?-1:1)*(60+Math.random()*200), t, 0.25);
-        setTimeout(()=>o1.detune.setTargetAtTime(0, ac.currentTime, 0.7), 600+Math.random()*1400);
-      }
-
-      if(Math.random() < 0.14 + fear*0.25) blip(0.25 + Math.random()*(0.4+fear));
-      if(Math.random() < 0.10 + fear*0.18 + hallu*0.12) throb(0.25 + fear*0.9 + hallu*0.6);
-
-      setTimeout(mutate, 800 + Math.random()*1600);
-    }
-
-    function eventTick(){
-      const fear=audio?.fear ?? 0;
-      const hallu=audio?.hallu ?? 0;
-      if(Math.random() < 0.09 + fear*0.25 + hallu*0.2) blip(0.15 + Math.random()*(0.35+fear+hallu));
-      setTimeout(eventTick, 260 + Math.random()*(950 - fear*450));
-    }
-
-    audio={
-      ac,
-      fear:0,
-      hallu:0,
-      blip,
-      setFear(f){ audio.fear=f; },
-      setHallu(h){ audio.hallu=h; }
-    };
-
-    setTimeout(mutate, 600);
-    setTimeout(eventTick, 900);
+    // Background Drone
+    droneOsc = ac.createOscillator();
+    droneOsc.type = 'sawtooth';
+    droneOsc.frequency.value = 55; // Low A
+    const filter = ac.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 120;
+    const lfo = ac.createOscillator();
+    lfo.frequency.value = 0.1;
+    const lfoGain = ac.createGain();
+    lfoGain.gain.value = 50;
+    
+    lfo.connect(lfoGain).connect(filter.frequency);
+    droneOsc.connect(filter).connect(master);
+    droneOsc.start();
+    lfo.start();
+    
+    initialized = true;
+    scheduler();
   }
 
-  async function ensureAudioRunning(){
-    initAudio();
-    if(audio?.ac?.state==="suspended"){
-      try{ await audio.ac.resume(); }catch{}
-    }
+  function playKick(t) {
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.5);
+    g.gain.setValueAtTime(1, t);
+    g.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+    
+    // Distortion
+    const dist = ac.createWaveShaper();
+    dist.curve = makeDistortionCurve(400);
+    dist.oversample = '4x';
+
+    osc.connect(g).connect(dist).connect(master);
+    osc.start(t);
+    osc.stop(t + 0.5);
   }
 
-  /* ============================================================
-     HELPERS
-  ============================================================ */
-  const clamp=(v,a,b)=> v<a?a : v>b?b : v;
-  const inBounds=(x,y)=> x>=0&&y>=0&&x<COLS&&y<ROWS;
-  const isFloor=(x,y)=> inBounds(x,y) && map[y][x]===0;
-
-  function pushMessage(text,color="#fff"){
-    messages.push({
-      text,
-      x:10+Math.random()*(W-20),
-      y:20+Math.random()*(H-20),
-      life:70,
-      color
-    });
-  }
-  function triggerMessage(text=null){
-    if(Math.random()>0.38 && !text) return;
-    const phrase=text||crypticPhrases[(Math.random()*crypticPhrases.length)|0];
-    pushMessage(phrase, Math.random()>0.5?PAL.danger:"#fff");
+  function playSnare(t) {
+    const noise = ac.createBufferSource();
+    noise.buffer = createNoiseBuffer(ac);
+    const noiseFilter = ac.createBiquadFilter();
+    noiseFilter.type = 'highpass';
+    noiseFilter.frequency.value = 1000;
+    const noiseEnv = ac.createGain();
+    noiseEnv.gain.setValueAtTime(0.5, t);
+    noiseEnv.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+    noise.connect(noiseFilter).connect(noiseEnv).connect(master);
+    noise.start(t);
   }
 
-  function randomFloorFar(px,py,manh){
-    for(let i=0;i<900;i++){
-      const x=(Math.random()*COLS)|0;
-      const y=(Math.random()*ROWS)|0;
-      if(!isFloor(x,y)) continue;
-      if(Math.abs(x-px)+Math.abs(y-py)<manh) continue;
-      return {x,y};
-    }
-    for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
-      if(isFloor(x,y) && Math.abs(x-px)+Math.abs(y-py)>=manh) return {x,y};
-    }
-    return {x:1,y:1};
+  function playAlarm(t) {
+    const osc = ac.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(800, t);
+    osc.frequency.linearRampToValueAtTime(400, t+0.3);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.1, t);
+    g.gain.linearRampToValueAtTime(0, t+0.3);
+    osc.connect(g).connect(master);
+    osc.start(t);
   }
 
-  /* ============================================================
-     BRAIDED MAZE
-  ============================================================ */
-  function generateBraidedMaze(){
-    map=Array(ROWS).fill(0).map(()=>Array(COLS).fill(1));
-    const stack=[{x:1,y:1}];
-    map[1][1]=0;
+  function scheduler() {
+    const lookahead = 25.0;
+    const scheduleAheadTime = 0.1;
+    while (nextNoteTime < ac.currentTime + scheduleAheadTime) {
+      // Martial Pattern: Kick on 1, 2, 3, 4. Snare on 3.
+      // 4/4 time
+      if(beatCount % 4 === 0) playKick(nextNoteTime);
+      if(beatCount % 4 === 2) { playKick(nextNoteTime); playSnare(nextNoteTime); }
+      if(beatCount % 8 === 7 && Math.random() > 0.5) playSnare(nextNoteTime + 0.1); // ghost note
+      
+      // Random industrial clank
+      if(Math.random() < 0.1) playAlarm(nextNoteTime);
 
-    while(stack.length){
-      const c=stack[stack.length-1];
-      const dirs=[[2,0],[-2,0],[0,2],[0,-2]].sort(()=>Math.random()-0.5);
-      let carved=false;
-      for(const[dx,dy] of dirs){
-        const nx=c.x+dx, ny=c.y+dy;
-        if(nx>0&&ny>0&&nx<COLS-1&&ny<ROWS-1&&map[ny][nx]===1){
-          map[ny][nx]=0;
-          map[c.y+dy/2][c.x+dx/2]=0;
-          stack.push({x:nx,y:ny});
-          carved=true; break;
-        }
-      }
-      if(!carved) stack.pop();
+      const secondsPerBeat = 60.0 / tempo;
+      nextNoteTime += secondsPerBeat;
+      beatCount++;
     }
-
-    // braid dead ends
-    for(let y=1;y<ROWS-1;y++){
-      for(let x=1;x<COLS-1;x++){
-        if(map[y][x]!==0) continue;
-        let exits=0;
-        const neigh=[[1,0],[-1,0],[0,1],[0,-1]];
-        for(const[dX,dY] of neigh){
-          if(map[y+dY][x+dX]===0) exits++;
-        }
-        if(exits===1 && Math.random()<0.62){
-          const dirs=neigh.sort(()=>Math.random()-0.5);
-          for(const[dX,dY] of dirs){
-            if(map[y+dY][x+dX]===1){
-              map[y+dY][x+dX]=0;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    // extra loops
-    for(let i=0;i<16;i++){
-      const x=1+((Math.random()*(COLS-2))|0);
-      const y=1+((Math.random()*(ROWS-2))|0);
-      if(map[y][x]===1 && Math.random()<0.5) map[y][x]=0;
-    }
+    setTimeout(scheduler, lookahead);
   }
 
-  /* ============================================================
-     COLLISION (circle vs tiles)
-  ============================================================ */
-  function resolveCircleGrid(px,py,r){
-    let x=px,y=py;
-    const minX=Math.floor(x-1), maxX=Math.floor(x+1);
-    const minY=Math.floor(y-1), maxY=Math.floor(y+1);
-
-    for(let ty=minY; ty<=maxY; ty++){
-      for(let tx=minX; tx<=maxX; tx++){
-        if(!inBounds(tx,ty) || map[ty][tx]===1){
-          const cx=clamp(x, tx, tx+1);
-          const cy=clamp(y, ty, ty+1);
-          const dx=x-cx, dy=y-cy;
-          const d=Math.hypot(dx,dy);
-          if(d<r){
-            const push=(r-d)/(d||1);
-            x += dx*push;
-            y += dy*push;
-          }
-        }
-      }
+  function makeDistortionCurve(amount) {
+    let k = typeof amount === 'number' ? amount : 50,
+      n_samples = 44100,
+      curve = new Float32Array(n_samples),
+      deg = Math.PI / 180,
+      i = 0, x;
+    for ( ; i < n_samples; ++i ) {
+      x = i * 2 / n_samples - 1;
+      curve[i] = ( 3 + k ) * x * 20 * deg / ( Math.PI + k * Math.abs(x) );
     }
-    return {x,y};
+    return curve;
   }
 
-  /* ============================================================
-     OBJECTIVES / PULSE
-  ============================================================ */
-  let pulse={active:false, t:0, ring:0};
-
-  function nearestObjective(){
-    let best=null, bestD=1e9;
-    for(const c of chests){
-      if(c.opened) continue;
-      const d=Math.hypot((c.x+0.5)-hero.x,(c.y+0.5)-hero.y);
-      if(d<bestD){ bestD=d; best={x:c.x,y:c.y}; }
-    }
-    if(best) return best;
-
-    for(const o of offerings){
-      if(o.collected) continue;
-      const d=Math.hypot((o.x+0.5)-hero.x,(o.y+0.5)-hero.y);
-      if(d<bestD){ bestD=d; best={x:o.x,y:o.y}; }
-    }
-    if(!best && exit) best={x:exit.x,y:exit.y};
-    return best;
+  function createNoiseBuffer(ctx) {
+    const size = ctx.sampleRate;
+    const buffer = ctx.createBuffer(1, size, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
+    return buffer;
   }
 
-  function triggerPulse(){
-    if(!started) return;
-    if(pulse.active) return;
-    const t=nearestObjective();
-    if(!t) return;
-    pulse.active=true; pulse.t=0; pulse.ring=0;
-    run.anxiety=Math.max(run.anxiety,10);
-    audio?.blip?.(1.0);
-    pushMessage("ECHO PULSE", "#fff");
-
-    if(mission.active && mission.type==="ECHO_COUNT"){
-      mission.extra.used++;
-      if(mission.extra.used > mission.extra.max){
-        mission.extra.used=0;
-        run.anxiety=Math.max(run.anxiety,16);
-        pushMessage("ECHO OVERFLOW", PAL.danger);
-      }
-    }
-  }
-
-  /* ============================================================
-     PROMPTS
-  ============================================================ */
-  function showPrompt(p){
-    if(prompt.active) return;
-    prompt.active=true;
-    prompt.text=p.text(hero.name.toUpperCase());
-    prompt.a=p.a; prompt.b=p.b;
-    prompt.onChoose=p.choose;
-    prompt.timer=6.6;
-    pushMessage("INPUT REQUIRED", PAL.ui);
-    run.anxiety=Math.max(run.anxiety,10);
-  }
-
-  function choosePrompt(choice){
-    if(!prompt.active) return;
-    const fn=prompt.onChoose;
-    prompt.active=false;
-    if(fn) fn(choice);
-    audio?.blip?.(0.9);
-  }
-
-  /* ============================================================
-     MISSIONS
-  ============================================================ */
-  function setMission(m){
-    mission.active=true;
-    mission.completed=false;
-    mission.title=m.title;
-    mission.desc=m.desc;
-    mission.type=m.type;
-    mission.progress=0;
-    mission.goal=m.goal ?? 1;
-    mission.extra=m.extra ?? null;
-
-    exitLocked=true;
-    pushMessage(`${hero.name.toUpperCase()}: NEW MISSION`, PAL.ui);
-    triggerMessage("NEW TASK LOADED");
-  }
-
-  function completeMission(){
-    mission.completed=true;
-    mission.active=false;
-    exitLocked=false;
-    triggerMessage("TASK COMPLETE");
-    triggerMessage("EXIT UNSEALED");
-    audio?.blip?.(1.0);
-    run.anxiety=Math.max(0, run.anxiety-4);
-  }
-
-  function generateRandomMission(){
-    const d=run.diffIndex;
-    const types=["STILLNESS","NO_RUN","STAIN_TOUCH","ECHO_COUNT","FOLLOW_ORDER"];
-    const t=types[(Math.random()*types.length)|0];
-
-    if(t==="STILLNESS"){
-      const seconds=2.2 + Math.random()*2.3 + d*0.35;
-      return { type:"STILLNESS", title:"STILLNESS RITUAL",
-        desc:`Stand still near a stain for ${seconds.toFixed(1)}s.\n(Don't move.)`,
-        goal:seconds
-      };
-    }
-
-    if(t==="NO_RUN"){
-      const time=9 + ((Math.random()*9)|0) + d*2;
-      return { type:"NO_RUN", title:"SILENT WALK",
-        desc:`Survive ${time}s without sprinting.\n(Shift forbidden.)`,
-        goal:time
-      };
-    }
-
-    if(t==="STAIN_TOUCH"){
-      const count=2 + ((Math.random()*2)|0) + (d>1?1:0);
-      return { type:"STAIN_TOUCH", title:"TOUCH THE CORRUPTION",
-        desc:`Step into ${count} different stains.\n(Each counts once.)`,
-        goal:count,
-        extra:{touched:new Set()}
-      };
-    }
-
-    if(t==="ECHO_COUNT"){
-      const pulses=2 + ((Math.random()*2)|0) + (d>2?1:0);
-      return { type:"ECHO_COUNT", title:"ECHO TEST",
-        desc:`Use Signal Pulse (E) exactly ${pulses} times.\n(Too many resets.)`,
-        goal:pulses,
-        extra:{used:0,max:pulses}
-      };
-    }
-
-    // FOLLOW_ORDER
-    const order=[1,2,3].sort(()=>Math.random()-0.5);
-    offerings.forEach((o,i)=>o.order=order[i]);
-    return { type:"FOLLOW_ORDER", title:"SEQUENCE OF OFFERINGS",
-      desc:`Collect offerings in correct sequence.\n(Colors indicate order.)`,
-      goal:TOTAL_OFFERINGS,
-      extra:{needed:1}
-    };
-  }
-
-  function updateMission(dt, moving, sprinting){
-    if(!mission.active) return;
-
-    if(mission.type==="STILLNESS"){
-      const near=stains.some(s=>Math.hypot((s.x+0.5)-hero.x,(s.y+0.5)-hero.y)<2.0);
-      if(!moving && near) mission.progress += dt;
-      else mission.progress = Math.max(0, mission.progress - dt*0.9);
-      if(mission.progress >= mission.goal) completeMission();
-      return;
-    }
-
-    if(mission.type==="NO_RUN"){
-      if(sprinting){
-        mission.progress = Math.max(0, mission.progress - dt*2.2);
-        if(Math.random()<0.02) triggerMessage("TOO LOUD");
-        run.anxiety=Math.max(run.anxiety,12);
-      } else mission.progress += dt;
-      if(mission.progress >= mission.goal) completeMission();
-      return;
-    }
-
-    if(mission.type==="STAIN_TOUCH"){
-      for(const s of stains){
-        if(Math.hypot((s.x+0.5)-hero.x,(s.y+0.5)-hero.y)<0.95){
-          mission.extra.touched.add(`${s.x},${s.y}`);
-        }
-      }
-      mission.progress = mission.extra.touched.size;
-      if(mission.progress >= mission.goal) completeMission();
-      return;
-    }
-
-    if(mission.type==="ECHO_COUNT"){
-      mission.progress = mission.extra.used;
-      if(mission.progress >= mission.goal) completeMission();
-      return;
-    }
-
-    if(mission.type==="FOLLOW_ORDER"){
-      mission.progress = collectedCount;
-      return;
-    }
-  }
-
-  /* ============================================================
-     FLASH IMAGES / DISTORTION (procedural, hooks for your assets)
-  ============================================================ */
-  // Later you can add:
-  // const FLASH_IMAGES = ["assets/your1.png","assets/your2.png"];
-  // const FACE_IMAGES = ["assets/face1.png","assets/face2.png"];
-  // and load them. For now, procedural.
-
-  function generateCreepyImage(kind="face"){
-    const c=document.createElement("canvas");
-    c.width=160; c.height=120;
-    const g=c.getContext("2d");
-    g.fillStyle="#000"; g.fillRect(0,0,c.width,c.height);
-
-    // base noise
-    for(let i=0;i<3200;i++){
-      const x=(Math.random()*c.width)|0;
-      const y=(Math.random()*c.height)|0;
-      const v=(Math.random()*60)|0;
-      g.fillStyle=`rgb(${v},${v},${v})`;
-      g.fillRect(x,y,1,1);
-    }
-
-    // red smears
-    g.globalAlpha=0.25;
-    for(let i=0;i<10;i++){
-      g.fillStyle = Math.random()<0.5 ? "rgb(140,0,30)" : "rgb(80,0,120)";
-      g.fillRect((Math.random()*c.width)|0, (Math.random()*c.height)|0, 10+(Math.random()*70|0), 2+(Math.random()*10|0));
-    }
-    g.globalAlpha=1;
-
-    if(kind==="face"){
-      const cx=c.width/2 + (Math.random()*18-9);
-      const cy=c.height/2 + (Math.random()*12-6);
-      const eyeY=cy-10 + Math.random()*6;
-      const eyeDX=28 + Math.random()*12;
-
-      g.fillStyle="rgba(255,60,90,0.65)";
-      g.fillRect(cx-eyeDX, eyeY, 9, 4);
-      g.fillRect(cx+eyeDX-9, eyeY, 9, 4);
-
-      g.fillStyle="rgba(0,0,0,0.9)";
-      g.fillRect(cx-eyeDX+4, eyeY+1, 2, 2);
-      g.fillRect(cx+eyeDX-6, eyeY+1, 2, 2);
-
-      g.fillStyle="rgba(255,255,255,0.12)";
-      g.fillRect(cx-22, cy+14, 44, 3);
-    }
-
-    // glitch smear
-    g.globalAlpha=0.22;
-    for(let i=0;i<7;i++){
-      const y=(Math.random()*c.height)|0;
-      const dx=(Math.random()*26-13);
-      g.drawImage(c, 0, y, c.width, 2, dx, y, c.width, 2);
-    }
-    g.globalAlpha=1;
-
-    return c;
-  }
-
-  const flash={active:false,t:0,dur:0.9,img:null,alpha:0,kind:"face"};
-  function triggerFlash(kind="face"){
-    flash.active=true;
-    flash.t=0;
-    flash.dur=0.65+Math.random()*0.8;
-    flash.img=generateCreepyImage(kind);
-    flash.alpha=0;
-    flash.kind=kind;
-  }
-
-  /* ============================================================
-     MONSTER SPRITE (procedural; hook for your face images later)
-  ============================================================ */
-  function makeMonsterSprite(){
-    const c=document.createElement("canvas");
-    c.width=20; c.height=20;
-    const g=c.getContext("2d");
-    g.clearRect(0,0,20,20);
-
-    g.fillStyle="rgba(30,30,42,0.95)";
-    g.fillRect(4,4,12,12);
-
-    g.fillStyle="rgba(255,60,90,0.85)";
-    g.fillRect(7,10,2,1);
-    g.fillRect(11,10,2,1);
-
-    g.fillStyle="rgba(0,0,0,0.9)";
-    g.fillRect(8,13,4,2);
-
-    for(let i=0;i<30;i++){
-      const x=(Math.random()*20)|0;
-      const y=(Math.random()*20)|0;
-      g.fillStyle=Math.random()<0.5?"rgba(255,60,90,0.10)":"rgba(255,255,255,0.08)";
-      g.fillRect(x,y,1,1);
-    }
-    return c;
-  }
-  const monsterSprite=makeMonsterSprite();
-
-  /* ============================================================
-     COMBAT (Space): role-based, effective but costly
-  ============================================================ */
-  function actionProfile(){
-    // range, damage, stagger seconds, oxygenCost, noise, selfFear
-    if(hero.role==="thief"){
-      return {range:1.25, dmg:8, stagger:0.9, oxy:4, noise:0.7, fear:0.7};
-    }
-    if(hero.role==="killer"){
-      return {range:1.05, dmg:22, stagger:0.5, oxy:10, noise:1.45, fear:1.1};
-    }
-    // butcher
-    return {range:1.55, dmg:12, stagger:1.2, oxy:14, noise:1.25, fear:1.0, pull:0.75};
-  }
-
-  function tryAction(){
-    if(!started) return;
-    if(hero.actionCD>0) return;
-
-    const atk=actionProfile();
-    if(hero.oxygen < atk.oxy) return;
-
-    hero.oxygen = Math.max(0, hero.oxygen - atk.oxy);
-    hero.actionCD = ACTION_CD_BASE + atk.dmg*0.02; // killer has longer CD
-    run.anxiety = Math.max(run.anxiety, 8 + atk.noise*6);
-
-    audio?.blip?.(atk.noise);
-
-    let hit=false;
-
-    for(const m of monsters){
-      if(m.deadTimer>0) continue;
-      const dx=m.x-hero.x, dy=m.y-hero.y;
-      const d=Math.max(1e-6, Math.hypot(dx,dy));
-      if(d <= atk.range){
-        hit=true;
-        m.hp -= atk.dmg;
-        m.stun = Math.max(m.stun, atk.stagger);
-        m.lastSeen = 2.0;
-
-        if(atk.pull){
-          m.x += (dx/d) * atk.pull;
-          m.y += (dy/d) * atk.pull;
-        }
-
-        triggerFlash("face");
-        pushMessage("HIT", PAL.danger);
-
-        if(m.hp <= 0){
-          banishMonster(m);
-        }
-      }
-    }
-
-    if(!hit){
-      // whiff = makes noise anyway
-      if(Math.random()<0.18) triggerMessage("MISSED");
-    }
-
-    // action makes you “louder”
-    for(const m of monsters){
-      if(m.deadTimer>0) continue;
-      m.alert = Math.min(2.4, (m.alert||0) + atk.noise*0.6);
-    }
-  }
-
-  function banishMonster(m){
-    // Not permanent. It returns.
-    m.deadTimer = 10 + Math.random()*10;
-    m.hp = m.hpMax; // reset on return
-    m.stun = 0;
-    m.alert = 0;
-
-    hero.kills++;
-    hero.hallucination = Math.min(60, hero.hallucination + (HALLU_GAIN_MIN + Math.random()*(HALLU_GAIN_MAX-HALLU_GAIN_MIN)));
-    pushMessage(`${hero.name.toUpperCase()}: WHAT DID YOU DO`, "#fff");
-    triggerMessage("IT COMES BACK");
-    audio?.blip?.(1.2);
-  }
-
-  /* ============================================================
-     MONSTERS (AI): non-solid threat; cannot hard-block corridors
-  ============================================================ */
-  function pickNeighborStep(mx,my,tx,ty){
-    const gx=Math.floor(mx), gy=Math.floor(my);
-    const opts=[
-      {x:gx+1,y:gy},{x:gx-1,y:gy},{x:gx,y:gy+1},{x:gx,y:gy-1}
-    ].filter(p=>isFloor(p.x,p.y));
-    if(!opts.length) return null;
-
-    let best=opts[0], bestScore=1e9;
-    for(const o of opts){
-      const d=Math.hypot((o.x+0.5)-tx,(o.y+0.5)-ty);
-      const wob=(Math.random()-0.5)*0.35;
-      const score=d+wob;
-      if(score<bestScore){ bestScore=score; best=o; }
-    }
-    return best;
-  }
-
-  function spawnMonsters(){
-    monsters=[];
-    for(let i=0;i<run.monstersCount;i++){
-      const r=randomFloorFar(1,1, 12+i*2);
-      const baseHp = 42 + run.diffIndex*10;
-      monsters.push({
-        x:r.x+0.5, y:r.y+0.5,
-        hpMax:baseHp,
-        hp:baseHp,
-        stun:0,
-        deadTimer:0,
-        stepCd:0,
-        target:null,
-        lastSeen:0,
-        alert:0,
-        kind:(Math.random()<0.5?"stalker":"hunger")
-      });
-    }
-  }
-
-  function updateMonsters(dt){
-    let closest=999;
-
-    for(const m of monsters){
-      if(m.deadTimer>0){
-        m.deadTimer = Math.max(0, m.deadTimer-dt);
-        if(m.deadTimer<=0){
-          // respawn far
-          const r=randomFloorFar((hero.x|0),(hero.y|0), 12+run.diffIndex*2);
-          m.x=r.x+0.5; m.y=r.y+0.5;
-          m.hp=m.hpMax;
-          m.alert=0;
-          triggerMessage("RETURN");
-        }
-        continue;
-      }
-
-      if(m.stun>0){
-        m.stun = Math.max(0, m.stun-dt);
-        continue;
-      }
-
-      const dx=hero.x-m.x, dy=hero.y-m.y;
-      const dist=Math.max(1e-6, Math.hypot(dx,dy));
-      closest=Math.min(closest, dist);
-
-      const sprinting=!!keys.ShiftLeft;
-      const hearRadius = (sprinting ? 7.8 : 4.8) + (m.alert||0);
-
-      // hallucinations make the world “noisier”
-      const halluBoost = hero.hallucination>0 ? 1.0 : 0.0;
-
-      let tx=m.x, ty=m.y;
-
-      if(dist < hearRadius){
-        m.lastSeen = 1.6 + halluBoost*0.7;
-        tx=hero.x; ty=hero.y;
-      } else if(m.lastSeen>0){
-        m.lastSeen = Math.max(0, m.lastSeen-dt);
-        tx = m.x + (dx/dist)*1.0;
-        ty = m.y + (dy/dist)*1.0;
-      } else {
-        // drift to stains (creepy)
-        const s=stains[(Math.random()*stains.length)|0];
-        tx=s.x+0.5; ty=s.y+0.5;
-      }
-
-      m.stepCd -= dt;
-      if(m.stepCd<=0 || !m.target){
-        m.stepCd = 0.14 + Math.random()*0.20;
-        const step=pickNeighborStep(m.x,m.y,tx,ty);
-        if(step) m.target=step;
-      }
-
-      const speed=(0.85 + run.diffIndex*0.12) * run.aggression * (m.kind==="hunger"?1.06:1.0);
-      if(m.target){
-        const cx=m.target.x+0.5, cy=m.target.y+0.5;
-        const mdx=cx-m.x, mdy=cy-m.y;
-        const md=Math.max(1e-6, Math.hypot(mdx,mdy));
-        m.x += (mdx/md) * speed * dt * 3.15;
-        m.y += (mdy/md) * speed * dt * 3.15;
-        if(md<0.08) m.stepCd=0;
-      }
-
-      // close-range dread
-      if(dist < 3.2){
-        run.anxiety = Math.max(run.anxiety, 9 + (3.2-dist)*4.5);
-        if(Math.random()<0.03) triggerMessage();
-      }
-
-      // face flashes near
-      if(dist < 2.0 && Math.random() < 0.006 + run.diffIndex*0.003){
-        triggerFlash("face");
-      }
-
-      // damage zone
-      hero.hitCD = Math.max(0, hero.hitCD-dt);
-      if(dist < 0.64 && hero.hitCD<=0){
-        hero.hitCD = 0.75;
-        hero.panic++;
-        hero.oxygen = Math.max(0, hero.oxygen - (12 + run.diffIndex*4));
-        triggerMessage("DON'T LOOK");
-        audio?.blip?.(1.0);
-        triggerFlash("face");
-
-        // shove away (collision resolver prevents corner glue)
-        hero.x += (dx/dist)*0.40;
-        hero.y += (dy/dist)*0.40;
-        const r=resolveCircleGrid(hero.x, hero.y, PLAYER_RADIUS);
-        hero.x=r.x; hero.y=r.y;
-
-        if(hero.panic>=3){
-          gameOver("CAUGHT IN THE BUFFER");
-          return;
-        }
-      }
-
-      // alerts decay
-      m.alert = Math.max(0, (m.alert||0) - dt*0.35);
-    }
-
-    const fear = clamp(1 - closest/6, 0, 1);
-    audio?.setFear?.(fear);
-
-    // hallucinations also modulate audio
-    const halluNorm = clamp(hero.hallucination/60, 0, 1);
-    audio?.setHallu?.(halluNorm);
-  }
-
-  /* ============================================================
-     LEVEL GEN
-  ============================================================ */
-  let collectedCount=0;
-
-  function generateLevel(){
-    generateBraidedMaze();
-
-    stains=[];
-    for(let i=0;i<STAINS;i++){
-      stains.push(randomFloorFar(1,1,4));
-    }
-
-    offerings=[];
-    while(offerings.length<TOTAL_OFFERINGS){
-      const r=randomFloorFar(1,1,6);
-      if(offerings.some(o=>o.x===r.x&&o.y===r.y)) continue;
-      offerings.push({x:r.x,y:r.y,collected:false,order:0});
-    }
-
-    chests=[];
-    while(chests.length<CHESTS_PER_LEVEL){
-      const r=randomFloorFar(1,1,5);
-      if(chests.some(c=>c.x===r.x&&c.y===r.y)) continue;
-      if(offerings.some(o=>o.x===r.x&&o.y===r.y)) continue;
-      chests.push({x:r.x,y:r.y,opened:false});
-    }
-
-    oxyTanks=[];
-    while(oxyTanks.length<OXY_TANKS){
-      const r=randomFloorFar(1,1,6);
-      if(offerings.some(o=>o.x===r.x&&o.y===r.y)) continue;
-      if(chests.some(c=>c.x===r.x&&c.y===r.y)) continue;
-      oxyTanks.push({x:r.x,y:r.y,used:false});
-    }
-
-    exit=randomFloorFar(1,1,12);
-    exitLocked=true;
-
-    collectedCount=0;
-    messages=[];
-    run.anxiety=0;
-
-    hero.x=1.5; hero.y=1.5;
-    hero.vx=0; hero.vy=0;
-    hero.oxygen = hero.oxygenMax;
-    hero.panic=0;
-    hero.hitCD=0;
-    hero.actionCD=0;
-    hero.animT=0;
-
-    mission.active=false;
-    mission.completed=false;
-    prompt.active=false;
-    pulse.active=false;
-    flash.active=false;
-
-    spawnMonsters();
-    updateHUD();
-  }
-
-  /* ============================================================
-     PICKUPS
-  ============================================================ */
-  function openChest(c){
-    c.opened=true;
-    triggerMessage("CHEST OPENED");
-    audio?.blip?.(1.0);
-    if(Math.random()<0.78) triggerFlash("face");
-
-    if(!mission.active && exitLocked){
-      setMission(generateRandomMission());
-    } else if(Math.random()<0.6){
-      showPrompt(pick(lorePrompts));
-    }
-  }
-
-  function collectOffering(o){
-    if(mission.active && mission.type==="FOLLOW_ORDER"){
-      const needed=(mission.extra?.needed ?? 1);
-      if(o.order !== needed){
-        triggerMessage("WRONG SEQUENCE");
-        run.anxiety=Math.max(run.anxiety,18);
-        audio?.blip?.(1.0);
-        triggerFlash("face");
-        generateLevel();
-        return;
-      }
-      mission.extra.needed = needed+1;
-      if(mission.extra.needed > TOTAL_OFFERINGS){
-        completeMission();
-      }
-    }
-
-    o.collected=true;
-    collectedCount++;
-    triggerMessage("OFFERING ACCEPTED");
-    pushMessage(`${hero.name.toUpperCase()}: MEMORY INDEXED`, "#fff");
-    audio?.blip?.(0.9);
-
-    if(Math.random()<0.55) triggerFlash("face");
-    if(Math.random()<0.32) showPrompt(pick(lorePrompts));
-
-    updateHUD();
-  }
-
-  function takeOxy(t){
-    t.used=true;
-    hero.oxygen = Math.min(hero.oxygenMax, hero.oxygen + OXY_TANK_GAIN);
-    pushMessage("OXYGEN TANK", PAL.ui);
-    audio?.blip?.(0.6);
-  }
-
-  /* ============================================================
-     DIFFICULTY (random per run)
-  ============================================================ */
-  const DIFF_LABELS=["SICKLY","MEAN","FAMISHED","RABID"];
-
-  function pickDifficulty(){
-    run.diffIndex = (Math.random()*4)|0;
-    run.diffLabel = DIFF_LABELS[run.diffIndex];
-
-    run.monstersCount = 1 + ((Math.random()*2)|0) + (run.diffIndex>1?1:0); // 1..3
-    run.aggression = 0.95 + run.diffIndex*0.12 + Math.random()*0.08;
-    run.oxygenDrain = 0.92 + run.diffIndex*0.12 + Math.random()*0.10;
-
-    // role tweaks
-    hero.oxygenMax = BASE_OXYGEN;
-    if(hero.role==="thief"){
-      run.oxygenDrain *= 0.94;
-    } else if(hero.role==="killer"){
-      run.aggression *= 1.06;
-    } else if(hero.role==="butcher"){
-      hero.oxygenMax = BASE_OXYGEN + 10;
-    }
-    hero.oxygen = hero.oxygenMax;
-  }
-
-  /* ============================================================
-     HUD
-  ============================================================ */
-  function updateHUD(){
-    hName.textContent = `NAME: ${hero.name.toUpperCase()}`;
-    hRole.textContent = `ROLE: ${hero.role.toUpperCase()}`;
-    hDiff.textContent = `DIFF: ${run.diffLabel} · M${run.monstersCount}`;
-    hLoot.textContent = `CHESTS ${chests.filter(c=>c.opened).length}/${CHESTS_PER_LEVEL}`;
-    hOff.textContent  = `OFFERINGS ${collectedCount}/${TOTAL_OFFERINGS}`;
-
-    hMission.textContent = mission.active ? mission.title : (exitLocked ? "LOCKED" : "UNSEALED");
-    const mpct = mission.active ? clamp(mission.progress/mission.goal,0,1) : (exitLocked?0:1);
-    hMis.style.width = `${(mpct*100)|0}%`;
-
-    const opct = clamp(hero.oxygen/hero.oxygenMax,0,1);
-    hOxy.style.width = `${(opct*100)|0}%`;
-
-    hAtk.textContent = hero.actionCD>0 ? `ACTION: ${hero.actionCD.toFixed(1)}s` : "ACTION: READY";
-  }
-
-  /* ============================================================
-     VISUAL EFFECTS: grain + hallucinations layer
-  ============================================================ */
-  function drawNoise(amount){
-    if(amount<=0) return;
-    ctx.save();
-    ctx.globalAlpha = Math.min(0.24, amount/50);
-    for(let i=0;i<140;i++){
-      const x=Math.random()*W, y=Math.random()*H;
-      const w=1+Math.random()*2, h=1+Math.random()*2;
-      ctx.fillStyle = Math.random()<0.5 ? "#0b0b0b" : "#171717";
-      ctx.fillRect(x,y,w,h);
-    }
-    ctx.restore();
-  }
-
-  function hallucinationOverlay(h){
-    if(h<=0) return;
-    const n = clamp(h/60, 0, 1);
-
-    // subtle mirror slices
-    if(Math.random() < 0.10*n){
-      const y = (Math.random()*H)|0;
-      const hgt = 6 + ((Math.random()*30)|0);
-      const xOff = ((Math.random()*40)-20)|0;
-      ctx.save();
-      ctx.globalAlpha = 0.10 + 0.20*n;
-      ctx.drawImage(canvas, 0, y, W, hgt, xOff, y, W, hgt);
-      ctx.restore();
-    }
-
-    // fake exit flashes
-    if(Math.random() < 0.018*n){
-      ctx.save();
-      ctx.globalAlpha = 0.25 + 0.25*n;
-      ctx.fillStyle = "rgba(255,255,255,0.9)";
-      ctx.fillRect((Math.random()*W)|0, (Math.random()*H)|0, 8, 10);
-      ctx.restore();
-    }
-
-    // whisper name
-    if(Math.random() < 0.02*n){
-      pushMessage(hero.name.toUpperCase(), Math.random()<0.5?PAL.danger:"#fff");
-    }
-
-    // face flash frequency increases
-    if(Math.random() < 0.008 + 0.03*n){
-      triggerFlash("face");
-    }
-  }
-
-  /* ============================================================
-     UPDATE LOOP
-  ============================================================ */
-  let lastT=performance.now();
-
-  function update(){
-    const now=performance.now();
-    const dt=Math.min(0.05,(now-lastT)/1000);
-    lastT=now;
-
-    // prompt timer
-    if(prompt.active){
-      prompt.timer -= dt;
-      if(prompt.timer<=0){
-        prompt.active=false;
-        triggerMessage("NO RESPONSE");
-        run.anxiety=Math.max(run.anxiety,14);
-        run.aggression += 0.06;
-      }
-    }
-
-    // oxygen drain (+ hallucination penalty)
-    const sprinting=!!keys.ShiftLeft;
-    hRun.textContent = `RUN: ${sprinting?"ON":"OFF"}`;
-
-    const halluNorm = clamp(hero.hallucination/60, 0, 1);
-    const halluDrain = 1 + halluNorm*0.45;
-    const drain = run.oxygenDrain * (sprinting ? RUN_OXY_MULT : 1.0) * halluDrain;
-
-    hero.oxygen = Math.max(0, hero.oxygen - drain*dt);
-    if(hero.oxygen<=0){ gameOver("NO AIR LEFT"); return; }
-
-    // movement (smooth accel)
-    let ix=0,iy=0;
-    if(keys.KeyW||keys.ArrowUp) iy-=1;
-    if(keys.KeyS||keys.ArrowDown) iy+=1;
-    if(keys.KeyA||keys.ArrowLeft) ix-=1;
-    if(keys.KeyD||keys.ArrowRight) ix+=1;
-    if(ix||iy){
-      const l=Math.hypot(ix,iy); ix/=l; iy/=l;
-    }
-
-    const maxSpeed = sprinting ? MAX_RUN : MAX_WALK;
-    hero.vx += ix*ACCEL*dt;
-    hero.vy += iy*ACCEL*dt;
-
-    const sp=Math.hypot(hero.vx,hero.vy);
-    if(sp>maxSpeed){
-      hero.vx *= maxSpeed/sp;
-      hero.vy *= maxSpeed/sp;
-    }
-
-    hero.vx *= Math.pow(FRICTION, dt*60);
-    hero.vy *= Math.pow(FRICTION, dt*60);
-
-    // integrate + resolve
-    let nx=hero.x + hero.vx*dt;
-    let ny=hero.y + hero.vy*dt;
-    const r=resolveCircleGrid(nx, ny, PLAYER_RADIUS);
-    hero.x=r.x; hero.y=r.y;
-
-    const moving = Math.abs(hero.vx)+Math.abs(hero.vy) > 0.01;
-
-    // anxiety
-    if(sprinting) run.anxiety = Math.min(run.anxiety + 0.35, 18);
-    else run.anxiety = Math.max(run.anxiety - 0.12, 0);
-
-    // stains influence
-    for(const s of stains){
-      const d=Math.hypot((s.x+0.5)-hero.x,(s.y+0.5)-hero.y);
-      if(d<1.05){
-        run.anxiety = Math.max(run.anxiety, 7);
-        if(Math.random()<0.014) triggerMessage("COLOR BLEED");
-        if(Math.random()<0.005) showPrompt(pick(lorePrompts));
-      }
-    }
-
-    // mission
-    updateMission(dt, moving, sprinting);
-
-    // monsters
-    updateMonsters(dt);
-
-    // pulse ring
-    if(pulse.active){
-      pulse.t += dt*12;
-      pulse.ring = pulse.t;
-      if(pulse.t>25) pulse.active=false;
-    }
-
-    // flash
-    if(flash.active){
-      flash.t += dt;
-      if(flash.t < flash.dur*0.2) flash.alpha = flash.t/(flash.dur*0.2);
-      else flash.alpha = 1 - (flash.t - flash.dur*0.2)/(flash.dur*0.8);
-      if(flash.t >= flash.dur){ flash.active=false; flash.alpha=0; }
-    }
-
-    // action cd
-    hero.actionCD = Math.max(0, hero.actionCD-dt);
-
-    // hallucination decay
-    hero.hallucination = Math.max(0, hero.hallucination - dt*HALLU_DECAY_PER_SEC);
-
-    // pickups
-    for(const c of chests){
-      if(c.opened) continue;
-      if(Math.hypot((c.x+0.5)-hero.x,(c.y+0.5)-hero.y) < 0.72) openChest(c);
-    }
-    for(const o of offerings){
-      if(o.collected) continue;
-      if(Math.hypot((o.x+0.5)-hero.x,(o.y+0.5)-hero.y) < 0.72) collectOffering(o);
-    }
-    for(const t of oxyTanks){
-      if(t.used) continue;
-      if(Math.hypot((t.x+0.5)-hero.x,(t.y+0.5)-hero.y) < 0.72) takeOxy(t);
-    }
-
-    // exit
-    if(exit && !exitLocked){
-      if(Math.hypot((exit.x+0.5)-hero.x,(exit.y+0.5)-hero.y) < 0.62){
-        win();
-        return;
-      }
-    }
-
-    // message life
-    for(let i=messages.length-1;i>=0;i--){
-      messages[i].life--;
-      if(messages[i].life<=0) messages.splice(i,1);
-    }
-
-    // animate hero
-    hero.animT += dt;
-
-    updateHUD();
-  }
-
-  /* ============================================================
-     RENDER
-  ============================================================ */
-  function render(){
-    ctx.fillStyle="#000";
-    ctx.fillRect(0,0,W,H);
-
-    const shake=Math.min(6, run.anxiety*0.45);
-    const sx=(Math.random()-0.5)*shake*(hero.hallucination>0?1.25:1);
-    const sy=(Math.random()-0.5)*shake*(hero.hallucination>0?1.25:1);
-
-    const camX = -hero.x*TILE + W/2 + sx;
-    const camY = -hero.y*TILE + H/2 + sy;
-
-    const viewRadius = clamp(BASE_FOV - (run.anxiety/5) + (pulse.active?2.4:0), MIN_FOV, MAX_FOV);
-
-    // map
-    for(let y=0;y<ROWS;y++){
-      for(let x=0;x<COLS;x++){
-        const dist=Math.hypot((x+0.5)-hero.x,(y+0.5)-hero.y);
-
-        let vis=0;
-        if(dist<viewRadius){
-          vis=1-(dist/viewRadius);
-          vis=Math.pow(vis,0.62);
-        }
-
-        if(pulse.active){
-          if(Math.abs(dist - pulse.ring)<1.5){
-            vis += 0.48*(1-(Math.abs(dist-pulse.ring)/1.5));
-          }
-        }
-
-        if(vis<=0.01) continue;
-        vis=clamp(vis,0,1);
-
-        const px=camX + x*TILE;
-        const py=camY + y*TILE;
-
-        ctx.save();
-        ctx.globalAlpha=vis;
-
-        if(map[y][x]===1){
-          ctx.fillStyle=PAL.wall;
-          ctx.fillRect(px,py,TILE,TILE);
-          ctx.strokeStyle="rgba(0,0,0,0.35)";
-          ctx.strokeRect(px,py,TILE,TILE);
-        } else {
-          ctx.fillStyle=PAL.floor;
-          ctx.fillRect(px,py,TILE,TILE);
-
-          const st = stains.find(s=>s.x===x && s.y===y);
-          if(st){
-            ctx.fillStyle = Math.random()<0.5 ? "rgba(160,0,50,0.40)" : "rgba(80,0,120,0.30)";
-            ctx.fillRect(px,py,TILE,TILE);
-          }
-        }
-        ctx.restore();
-      }
-    }
-
-    // objects
-    function drawObj(tx,ty,color,shape){
-      const dist=Math.hypot((tx+0.5)-hero.x,(ty+0.5)-hero.y);
-      if(dist>viewRadius && !(pulse.active && Math.abs(dist-pulse.ring)<1.5)) return;
-      const x=camX + tx*TILE;
-      const y=camY + ty*TILE;
-
-      ctx.fillStyle=color;
-      if(shape==="box") ctx.fillRect(x+4,y+4,8,8);
-      else if(shape==="circle"){
-        ctx.beginPath(); ctx.arc(x+8,y+8,4,0,Math.PI*2); ctx.fill();
-      } else if(shape==="diamond"){
-        ctx.beginPath();
-        ctx.moveTo(x+8,y+2); ctx.lineTo(x+14,y+8);
-        ctx.lineTo(x+8,y+14); ctx.lineTo(x+2,y+8);
-        ctx.closePath(); ctx.fill();
-      }
-    }
-
-    chests.forEach(c=>{ if(!c.opened) drawObj(c.x,c.y,"#3a88aa","box"); });
-
-    offerings.forEach(o=>{
-      if(o.collected) return;
-      const col = (mission.active && mission.type==="FOLLOW_ORDER")
-        ? (o.order===1 ? "#ff3355" : o.order===2 ? "#44ff88" : "#4488ff")
-        : "#ddcc44";
-      drawObj(o.x,o.y,col,"circle");
-    });
-
-    oxyTanks.forEach(t=>{ if(!t.used) drawObj(t.x,t.y,"#55ddff","box"); });
-
-    if(exit){
-      drawObj(exit.x, exit.y, exitLocked ? "#550000" : "#ffffff", "diamond");
-      if(!exitLocked){
-        const x=camX + exit.x*TILE;
-        const y=camY + exit.y*TILE;
-        ctx.fillStyle="rgba(255,60,90,0.7)";
-        ctx.fillRect(x+7,y+3,2,TILE-6);
-      }
-    }
-
-    // monsters
-    for(const m of monsters){
-      if(m.deadTimer>0) continue;
-      const dist=Math.hypot(m.x-hero.x,m.y-hero.y);
-      if(dist<viewRadius+1.6){
-        const x=camX + m.x*TILE - 10;
-        const y=camY + m.y*TILE - 10;
-        const jx=(Math.random()-0.5)*2;
-        const jy=(Math.random()-0.5)*2;
-        ctx.globalAlpha=0.85;
-        ctx.drawImage(monsterSprite, x+jx, y+jy);
-
-        // HP hint (subtle) when close enough (not too gamey)
-        if(dist<2.2){
-          const pct=clamp(m.hp/m.hpMax,0,1);
-          ctx.globalAlpha=0.6;
-          ctx.fillStyle="rgba(255,255,255,0.15)";
-          ctx.fillRect(x, y-3, 20, 2);
-          ctx.fillStyle="rgba(255,51,85,0.85)";
-          ctx.fillRect(x, y-3, 20*pct, 2);
-        }
-        ctx.globalAlpha=1;
-      }
-    }
-
-    // hero sprite (creepy animated, role tint)
-    const hx=W/2, hy=H/2;
-    const breath=1 + Math.sin(hero.animT*3.2)*0.10;
-    const jitter=(Math.random()-0.5)*(0.6 + run.anxiety*0.08 + (hero.hallucination>0?0.4:0));
-
-    let tint = hero.role==="thief" ? "rgba(180,220,210,0.95)"
-             : hero.role==="killer" ? "rgba(220,190,200,0.95)"
-             : "rgba(220,210,180,0.95)";
-
-    ctx.save();
-    ctx.translate(hx+jitter, hy+jitter);
-
-    // aura corruption
-    ctx.globalAlpha=0.18;
-    ctx.fillStyle="rgba(255,60,90,0.35)";
-    ctx.fillRect(-6,-6,12,12);
-
-    // delayed shadow smear
-    ctx.globalAlpha=0.12;
-    ctx.fillStyle="rgba(0,0,0,0.9)";
-    ctx.fillRect(-2 + Math.sin(hero.animT*2.1)*2, -2, 4, 6);
-
-    ctx.globalAlpha=1;
-    ctx.fillStyle=tint;
-    ctx.fillRect(-2, -2, 4, 4*breath);
-
-    // head
-    ctx.fillStyle="rgba(0,0,0,0.85)";
-    ctx.fillRect(-1, -4, 2, 2);
-
-    // role marks
-    ctx.fillStyle= hero.role==="thief" ? "rgba(80,255,200,0.65)"
-               : hero.role==="killer" ? "rgba(255,80,140,0.65)"
-               : "rgba(255,210,80,0.65)";
-    ctx.fillRect(-3, 1, 1, 1);
-    ctx.fillRect( 2, 1, 1, 1);
-
-    ctx.restore();
-
-    // hallucination overlay (post-render)
-    hallucinationOverlay(hero.hallucination);
-
-    // flash overlay
-    if(flash.active && flash.img){
-      ctx.globalAlpha = flash.alpha*0.85;
-      ctx.drawImage(flash.img, 0,0, W,H);
-      ctx.globalAlpha = 1;
-    }
-
-    // grain
-    drawNoise(run.anxiety + (hero.hallucination>0?8:0));
-
-    // messages
-    ctx.font="14px VT323";
-    ctx.textAlign="left";
-    for(const m of messages){
-      ctx.fillStyle=m.color;
-      ctx.globalAlpha=Math.min(1, m.life/20);
-      ctx.fillText(m.text, m.x, m.y);
-    }
-    ctx.globalAlpha=1;
-
-    // prompt / mission UI
-    if(prompt.active){
-      ctx.fillStyle="rgba(0,0,0,0.88)";
-      ctx.fillRect(18, 150, 284, 76);
-      ctx.strokeStyle="rgba(204,255,204,0.65)";
-      ctx.strokeRect(18, 150, 284, 76);
-
-      ctx.fillStyle="#fff";
-      ctx.textAlign="center";
-      ctx.fillText(prompt.text, 160, 170);
-      ctx.fillStyle="#bbb";
-      ctx.fillText(prompt.a, 160, 192);
-      ctx.fillText(prompt.b, 160, 208);
-
-      ctx.fillStyle=PAL.danger;
-      ctx.fillRect(20, 222, 280*clamp(prompt.timer/6.6,0,1), 2);
-      ctx.textAlign="left";
-    } else if(mission.active){
-      ctx.fillStyle="rgba(0,0,0,0.55)";
-      ctx.fillRect(6, 200, 185, 34);
-      ctx.strokeStyle="rgba(204,255,204,0.25)";
-      ctx.strokeRect(6, 200, 185, 34);
-
-      ctx.fillStyle=PAL.ui;
-      ctx.fillText(mission.title, 10, 212);
-
-      const pct=clamp(mission.progress/mission.goal,0,1);
-      ctx.fillStyle="rgba(255,255,255,0.16)";
-      ctx.fillRect(10, 217, 110, 4);
-      ctx.fillStyle=PAL.ui;
-      ctx.fillRect(10, 217, 110*pct, 4);
-
-      ctx.fillStyle="#aaa";
-      const line = mission.desc.split("\n")[1] || "";
-      ctx.fillText(line, 10, 232);
-    }
-  }
-
-  /* ============================================================
-     GAME LOOP
-  ============================================================ */
-  function tick(){
-    if(started){
-      update();
-      render();
-    } else {
-      ctx.fillStyle="#000";
-      ctx.fillRect(0,0,W,H);
-      drawNoise(6);
-    }
-    requestAnimationFrame(tick);
-  }
-
-  /* ============================================================
-     START / END
-  ============================================================ */
-  async function startGame(){
-    if(started) return;
-
-    const nm=(nameInput.value||"").trim();
-    hero.name = nm ? nm.slice(0,18) : "UNKNOWN";
-    hero.role = roleInput.value || "thief";
-
-    pickDifficulty();
-    await ensureAudioRunning();
-
-    overlay.style.display="none";
-    started=true;
-
-    pushMessage(generateLore(), "#fff");
-    triggerMessage("BOOTING LEVEL");
-
-    generateLevel();
-  }
-
-  function gameOver(reason){
-    started=false;
-    alert(`${reason}\n\nRUN END.\n${hero.name.toUpperCase()} WAS ARCHIVED.`);
-    location.reload();
-  }
-
-  function win(){
-    started=false;
-    alert(`EXIT UNSEALED.\n${hero.name.toUpperCase()} WAS UPLOADED.\n\nTHE MAZE SAVES COPIES.`);
-    location.reload();
-  }
-
-  /* ============================================================
-     BOOT
-  ============================================================ */
-  updateHUD();
-  tick();
-
+  return { init, playKick, playSnare };
 })();
+
+/* =========================================================================
+   ASSET GENERATION (Procedural Textures)
+   ========================================================================= */
+const Assets = (() => {
+  const cache = {};
+  
+  function createNoisePattern(colorHex, noiseAmt) {
+    const k = colorHex + noiseAmt;
+    if(cache[k]) return cache[k];
+    
+    const c = document.createElement('canvas');
+    c.width = 32; c.height = 32;
+    const x = c.getContext('2d');
+    
+    x.fillStyle = colorHex;
+    x.fillRect(0,0,32,32);
+    
+    for(let i=0; i<120; i++) {
+      x.fillStyle = Math.random() > 0.5 ? 'rgba(0,0,0,'+noiseAmt+')' : 'rgba(255,255,255,'+(noiseAmt/2)+')';
+      x.fillRect(Math.random()*32, Math.random()*32, 2, 2);
+    }
+    
+    const p = ctx.createPattern(c, 'repeat');
+    cache[k] = p;
+    return p;
+  }
+
+  function createGridPattern(colorHex) {
+    const c = document.createElement('canvas');
+    c.width = 32; c.height = 32;
+    const x = c.getContext('2d');
+    x.fillStyle = colorHex;
+    x.fillRect(0,0,32,32);
+    x.strokeStyle = "rgba(0,0,0,0.3)";
+    x.strokeRect(0,0,32,32);
+    return ctx.createPattern(c, 'repeat');
+  }
+
+  return { createNoisePattern, createGridPattern };
+})();
+
+/* =========================================================================
+   ENTITIES & LOGIC
+   ========================================================================= */
+
+class Entity {
+  constructor(x, y, type) {
+    this.x = x; this.y = y; this.type = type;
+    this.vx = 0; this.vy = 0;
+    this.hp = 100;
+    this.dead = false;
+  }
+}
+
+class Enemy extends Entity {
+  constructor(x, y, kind) {
+    super(x, y, 'enemy');
+    this.kind = kind || 'grunt';
+    this.speed = 1.0 + Math.random();
+    this.state = 'IDLE'; // IDLE, CHASE, STUN
+    this.stunTimer = 0;
+    this.detectionRad = 180;
+  }
+  
+  update(dt, hero) {
+    if(this.dead) return;
+    
+    if(this.stunTimer > 0) {
+      this.stunTimer -= dt;
+      return;
+    }
+
+    const dx = hero.x - this.x;
+    const dy = hero.y - this.y;
+    const dist = Math.hypot(dx, dy);
+    
+    // Line of sight check (simple)
+    if(dist < this.detectionRad) {
+      this.state = 'CHASE';
+    } else {
+      this.state = 'IDLE';
+    }
+
+    if(this.state === 'CHASE') {
+      const angle = Math.atan2(dy, dx);
+      this.vx = Math.cos(angle) * this.speed;
+      this.vy = Math.sin(angle) * this.speed;
+      
+      this.x += this.vx;
+      this.y += this.vy;
+      
+      // Damage Hero
+      if(dist < 15) {
+        hero.takeDamage(0.5); // Damage per frame essentially
+      }
+    }
+    
+    // Simple wall collision
+    if(mapSolid(this.x, this.y)) {
+      this.x -= this.vx * 2;
+      this.y -= this.vy * 2;
+    }
+  }
+  
+  takeDamage(amount) {
+    this.hp -= amount;
+    this.stunTimer = 10; // Stun frames
+    game.particles.push(new Particle(this.x, this.y, COLORS.blood, 10));
+    if(this.hp <= 0) {
+      this.dead = true;
+      // Spawn corpse decal
+      game.decals.push({x: this.x, y: this.y, type: 'corpse'});
+      // Penalty for killing: More entropy
+      game.hero.sanity -= 5;
+      log("TARGET ELIMINATED. SANITY COMPROMISED.");
+    }
+  }
+}
+
+class Particle {
+  constructor(x, y, color, speed) {
+    this.x = x; this.y = y;
+    const angle = Math.random() * Math.PI * 2;
+    this.vx = Math.cos(angle) * Math.random() * speed;
+    this.vy = Math.sin(angle) * Math.random() * speed;
+    this.life = 1.0;
+    this.color = color;
+  }
+  update(dt) {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.life -= 0.05;
+  }
+}
+
+/* =========================================================================
+   MAP GENERATION (Braided Maze)
+   ========================================================================= */
+function mapSolid(x, y) {
+  const tx = Math.floor(x / TILE_SIZE);
+  const ty = Math.floor(y / TILE_SIZE);
+  if(tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return true;
+  return game.map[ty][tx] === 1;
+}
+
+function generateLevel() {
+  // Pick theme
+  const keys = Object.keys(THEMES);
+  const tKey = keys[Math.floor(Math.random() * keys.length)];
+  game.theme = THEMES[tKey];
+  document.getElementById('hud-theme').innerText = "LOC: " + game.theme.name;
+
+  // Initialize maze
+  game.map = [];
+  for(let y=0; y<MAP_H; y++) {
+    game.map[y] = [];
+    for(let x=0; x<MAP_W; x++) {
+      game.map[y][x] = 1; // Wall
+    }
+  }
+
+  // Recursive Backtracker
+  const stack = [{x: 1, y: 1}];
+  game.map[1][1] = 0;
+  
+  while(stack.length > 0) {
+    const current = stack[stack.length - 1];
+    const dirs = [[0,-2], [0,2], [-2,0], [2,0]].sort(() => Math.random() - 0.5);
+    let carved = false;
+    
+    for(let dir of dirs) {
+      const nx = current.x + dir[0];
+      const ny = current.y + dir[1];
+      if(nx > 0 && nx < MAP_W-1 && ny > 0 && ny < MAP_H-1 && game.map[ny][nx] === 1) {
+        game.map[ny][nx] = 0;
+        game.map[current.y + dir[1]/2][current.x + dir[0]/2] = 0;
+        stack.push({x: nx, y: ny});
+        carved = true;
+        break;
+      }
+    }
+    if(!carved) stack.pop();
+  }
+  
+  // Add braiding (remove dead ends)
+  for(let y=1; y<MAP_H-1; y++){
+    for(let x=1; x<MAP_W-1; x++){
+      if(game.map[y][x] === 0) {
+        let walls = 0;
+        if(game.map[y-1][x]) walls++;
+        if(game.map[y+1][x]) walls++;
+        if(game.map[y][x-1]) walls++;
+        if(game.map[y][x+1]) walls++;
+        if(walls === 3 && Math.random() < 0.5) {
+          // Punch a hole
+          if(game.map[y-1][x]) game.map[y-1][x]=0;
+          else if(game.map[y+1][x]) game.map[y+1][x]=0;
+          else if(game.map[y][x-1]) game.map[y][x-1]=0;
+          else if(game.map[y][x+1]) game.map[y][x+1]=0;
+        }
+      }
+    }
+  }
+
+  // Place Hero
+  game.hero.x = TILE_SIZE * 1.5;
+  game.hero.y = TILE_SIZE * 1.5;
+
+  // Place Enemies
+  game.entities = [];
+  let enemyCount = 3 + game.lvl;
+  while(enemyCount > 0) {
+    const ex = Math.floor(Math.random() * (MAP_W-2)) + 1;
+    const ey = Math.floor(Math.random() * (MAP_H-2)) + 1;
+    if(game.map[ey][ex] === 0 && Math.hypot(ex*TILE_SIZE - game.hero.x, ey*TILE_SIZE - game.hero.y) > 200) {
+      game.entities.push(new Enemy(ex * TILE_SIZE + 16, ey * TILE_SIZE + 16));
+      enemyCount--;
+    }
+  }
+
+  // Place Puzzle Code
+  let placedCode = false;
+  while(!placedCode) {
+    const rx = Math.floor(Math.random() * (MAP_W-2)) + 1;
+    const ry = Math.floor(Math.random() * (MAP_H-2)) + 1;
+    if(game.map[ry][rx] === 0) {
+      game.puzzle.code = Math.floor(100 + Math.random() * 899).toString();
+      game.decals.push({x: rx * TILE_SIZE + 16, y: ry * TILE_SIZE + 16, type: 'code', val: game.puzzle.code});
+      placedCode = true;
+    }
+  }
+
+  // Place Terminal (Exit Trigger)
+  let placedTerm = false;
+  while(!placedTerm) {
+    const tx = Math.floor(Math.random() * (MAP_W-2)) + 1;
+    const ty = Math.floor(Math.random() * (MAP_H-2)) + 1;
+    // ensure it's far from player
+    if(game.map[ty][tx] === 0 && Math.hypot(tx*TILE_SIZE - game.hero.x, ty*TILE_SIZE - game.hero.y) > 300) {
+       game.puzzle.loc = {x: tx*TILE_SIZE + 16, y: ty*TILE_SIZE + 16};
+       placedTerm = true;
+    }
+  }
+  
+  // Place Exit
+  // For now, exit is same as terminal location, unlocks after code.
+  game.puzzle.solved = false;
+}
+
+/* =========================================================================
+   INPUT & INTERACTION
+   ========================================================================= */
+
+window.addEventListener('keydown', e => {
+  game.keys[e.key.toLowerCase()] = true;
+  if(e.code === 'Space') attack();
+  if(e.key.toLowerCase() === 'e') interact();
+});
+window.addEventListener('keyup', e => game.keys[e.key.toLowerCase()] = false);
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  game.mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  game.mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
+});
+
+function interact() {
+  if(!game.running) return;
+  // Check distance to terminal
+  const d = Math.hypot(game.puzzle.loc.x - game.hero.x, game.puzzle.loc.y - game.hero.y);
+  if(d < 40) {
+    if(!game.puzzle.solved) {
+      document.getElementById('terminal-modal').classList.remove('hidden');
+      game.paused = true;
+    } else {
+      nextLevel();
+    }
+  }
+}
+
+function attack() {
+  if(game.paused || game.hero.ammo <= 0) return;
+  
+  // Melee or Shoot logic
+  game.hero.ammo--; // Stamina or ammo
+  updateHUD();
+  
+  // Hitbox in front of player
+  const reach = 60;
+  const ax = game.hero.x + Math.cos(game.hero.angle) * 20;
+  const ay = game.hero.y + Math.sin(game.hero.angle) * 20;
+  
+  // Visual
+  game.particles.push(new Particle(ax, ay, '#fff', 5));
+  
+  // Check collision with enemies
+  game.entities.forEach(e => {
+    if(e.dead) return;
+    const d = Math.hypot(e.x - ax, e.y - ay);
+    if(d < reach) {
+      e.takeDamage(35);
+    }
+  });
+}
+
+document.getElementById('btn-unlock').onclick = () => {
+  const i1 = document.getElementById('code-1').value;
+  const i2 = document.getElementById('code-2').value;
+  const i3 = document.getElementById('code-3').value;
+  const guess = i1+i2+i3;
+  
+  if(guess === game.puzzle.code) {
+    game.puzzle.solved = true;
+    document.getElementById('terminal-modal').classList.add('hidden');
+    game.paused = false;
+    log("ACCESS GRANTED. EXIT UNLOCKED.");
+    document.getElementById('hud-obj').innerText = "OBJ: ESCAPE";
+    document.getElementById('hud-obj').style.color = "#aaddaa";
+  } else {
+    document.getElementById('terminal-modal').classList.add('flicker');
+    setTimeout(()=>document.getElementById('terminal-modal').classList.remove('flicker'), 500);
+    log("ERROR. INVALID CREDENTIALS.");
+  }
+};
+
+document.getElementById('btn-close-term').onclick = () => {
+  document.getElementById('terminal-modal').classList.add('hidden');
+  game.paused = false;
+};
+
+document.getElementById('btn-start').onclick = () => {
+  const role = document.getElementById('role-select').value;
+  game.hero.role = role;
+  if(role === 'soldier') { game.hero.maxHp = 150; game.hero.ammo = 10; }
+  else if(role === 'detective') { game.hero.sanity = 120; game.hero.ammo = 5; }
+  else { game.hero.ammo = 3; }
+  
+  document.getElementById('menu-overlay').style.display = 'none';
+  Audio.init();
+  generateLevel();
+  game.running = true;
+  game.hero.hp = game.hero.maxHp;
+  updateHUD();
+  loop();
+};
+
+/* =========================================================================
+   CORE LOOP
+   ========================================================================= */
+
+function log(msg) {
+  const el = document.getElementById('hud-log');
+  el.innerText = msg;
+  el.style.opacity = 1;
+  setTimeout(() => el.style.opacity = 0.5, 2000);
+}
+
+function nextLevel() {
+  game.lvl++;
+  game.hero.sanity = Math.min(100, game.hero.sanity + 20);
+  log("DESCENDING DEEPER...");
+  generateLevel();
+  document.getElementById('hud-obj').innerText = "OBJ: FIND CODE";
+  document.getElementById('hud-obj').style.color = "var(--warn)";
+}
+
+function updateHUD() {
+  document.getElementById('bar-oxy').style.width = game.hero.oxy + "%";
+  document.getElementById('bar-san').style.width = game.hero.sanity + "%";
+  document.getElementById('hud-hp').innerText = `VIT: ${Math.ceil(game.hero.hp)}%`;
+  
+  let ammoStr = "[";
+  for(let i=0; i<game.hero.ammo; i++) ammoStr += "|";
+  ammoStr += "]";
+  document.getElementById('hud-ammo').innerText = ammoStr;
+}
+
+game.hero.takeDamage = function(amt) {
+  this.hp -= amt;
+  document.getElementById('main').style.backgroundColor = "#200";
+  setTimeout(()=>document.getElementById('main').style.backgroundColor = "#020202", 50);
+  if(this.hp <= 0) {
+    alert("CRITICAL FAILURE. SUBJECT TERMINATED.");
+    location.reload();
+  }
+}
+
+function loop() {
+  requestAnimationFrame(loop);
+  if(!game.running || game.paused) return;
+
+  // --- LOGIC ---
+  const dt = 1; // Simplistic fixed time step
+  game.t++;
+  
+  // Movement
+  let mx = 0, my = 0;
+  if(game.keys['w']) my -= 1;
+  if(game.keys['s']) my += 1;
+  if(game.keys['a']) mx -= 1;
+  if(game.keys['d']) mx += 1;
+  
+  // Sprint (Shift)
+  const speed = game.keys['shift'] ? 4 : 2;
+  if(game.keys['shift']) game.hero.oxy -= 0.1;
+  else if(game.hero.oxy < 100) game.hero.oxy += 0.05;
+  
+  if(mx !== 0 || my !== 0) {
+    const nextX = game.hero.x + mx * speed;
+    const nextY = game.hero.y + my * speed;
+    if(!mapSolid(nextX, game.hero.y)) game.hero.x = nextX;
+    if(!mapSolid(game.hero.x, nextY)) game.hero.y = nextY;
+  }
+  
+  // Rotation (look at mouse) based on camera offset
+  const camX = game.hero.x - canvas.width/2;
+  const camY = game.hero.y - canvas.height/2;
+  const dx = (game.mouse.x + camX) - game.hero.x;
+  const dy = (game.mouse.y + camY) - game.hero.y;
+  game.hero.angle = Math.atan2(dy, dx);
+
+  // Entities
+  game.entities.forEach(e => e.update(dt, game.hero));
+  
+  // Particles
+  game.particles.forEach((p, i) => {
+    p.update();
+    if(p.life <= 0) game.particles.splice(i, 1);
+  });
+
+  // --- RENDER ---
+  ctx.fillStyle = COLORS.void;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  ctx.save();
+  // Camera Follow
+  ctx.translate(-Math.floor(game.hero.x - canvas.width/2), -Math.floor(game.hero.y - canvas.height/2));
+
+  // 1. Draw Map (visible area only for optimization)
+  const startCol = Math.floor((game.hero.x - canvas.width/2) / TILE_SIZE);
+  const endCol = startCol + (canvas.width / TILE_SIZE) + 1;
+  const startRow = Math.floor((game.hero.y - canvas.height/2) / TILE_SIZE);
+  const endRow = startRow + (canvas.height / TILE_SIZE) + 1;
+
+  const wallPat = Assets.createGridPattern(game.theme.wall);
+  const floorPat = Assets.createNoisePattern(game.theme.floor, game.theme.noise);
+
+  for(let y = startRow; y <= endRow; y++) {
+    for(let x = startCol; x <= endCol; x++) {
+      if(y>=0 && y<MAP_H && x>=0 && x<MAP_W) {
+        if(game.map[y][x] === 1) {
+          ctx.fillStyle = wallPat;
+          ctx.fillRect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        } else {
+          ctx.fillStyle = floorPat;
+          ctx.fillRect(x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        }
+      }
+    }
+  }
+
+  // 2. Draw Decals
+  game.decals.forEach(d => {
+    if(d.type === 'blood' || d.type === 'corpse') {
+      ctx.fillStyle = COLORS.blood;
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, 10, 0, Math.PI*2);
+      ctx.fill();
+    } else if(d.type === 'code') {
+      ctx.fillStyle = "#ff0000";
+      ctx.font = "bold 20px VT323";
+      ctx.fillText(d.val, d.x, d.y);
+    }
+  });
+  
+  // 3. Draw Terminal
+  ctx.fillStyle = game.puzzle.solved ? "#55ff55" : "#5555ff";
+  ctx.fillRect(game.puzzle.loc.x - 10, game.puzzle.loc.y - 10, 20, 20);
+  if(!game.puzzle.solved) {
+    ctx.shadowColor = "#5555ff"; ctx.shadowBlur = 10;
+    ctx.fillRect(game.puzzle.loc.x - 5, game.puzzle.loc.y - 5, 10, 10);
+    ctx.shadowBlur = 0;
+  }
+
+  // 4. Draw Entities
+  game.entities.forEach(e => {
+    if(e.dead) return;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    // Draw Enemy Sprite (Procedural)
+    ctx.fillStyle = "#882222";
+    if(e.state === 'CHASE') ctx.fillStyle = "#ff0000";
+    ctx.fillRect(-10, -10, 20, 20);
+    // Eyes
+    ctx.fillStyle = "#ffff00";
+    ctx.fillRect(-5, -5, 4, 4);
+    ctx.fillRect(2, -5, 4, 4);
+    ctx.restore();
+  });
+
+  // 5. Draw Hero
+  ctx.save();
+  ctx.translate(game.hero.x, game.hero.y);
+  ctx.rotate(game.hero.angle);
+  ctx.fillStyle = COLORS.ui;
+  ctx.fillRect(-8, -8, 16, 16);
+  // Flashlight beam
+  ctx.fillStyle = "rgba(255, 255, 200, 0.1)";
+  ctx.beginPath();
+  ctx.moveTo(0,0);
+  ctx.arc(0, 0, 150, -0.3, 0.3);
+  ctx.fill();
+  ctx.restore();
+
+  // 6. Particles
+  game.particles.forEach(p => {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, 3, 3);
+    ctx.globalAlpha = 1;
+  });
+
+  // 7. Fog of War (Darkness)
+  ctx.restore(); // Back to screen space
+  
+  // Create a radial gradient for the vision
+  const grd = ctx.createRadialGradient(
+    canvas.width/2, canvas.height/2, 60,
+    canvas.width/2, canvas.height/2, FOV_RADIUS
+  );
+  grd.addColorStop(0, "rgba(0,0,0,0)");
+  grd.addColorStop(1, "rgba(0,0,0,0.95)");
+  
+  ctx.fillStyle = grd;
+  ctx.fillRect(0,0, canvas.width, canvas.height);
+
+  updateHUD();
+}
 </script>
 </body>
 </html>
