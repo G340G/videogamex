@@ -1,450 +1,383 @@
-import { createState, configureRun, setTheme, personalizeText, setLog, updateBars } from "./state.js";
-import { createInput, bindInput, key, wasPressed, clearFrame } from "./input.js";
-import { generateBraidedMaze, randomFloorCell, themeLore } from "./map.js";
-import { createRenderer, render } from "./render.js";
-import { spawnPlayer, spawnEnemy, spawnPeasant, moveWithCollision, updateEnemies, nearestPeasant } from "./entities.js";
-import { setupCombatByRole, attack } from "./combat.js";
-import { updateEffects, spawnFaceFlash } from "./hallucinations.js";
-import { clamp, dist, pick } from "./utils.js";
+import { makeRng, clamp, dist, pick, randInt } from "./utils.js";
+import { THEMES, generateBraidedMaze, randomFloor } from "./map.js";
+import { makeHero, makeEnemy, makePeasant, tryMoveCircle, heroAttack } from "./entities.js";
+import { render } from "./render.js";
 import { createAudio } from "./audio.js";
 
-/* ========= DOM ========= */
 const canvas = document.getElementById("game");
-const ui = {
-  hudLoc: document.getElementById("hud-loc"),
-  hudObj: document.getElementById("hud-obj"),
-  hudMission: document.getElementById("hud-mission"),
-  barOxy: document.getElementById("bar-oxy"),
-  barSan: document.getElementById("bar-san"),
-  stats: document.getElementById("hud-stats"),
-  log: document.getElementById("hud-log"),
-  ammo: document.getElementById("hud-ammo"),
+const ctx = canvas.getContext("2d", { alpha: false });
 
-  menu: document.getElementById("menu"),
-  nameInput: document.getElementById("nameInput"),
-  roleSelect: document.getElementById("roleSelect"),
-  introLore: document.getElementById("introLore"),
-  btnStart: document.getElementById("btnStart"),
-  btnMute: document.getElementById("btnMute"),
+const uiLoc = document.getElementById("hud-loc");
+const uiObj = document.getElementById("hud-obj");
+const uiMsg = document.getElementById("hud-msg");
+const uiKeys = document.getElementById("hud-keys");
 
-  prompt: document.getElementById("prompt"),
-  promptText: document.getElementById("promptText"),
-  promptA: document.getElementById("promptA"),
-  promptB: document.getElementById("promptB"),
-  promptBar: document.getElementById("promptBar"),
+const barOxy = document.getElementById("bar-oxy");
+const barSan = document.getElementById("bar-san");
 
-  flash: document.getElementById("flash"),
+const menu = document.getElementById("menu");
+const btnStart = document.getElementById("btnStart");
+const nameInput = document.getElementById("nameInput");
+const roleSelect = document.getElementById("roleSelect");
+
+const TILE_PX = 32;
+const MAP_W = 31; // odd
+const MAP_H = 23; // odd
+
+const state = {
+  running: false,
+  t: 0,
+  rng: makeRng((Math.random() * 1e9) | 0),
+  theme: THEMES[0],
+  map: null,
+  tilePx: TILE_PX,
+  baseFov: 7.5, // tiles
+  heroFacing: 0,
+
+  hero: null,
+  enemies: [],
+  npcs: [],
+  keysOnMap: [],
+  portal: null,
+  totalKeys: 0,
+  keysCollected: 0,
+
+  // difficulty
+  difficulty: 1,     // 1..3 randomized
+  enemyCount: 1,
+  msgTimer: 0,
+
+  input: {
+    down: new Set(),
+    justPressed: new Set()
+  },
+
+  audio: null,
 };
 
-const state = createState();
-state.ui = ui;
-
-const input = createInput();
-bindInput(input, canvas);
-
-const R = createRenderer(canvas);
-
-/* ========= AUDIO TOGGLE ========= */
-ui.btnMute.addEventListener("click", ()=>{
-  state.muted = !state.muted;
-  ui.btnMute.textContent = state.muted ? "AUDIO: OFF" : "AUDIO: ON";
-  if (state.audio && state.muted) state.audio.ac.suspend().catch(()=>{});
-  if (state.audio && !state.muted) state.audio.resume().catch(()=>{});
-});
-
-/* ========= START ========= */
-ui.btnStart.addEventListener("click", async ()=>{
-  configureRun(state, { name: ui.nameInput.value, role: ui.roleSelect.value });
-  setTheme(state);
-
-  state.audio = createAudio(state);
-  if(!state.muted) await state.audio.resume();
-
-  ui.menu.classList.add("hidden");
-  startRun();
-});
-
-function startRun(){
-  state.running = true;
-  state.paused = false;
-  state.level = 1;
-  state.escalation = 0;
-  state.keysFound = 0;
-  setupCombatByRole(state);
-  buildLevel();
-  setLog(state, personalizeText(state, "RUN STARTED: {NAME}."));
+function setMsg(s, ttl = 2.2) {
+  uiMsg.textContent = s;
+  state.msgTimer = ttl;
 }
 
-/* ========= PROMPT (peasants + lore choice) ========= */
-function showPrompt(p){
-  if(state.prompt.active) return;
-  state.prompt.active = true;
-  state.prompt.text = personalizeText(state, p.text);
-  state.prompt.a = personalizeText(state, p.a);
-  state.prompt.b = personalizeText(state, p.b);
-  state.prompt.timer = p.time ?? 7.0;
-  state.prompt.onChoose = p.choose;
+function bindInput() {
+  window.addEventListener("keydown", (e) => {
+    if (e.repeat) return;
+    state.input.down.add(e.code);
+    state.input.justPressed.add(e.code);
+  }, { passive: true });
 
-  ui.promptText.textContent = state.prompt.text;
-  ui.promptA.textContent = state.prompt.a;
-  ui.promptB.textContent = state.prompt.b;
-  ui.promptBar.style.width = "100%";
-  ui.prompt.classList.remove("hidden");
+  window.addEventListener("keyup", (e) => {
+    state.input.down.delete(e.code);
+  }, { passive: true });
 
-  setLog(state, "INPUT REQUIRED.");
-  state.audio?.blip?.(0.8);
-}
-
-function choosePrompt(choice){
-  if(!state.prompt.active) return;
-  const fn = state.prompt.onChoose;
-  state.prompt.active = false;
-  ui.prompt.classList.add("hidden");
-  state.audio?.blip?.(0.8);
-  if(fn) fn(choice);
-}
-
-/* ========= PEASANT PROMPTS ========= */
-function peasantPrompt(state, npc){
-  const offer = npc.offer;
-  showPrompt({
-    text: offer.text,
-    a: offer.a,
-    b: offer.b,
-    time: 9.0,
-    choose:(c)=>{
-      if(c===1){
-        offer.apply(state);
-        setLog(state, `PEASANT: ${offer.title}`);
-        state.audio?.blip?.(1.0);
-        npc.used = true;
-        npc.alive = false; // vanishes
-      } else {
-        setLog(state, "YOU REFUSED.");
-        state.escalation += 0.2;
-      }
-    }
+  // keep focus stable
+  window.addEventListener("blur", () => {
+    state.input.down.clear();
+    state.input.justPressed.clear();
   });
 }
+bindInput();
 
-/* ========= LEVEL BUILD ========= */
-function buildLevel(){
-  state.entities.length = 0;
-  state.pickups.length = 0;
-  state.decals.length = 0;
-  state.effects.length = 0;
+// IMPORTANT: clicking inside the name input must NOT start the game
+nameInput.addEventListener("pointerdown", (e) => e.stopPropagation());
+nameInput.addEventListener("mousedown", (e) => e.stopPropagation());
+nameInput.addEventListener("keydown", (e) => e.stopPropagation());
 
-  setTheme(state);
-  generateBraidedMaze(state, 31, 21);
-  spawnPlayer(state);
+// start ONLY via button
+btnStart.addEventListener("click", async () => {
+  const nm = (nameInput.value || "SUBJECT").trim().slice(0, 16);
+  const role = roleSelect.value;
 
-  // reset per level
-  state.keysFound = 0;
+  state.audio = state.audio || createAudio();
+  await state.audio.resume();
 
-  // place KEYS
-  const keyCount = state.keysTotal;
-  for(let i=0;i<keyCount;i++){
-    const c = randomFloorCell(state, {x:1,y:1,d:10+i*2});
-    state.pickups.push({ kind:"key", x:(c.x+0.5)*state.tileSize, y:(c.y+0.5)*state.tileSize, taken:false });
-  }
+  startRun(nm, role);
+});
 
-  // place PORTAL (locked until keys collected)
-  const portalCell = randomFloorCell(state, {x:1,y:1,d:20});
-  state.pickups.push({ kind:"portal", x:(portalCell.x+0.5)*state.tileSize, y:(portalCell.y+0.5)*state.tileSize, taken:false, locked:true });
+function startRun(name, role) {
+  state.running = true;
+  menu.style.display = "none";
 
-  // oxygen tanks (more generous)
-  const tankCount = 4 + state.difficulty.spawnExtra;
-  for(let i=0;i<tankCount;i++){
-    const c = randomFloorCell(state, {x:1,y:1,d:8+i});
-    state.pickups.push({ kind:"oxygen", x:(c.x+0.5)*state.tileSize, y:(c.y+0.5)*state.tileSize, taken:false, val: 16 + (state.r()*12|0) });
-  }
+  state.hero = makeHero(role, name);
 
-  // secret perk sometimes
-  if(state.r() < 0.70){
-    const c = randomFloorCell(state, {x:1,y:1,d:16});
-    state.pickups.push({ kind:"perk", x:(c.x+0.5)*state.tileSize, y:(c.y+0.5)*state.tileSize, taken:false });
-  }
+  // randomized difficulty each run
+  state.difficulty = randInt(state.rng, 1, 3); // 1 easy..3 harder
+  setMsg(`RUN SEED: ???  | DIFFICULTY: ${state.difficulty}`);
 
-  // spawn “psych peasants”
-  const peasantCount = 2 + (state.r()<0.5 ? 1 : 0);
-  for(let i=0;i<peasantCount;i++){
-    const c = randomFloorCell(state, {x:1,y:1,d:12+i*3});
-    spawnPeasant(state, c);
-  }
-
-  // enemies: easier early, still scaling
-  const baseEnemies = Math.max(1, 1 + state.difficulty.spawnExtra + (state.level>1 ? 1 : 0));
-  for(let i=0;i<baseEnemies;i++){
-    const far = randomFloorCell(state, {x:1,y:1,d:18});
-    spawnEnemy(state, "stalker", far);
-  }
-
-  ui.hudLoc.textContent = `LOC: ${state.theme.name}`;
-  ui.hudMission.textContent = `— ${state.theme.perk}`;
-  ui.hudObj.textContent = `OBJ: COLLECT KEYS (${state.keysFound}/${state.keysTotal})`;
-
-  ui.introLore.textContent = personalizeText(state, themeLore(state));
-
-  setLog(state, "FIND THE KEYS. THE PORTAL IS CLOSED.");
-  updateBars(state);
-}
-
-/* ========= PICKUP + PORTAL LOGIC ========= */
-function onKeyCollected(){
-  state.keysFound++;
-  setLog(state, `KEY ACQUIRED (${state.keysFound}/${state.keysTotal}).`);
-  state.audio?.blip?.(0.85);
-
-  // creep boost but mild
-  state.escalation += 0.15;
-  if(state.r()<0.22) spawnFaceFlash(state);
-
-  if(state.keysFound >= state.keysTotal){
-    const portal = state.pickups.find(p=>p.kind==="portal");
-    if(portal) portal.locked = false;
-    ui.hudObj.textContent = "OBJ: ENTER THE PORTAL";
-    setLog(state, "ALL KEYS. PORTAL OPEN.");
-    state.audio?.blip?.(1.0);
-  } else {
-    ui.hudObj.textContent = `OBJ: COLLECT KEYS (${state.keysFound}/${state.keysTotal})`;
-  }
-}
-
-function onPortalEntered(){
-  // level clear
-  state.level++;
-  state.escalation = Math.max(0, state.escalation - 0.6);
-
-  // difficulty ramps slowly
-  state.difficulty.enemyMult += 0.06;
-  state.difficulty.oxygenDrain += 0.04;
-
-  setLog(state, "SEQUENCE COMPLETE. DESCENDING…");
-  state.audio?.blip?.(1.0);
-  buildLevel();
-}
-
-/* ========= FLASH DOM ========= */
-function updateFlashDOM(){
-  const fx = state.effects.find(e=>e.type==="FACE_FLASH");
-  if(!fx){
-    ui.flash.classList.add("hidden");
-    ui.flash.style.opacity = "0";
-    ui.flash.style.background = "";
-    ui.flash.style.transform = "";
-    return;
-  }
-  const a = 1 - (fx.t/fx.dur);
-  const op = clamp(a*0.85, 0, 0.85);
-  const skew = (Math.random()*12-6)|0;
-
-  ui.flash.classList.remove("hidden");
-  ui.flash.style.opacity = String(op);
-  ui.flash.style.transform = `translate(${skew}px, ${(Math.random()*10-5)|0}px) skewX(${(Math.random()*10-5)|0}deg)`;
-  ui.flash.style.background = `
-    radial-gradient(circle at ${40+Math.random()*20}% ${40+Math.random()*20}%,
-      rgba(255,42,42,0.55), rgba(0,0,0,0) 55%),
-    radial-gradient(circle at ${60+Math.random()*20}% ${45+Math.random()*20}%,
-      rgba(255,255,255,0.12), rgba(0,0,0,0) 55%),
-    linear-gradient(${(Math.random()*40-20)|0}deg,
-      rgba(0,0,0,0), rgba(255,42,42,0.18), rgba(0,0,0,0))
-  `;
-}
-
-/* ========= MAIN LOOP ========= */
-let last = performance.now();
-let acc = 0;
-const STEP = 1/60;
-
-function loop(t){
+  generateLevel();
   requestAnimationFrame(loop);
-  const now = t || performance.now();
-  let frame = (now-last)/1000;
-  last = now;
-  frame = Math.min(frame, 0.05);
-  acc += frame;
-
-  if(state.audio && !state.muted) state.audio.tickMusic(state);
-
-  while(acc >= STEP){
-    update(STEP);
-    acc -= STEP;
-  }
-
-  render(state, R);
-  updateFlashDOM();
-  clearFrame(input);
 }
 
-function update(dt){
-  if(!state.running) return;
+function generateLevel() {
+  state.t = 0;
+  state.keysCollected = 0;
 
-  // prompt
-  if(state.prompt.active){
-    state.prompt.timer -= dt;
-    ui.promptBar.style.width = `${clamp((state.prompt.timer/9.0)*100, 0, 100)}%`;
-    if(state.prompt.timer <= 0){
-      state.prompt.active = false;
-      ui.prompt.classList.add("hidden");
-      setLog(state, "NO RESPONSE. IT CHOOSES FOR YOU.");
-      state.escalation += 0.3;
-    }
+  state.theme = pick(state.rng, THEMES);
+  uiLoc.textContent = `LOC: ${state.theme.name}`;
+  uiObj.textContent = `OBJ: COLLECT KEYS`;
+
+  state.map = generateBraidedMaze(state.rng, MAP_W, MAP_H);
+
+  // place hero
+  state.hero.x = 1.5;
+  state.hero.y = 1.5;
+
+  // oxygen lasts at least 60s at normal drain
+  state.hero.oxyMax = 100;
+  state.hero.oxy = 100;
+
+  // keys
+  const keyCount = clamp(3 + state.difficulty + randInt(state.rng, 0, 2), 3, 7);
+  state.totalKeys = keyCount;
+  state.keysOnMap = [];
+
+  for (let i = 0; i < keyCount; i++) {
+    const p = randomFloor(state.rng, state.map, { x: 1, y: 1, d: 12 });
+    state.keysOnMap.push({ x: p.x, y: p.y, taken: false });
   }
 
-  // prompt choices
-  if(state.prompt.active){
-    if(wasPressed(input,"Digit1") || wasPressed(input,"KeyY")) choosePrompt(1);
-    if(wasPressed(input,"Digit2") || wasPressed(input,"KeyN")) choosePrompt(2);
+  // portal far away
+  state.portal = randomFloor(state.rng, state.map, { x: 1, y: 1, d: 18 });
+
+  // enemies: more with difficulty, but not unfair
+  state.enemyCount = clamp(1 + state.difficulty, 1, 4);
+  state.enemies = [];
+  for (let i = 0; i < state.enemyCount; i++) {
+    const p = randomFloor(state.rng, state.map, { x: 1, y: 1, d: 16 });
+    const e = makeEnemy(p.x + 0.5, p.y + 0.5);
+    // tune per difficulty
+    e.speed += 0.25 * (state.difficulty - 1);
+    e.hp += 8 * (state.difficulty - 1);
+    state.enemies.push(e);
   }
 
-  // movement & oxygen
-  const p = state.player;
-  p.cooldown = Math.max(0, p.cooldown - dt);
-  p.dashCd = Math.max(0, p.dashCd - dt);
-  p.invuln = Math.max(0, p.invuln - dt);
+  // psych peasants (helpful weirdness)
+  state.npcs = [];
+  const effects = ["reveal", "poison", "oxy", "calm"];
+  const npcCount = 2 + randInt(state.rng, 0, 2);
+  for (let i = 0; i < npcCount; i++) {
+    const p = randomFloor(state.rng, state.map, { x: 1, y: 1, d: 8 });
+    state.npcs.push(makePeasant(p.x + 0.5, p.y + 0.5, pick(state.rng, effects)));
+  }
 
-  const sprinting = key(input,"ShiftLeft") || key(input,"ShiftRight");
-  p._sprinting = sprinting;
+  // lore injection
+  const lines = [
+    `${state.hero.name}, you wake up in a place that uses your thoughts as building material.`,
+    `They called you ${state.hero.role.toUpperCase()}. They wrote it into the walls.`,
+    `Collect the KEYS. The portal is real. The exit is not.`
+  ];
+  setMsg(lines[(state.rng() * lines.length) | 0], 4.0);
 
-  const drain = (sprinting ? 1.55 : 1.0) * state.difficulty.oxygenDrain * (1 + state.escalation*0.02);
-  p.oxyTimer = Math.max(0, p.oxyTimer - dt*drain);
+  updateHUD();
+}
 
-  // suffocation is slower now
-  if(p.oxyTimer <= 0){
-    p.hp -= dt * (4.2 + state.level*0.3);
-    p.sanity = clamp(p.sanity - dt*2.2, 0, p.sanityMax);
-    if(state.r()<0.02) state.audio?.corrupt?.();
+function updateHUD() {
+  const h = state.hero;
+  barOxy.style.width = `${clamp(h.oxy / h.oxyMax, 0, 1) * 100}%`;
+  barSan.style.width = `${clamp(h.sanity / 120, 0, 1) * 100}%`;
+  uiKeys.textContent = `KEYS: ${state.keysCollected}/${state.totalKeys}`;
+}
+
+function applyPeasantEffect(effect) {
+  const h = state.hero;
+  if (effect === "reveal") {
+    h.reveal = Math.max(h.reveal, 12);
+    setMsg(`A peasant smiles: "I CAN REMOVE THE FOG, ${h.name}."`, 3.2);
+  } else if (effect === "poison") {
+    h.poison = Math.max(h.poison, 10);
+    setMsg(`He offers poison: "DRINK. SEE THE MAZE'S TRUE COLORS."`, 3.2);
+  } else if (effect === "oxy") {
+    h.oxy = clamp(h.oxy + 45, 0, h.oxyMax);
+    setMsg(`OXYGEN TANK FOUND. Breathe slower.`, 2.8);
   } else {
-    // recover tiny sanity when breathing is OK
-    p.sanity = clamp(p.sanity + dt*0.6, 0, p.sanityMax);
+    h.sanity = clamp(h.sanity + 22, 0, 120);
+    setMsg(`He whispers: "CALM IS A KNIFE. HOLD IT."`, 2.8);
+  }
+  state.audio?.blip?.(0.8);
+  updateHUD();
+}
+
+function update(dt) {
+  const h = state.hero;
+
+  // message timer fade
+  if (state.msgTimer > 0) {
+    state.msgTimer -= dt;
+    if (state.msgTimer <= 0) uiMsg.textContent = "...";
   }
 
-  // smoother movement
-  let mx=0,my=0;
-  if(key(input,"KeyW")||key(input,"ArrowUp")) my -= 1;
-  if(key(input,"KeyS")||key(input,"ArrowDown")) my += 1;
-  if(key(input,"KeyA")||key(input,"ArrowLeft")) mx -= 1;
-  if(key(input,"KeyD")||key(input,"ArrowRight")) mx += 1;
+  // timers
+  h.attackCd = Math.max(0, h.attackCd - dt);
+  h.reveal = Math.max(0, h.reveal - dt);
+  h.poison = Math.max(0, h.poison - dt);
+  h.grief  = Math.max(0, h.grief - dt);
 
-  const mag = Math.hypot(mx,my) || 1;
-  mx/=mag; my/=mag;
+  // oxygen drain: >= 60s baseline
+  // baseline drain 100 / 60 per sec = 1.666.. per sec
+  const sprint = state.input.down.has("ShiftLeft") || state.input.down.has("ShiftRight");
+  const drain = sprint ? 2.6 : 1.65; // still survivable; sprint costs extra
+  h.oxy = Math.max(0, h.oxy - drain * dt);
 
-  const base = p.speed * (sprinting ? p.sprint : 1);
-  const accel = 18;
-  const friction = 11;
-
-  // facing from mouse
-  const camX = p.x - canvas.width/2;
-  const camY = p.y - canvas.height/2;
-  const fx = (input.mouseX + camX) - p.x;
-  const fy = (input.mouseY + camY) - p.y;
-  p.facing = Math.atan2(fy, fx);
-
-  const dvx = mx*base;
-  const dvy = my*base;
-
-  p.vx += (dvx - p.vx) * clamp(accel*dt, 0, 1);
-  p.vy += (dvy - p.vy) * clamp(accel*dt, 0, 1);
-
-  if(mx===0 && my===0){
-    p.vx *= Math.max(0, 1 - friction*dt);
-    p.vy *= Math.max(0, 1 - friction*dt);
+  if (h.oxy <= 0) {
+    // suffocation affects sanity + speed, but not instant death
+    h.sanity = Math.max(0, h.sanity - 10 * dt);
+  } else {
+    // slow sanity recovery in safe moments
+    h.sanity = Math.min(120, h.sanity + 2.2 * dt);
   }
 
-  // thief dash
-  if(state.role==="thief" && wasPressed(input,"Space") && sprinting && p.dashCd<=0){
-    p.dashCd = 1.2;
-    p.invuln = 0.18;
-    const k = 520;
-    p.vx += Math.cos(p.facing)*k;
-    p.vy += Math.sin(p.facing)*k;
-    setLog(state, "DASH.");
-    state.audio?.blip?.(0.55);
+  // movement (smooth)
+  let mx = 0, my = 0;
+  if (state.input.down.has("KeyW") || state.input.down.has("ArrowUp")) my -= 1;
+  if (state.input.down.has("KeyS") || state.input.down.has("ArrowDown")) my += 1;
+  if (state.input.down.has("KeyA") || state.input.down.has("ArrowLeft")) mx -= 1;
+  if (state.input.down.has("KeyD") || state.input.down.has("ArrowRight")) mx += 1;
+
+  // normalize
+  const mLen = Math.hypot(mx, my) || 1;
+  mx /= mLen; my /= mLen;
+
+  let spd = h.speed;
+  if (sprint) spd *= 1.25;
+  if (h.oxy <= 0) spd *= 0.78;
+
+  const dx = mx * spd * dt;
+  const dy = my * spd * dt;
+  tryMoveCircle(state.map, h, dx, dy);
+
+  // facing (based on movement, fallback keep last)
+  if (Math.abs(mx) + Math.abs(my) > 0.01) {
+    state.heroFacing = Math.atan2(my, mx);
   }
 
-  moveWithCollision(state, p, dt);
-
-  // interact and attack
-  if(wasPressed(input,"KeyE")){
-    const {npc, d} = nearestPeasant(state);
-    if(npc && d < 56 && !state.prompt.active){
-      peasantPrompt(state, npc);
-    } else {
-      setLog(state, "NO RESPONSE.");
-      state.audio?.blip?.(0.25);
+  // attack
+  if (state.input.justPressed.has("Space")) {
+    const hit = heroAttack(state);
+    if (hit) {
+      setMsg(`${h.name} strikes. The air remembers.`, 1.8);
+      state.audio?.blip?.(0.6);
     }
   }
-  if(wasPressed(input,"Space")) attack(state);
 
-  // pickups
-  for(const it of state.pickups){
-    if(it.taken) continue;
-
-    const d = dist(p.x,p.y,it.x,it.y);
-    if(d < 20){
-      if(it.kind==="key"){
-        it.taken = true;
-        onKeyCollected();
-      }
-      if(it.kind==="oxygen"){
-        it.taken = true;
-        const gain = it.val ?? 20;
-        p.oxyTimer = Math.min(p.oxyTimerMax, p.oxyTimer + gain);
-        setLog(state, `OXYGEN +${gain|0}s`);
-        state.audio?.blip?.(0.6);
-      }
-      if(it.kind==="perk"){
-        it.taken = true;
-        state.secretsFound++;
-        state.difficulty.oxygenDrain = Math.max(0.85, state.difficulty.oxygenDrain - 0.08);
-        state.escalation = Math.max(0, state.escalation - 0.7);
-        p.sanity = clamp(p.sanity + 12, 0, p.sanityMax);
-        setLog(state, "HIDDEN PERK: QUIETER BREATH.");
-        state.audio?.blip?.(0.9);
-      }
-      if(it.kind==="portal"){
-        if(it.locked){
-          setLog(state, "PORTAL LOCKED. KEYS REQUIRED.");
-          state.audio?.blip?.(0.25);
-        } else {
-          onPortalEntered();
-          return;
-        }
+  // interact with peasants (E)
+  if (state.input.justPressed.has("KeyE")) {
+    for (const n of state.npcs) {
+      if (n.used) continue;
+      if (dist(n.x, n.y, h.x, h.y) < 1.0) {
+        n.used = true;
+        applyPeasantEffect(n.effect);
+        break;
       }
     }
   }
 
-  // if peasant “GRIEF” asked for bonus key spawn
-  if(state._spawnBonusKey){
-    state._spawnBonusKey = false;
-    const c = randomFloorCell(state, {x:1,y:1,d:14});
-    state.pickups.push({ kind:"key", x:(c.x+0.5)*state.tileSize, y:(c.y+0.5)*state.tileSize, taken:false });
-    state.keysTotal += 1; // but keep goal consistent: keysTotal increases too
-    ui.hudObj.textContent = `OBJ: COLLECT KEYS (${state.keysFound}/${state.keysTotal})`;
-    setLog(state, "A NEW KEY APPEARS.");
+  // pick keys
+  for (const k of state.keysOnMap) {
+    if (k.taken) continue;
+    if (dist(k.x + 0.5, k.y + 0.5, h.x, h.y) < 0.75) {
+      k.taken = true;
+      state.keysCollected++;
+      setMsg(`KEY ACQUIRED (${state.keysCollected}/${state.totalKeys}).`, 2.0);
+      state.audio?.blip?.(0.9);
+      updateHUD();
+
+      if (state.keysCollected >= state.totalKeys) {
+        uiObj.textContent = `OBJ: ENTER PORTAL`;
+        setMsg(`The portal recognizes your name: ${h.name}.`, 3.2);
+      }
+    }
   }
 
-  updateEnemies(state, dt);
-  updateEffects(state, dt);
+  // enemies chase but not “hard block”
+  // since maze is braided (loops), you can always route around
+  let nearestEnemyDist = 99;
 
-  // fear
-  let nearest = 9999;
-  for(const e of state.entities){
-    if(!e.alive || e.kind==="peasant") continue;
-    nearest = Math.min(nearest, dist(p.x,p.y,e.x,e.y));
+  for (const e of state.enemies) {
+    if (!e.alive) continue;
+
+    e.stun = Math.max(0, e.stun - dt);
+    e.hitCd = Math.max(0, e.hitCd - dt);
+
+    const d = dist(e.x, e.y, h.x, h.y);
+    nearestEnemyDist = Math.min(nearestEnemyDist, d);
+
+    // if far, drift slightly (not perfect homing)
+    const hear = sprint ? 7.0 : 5.0;
+    if (e.stun > 0) continue;
+
+    if (d < hear) {
+      const vx = (h.x - e.x) / Math.max(0.001, d);
+      const vy = (h.y - e.y) / Math.max(0.001, d);
+
+      // “avoid hard blocking”: if too close, enemy slows and jitters sideways
+      let s = e.speed;
+      if (d < 1.2) s *= 0.55;
+
+      // slight lateral wobble
+      const wob = (Math.sin(state.t * 0.02 + e.x * 2.1) * 0.22);
+      const lx = -vy * wob;
+      const ly = vx * wob;
+
+      tryMoveCircle(state.map, e, (vx + lx) * s * dt, (vy + ly) * s * dt);
+    }
+
+    // damage hero if touching
+    if (d < 0.65 && e.hitCd <= 0) {
+      e.hitCd = 0.55;
+      h.hp = Math.max(0, h.hp - e.dmg);
+      h.grief = Math.max(h.grief, 8);
+
+      setMsg(`IT TOUCHES YOU, ${h.name}.`, 2.2);
+      state.audio?.blip?.(1.0);
+    }
   }
-  const fear = clamp(1 - nearest/260, 0, 1);
+
+  // fear-driven audio
+  const fear = clamp(1 - nearestEnemyDist / 7, 0, 1);
   state.audio?.setFear?.(fear);
 
-  // death
-  if(p.hp <= 0){
-    state.running = false;
-    alert("CRITICAL FAILURE. SUBJECT TERMINATED.");
-    location.reload();
+  // win: portal after keys
+  if (state.portal && state.keysCollected >= state.totalKeys) {
+    if (dist(state.portal.x + 0.5, state.portal.y + 0.5, h.x, h.y) < 0.9) {
+      win();
+    }
   }
 
-  updateBars(state);
+  // lose (not instant oxygen death; only if HP gone)
+  if (h.hp <= 0) {
+    lose();
+  }
+
+  updateHUD();
 }
 
-/* boot */
-requestAnimationFrame(loop);
+function win() {
+  state.running = false;
+  setMsg(`SEQUENCE COMPLETE. ${state.hero.name} IS UPLOADED.`, 6);
+  alert(`YOU ESCAPED.\n\nNAME: ${state.hero.name}\nROLE: ${state.hero.role.toUpperCase()}\nDIFFICULTY: ${state.difficulty}`);
+  location.reload();
+}
+
+function lose() {
+  state.running = false;
+  alert(`SUBJECT LOST.\n\nTHE MAZE KEEPS YOUR NAME.`);
+  location.reload();
+}
+
+let last = performance.now();
+function loop(now) {
+  if (!state.running) return;
+
+  const dt = Math.min(0.033, (now - last) / 1000);
+  last = now;
+
+  state.t++;
+  update(dt);
+  render(ctx, state);
+
+  // clear justPressed each frame
+  state.input.justPressed.clear();
+  requestAnimationFrame(loop);
+}
+
