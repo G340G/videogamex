@@ -1,138 +1,66 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
   <title>ENTROPY.DAT // KEYS</title>
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
-  <link rel="icon" href="data:,">
-  <style>
-    :root{
-      --bg:#050505;
-      --crt:#aaddaa;
-      --danger:#ff2a2a;
-      --warn:#ffcc00;
-      --dim:rgba(170,221,170,.28);
-    }
-    html,body{height:100%;margin:0;background:#020202;overflow:hidden;font-family:'VT323',monospace;color:var(--crt);user-select:none;-webkit-user-select:none;}
-    #main{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
-    #frame{position:relative;width:900px;max-width:100vw;height:650px;max-height:100vh;background:#000;border:2px solid #333;box-shadow:0 0 50px rgba(0,0,0,.85);overflow:hidden;}
-    canvas{display:block;width:100%;height:100%;image-rendering:pixelated;}
-
-    .scanlines{position:absolute;inset:0;pointer-events:none;z-index:50;
-      background:linear-gradient(to bottom,rgba(255,255,255,0),rgba(255,255,255,0) 50%,rgba(0,0,0,.28) 50%,rgba(0,0,0,.28));
-      background-size:100% 4px;mix-blend-mode:overlay;opacity:.85;}
-    .vignette{position:absolute;inset:0;pointer-events:none;z-index:51;background:radial-gradient(circle,rgba(0,0,0,0) 48%,rgba(0,0,0,.85) 100%);}
-
-    #ui{position:absolute;inset:0;pointer-events:none;z-index:60;display:flex;flex-direction:column;justify-content:space-between;padding:16px;}
-    .row{display:flex;justify-content:space-between;gap:10px;}
-    .box{background:rgba(0,0,0,.68);border:1px solid var(--dim);padding:8px 10px;font-size:1.1rem;text-shadow:0 0 6px rgba(170,221,170,.25);max-width:46%;}
-    .bar{width:160px;height:8px;background:#222;border:1px solid #444;margin-top:4px;}
-    .fill{height:100%;background:var(--crt);width:100%;}
-    .fill.red{background:var(--danger);box-shadow:0 0 8px var(--danger);}
-    #hud-obj{color:var(--warn)}
-    #hud-log{opacity:.9}
-    #hud-stats{opacity:.9}
-
-    #menu{position:absolute;inset:0;z-index:200;background:rgba(0,0,0,.88);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;pointer-events:auto;}
-    .panel{border:2px solid var(--crt);background:#0d0d0d;padding:20px 18px;width:460px;max-width:92vw;text-align:center;box-shadow:0 0 22px rgba(170,221,170,.18);}
-    h1{font-size:3.2rem;margin:0 0 8px;letter-spacing:4px;}
-    p{margin:8px 0;color:#cfd8cf;opacity:.9;font-size:1.25rem}
-    label{display:block;margin-top:10px;opacity:.9}
-    input,select{font-family:'VT323';font-size:1.2rem;background:#000;color:var(--crt);border:1px solid #444;padding:8px;width:80%;max-width:360px}
-    button{font-family:'VT323';font-size:1.45rem;background:transparent;color:var(--crt);border:1px solid var(--crt);padding:10px 14px;cursor:pointer;margin:8px 6px;transition:.18s;}
-    button:hover{background:var(--crt);color:#000}
-    .small{font-size:1.05rem;opacity:.72}
-    .hidden{display:none!important;}
-
-    /* prompt */
-    #prompt{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:170;pointer-events:none;}
-    #prompt .pbox{pointer-events:none;background:rgba(0,0,0,.78);border:1px solid var(--dim);padding:10px 12px;min-width:560px;max-width:92vw;}
-    #prompt .line{font-size:1.25rem;margin:2px 0;color:#e9f3e9}
-    #prompt .choice{color:#b8c7b8}
-    #promptBar{height:2px;background:var(--danger);width:100%;opacity:.9;margin-top:6px;}
-
-    /* face / hallucination overlay */
-    #flash{position:absolute;inset:0;z-index:120;pointer-events:none;mix-blend-mode:screen;opacity:0;transition:opacity .02s;}
-  </style>
+  <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-<div id="main">
-  <div id="frame">
-    <div class="scanlines"></div>
-    <div class="vignette"></div>
-    <canvas id="game" width="640" height="480"></canvas>
+  <div id="main">
+    <div id="crt-frame">
+      <canvas id="game" width="640" height="480"></canvas>
 
-    <div id="flash" class="hidden"></div>
+      <div class="scanlines"></div>
+      <div class="vignette"></div>
 
-    <div id="ui">
-      <div class="row">
-        <div class="box">
-          <div id="hud-loc">LOC: …</div>
-          <div id="hud-obj">OBJ: …</div>
-          <div id="hud-mission" class="small">—</div>
+      <div id="ui">
+        <div class="hud left">
+          <div id="hud-loc">LOC: --</div>
+          <div id="hud-obj">OBJ: --</div>
+          <div id="hud-msg">...</div>
         </div>
-        <div class="box">
+
+        <div class="hud right">
           <div>OXYGEN</div>
           <div class="bar"><div id="bar-oxy" class="fill"></div></div>
-          <div style="margin-top:6px">SANITY</div>
+
+          <div style="margin-top:8px;">SANITY</div>
           <div class="bar"><div id="bar-san" class="fill red"></div></div>
+
+          <div style="margin-top:8px;" id="hud-keys">KEYS: 0/0</div>
         </div>
       </div>
 
-      <div class="row">
-        <div class="box">
-          <div id="hud-log">SYSTEM READY…</div>
-        </div>
-        <div class="box" style="text-align:right">
-          <div id="hud-ammo">AMMO: —</div>
-          <div id="hud-stats">VIT: —</div>
-        </div>
-      </div>
-    </div>
+      <div id="menu">
+        <div class="panel">
+          <h1>ENTROPY.DAT</h1>
+          <p class="sub">The facility rearranges itself around your name.</p>
 
-    <div id="prompt" class="hidden">
-      <div class="pbox">
-        <div id="promptText" class="line"></div>
-        <div id="promptA" class="line choice"></div>
-        <div id="promptB" class="line choice"></div>
-        <div id="promptBar"></div>
-      </div>
-    </div>
+          <label class="lbl">PROTAGONIST NAME</label>
+          <input id="nameInput" type="text" maxlength="16" placeholder="type..." autocomplete="off" />
 
-    <div id="menu">
-      <div class="panel">
-        <h1>ENTROPY.DAT</h1>
-        <p id="introLore">Type your name. Choose a role. Initialize.</p>
+          <label class="lbl" style="margin-top:14px;">ROLE</label>
+          <select id="roleSelect">
+            <option value="thief">THIEF (fast, stealth pulse)</option>
+            <option value="killer">KILLER (balanced, brutal strike)</option>
+            <option value="butcher">BUTCHER (slow, heavy cleave)</option>
+          </select>
 
-        <label>PROTAGONIST NAME</label>
-        <input id="nameInput" maxlength="16" placeholder="e.g. MARA" />
+          <div class="row">
+            <button id="btnStart">INITIALIZE</button>
+          </div>
 
-        <label style="margin-top:12px;">ROLE</label>
-        <select id="roleSelect">
-          <option value="thief">THIEF (Dash + escape)</option>
-          <option value="killer">KILLER (Fast strikes)</option>
-          <option value="butcher">BUTCHER (Heavy cleave)</option>
-        </select>
-
-        <div style="margin-top:10px" class="small">
-          Controls: WASD / Arrows · Shift sprint · Space attack · E interact
-        </div>
-
-        <div style="margin-top:10px">
-          <button id="btnStart">INITIALIZE RUN</button>
-          <button id="btnMute">AUDIO: ON</button>
-        </div>
-
-        <div class="small" style="margin-top:6px;opacity:.7">
-          Collect all keys → portal opens. Beware the “peasants”.
+          <p class="tiny">
+            WASD / Arrows move · Shift sprint · Space attack · E interact<br/>
+            Collect all keys → enter portal.
+          </p>
         </div>
       </div>
     </div>
-
   </div>
-</div>
 
-<script type="module" src="./js/main.js"></script>
+  <script type="module" src="./js/main.js"></script>
 </body>
 </html>
